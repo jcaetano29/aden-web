@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
-import { MessageType } from "@aden/shared";
+import { MessageType, MAP_BOUNDS } from "@aden/shared";
 import appConfig from "../testServer.js";
 
 describe("GameRoom", () => {
@@ -29,12 +29,17 @@ describe("GameRoom", () => {
     await room.waitForNextPatch();
 
     client.send(MessageType.MoveTo, { x: 100, z: 0 });
+    // targetX se fija sincronicamente en el handler de moveTo, antes de cualquier tick
+    await room.waitForNextPatch();
+    const target = room.state.players.get(client.sessionId)!;
+    expect(target.targetX).toBe(MAP_BOUNDS.maxX); // recortado a MAP_BOUNDS por clampToBounds
+
     // avanzar ~0.5s de simulacion
     await room.waitForNextSimulationTick();
     await room.waitForNextSimulationTick();
 
     const p = room.state.players.get(client.sessionId)!;
     expect(p.x).toBeGreaterThan(0);
-    expect(p.x).toBeLessThanOrEqual(50); // recortado a MAP_BOUNDS
+    expect(p.x).toBeLessThanOrEqual(MAP_BOUNDS.maxX); // nunca supera el bound clampeado
   });
 });
