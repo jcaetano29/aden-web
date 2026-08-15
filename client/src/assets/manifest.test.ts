@@ -26,4 +26,8 @@ describe("pickModelForSession", () => {
     );
     expect(seen.size).toBeGreaterThan(1);
   });
+
+  it("lanza error si la lista de modelos está vacía", () => {
+    expect(() => pickModelForSession("abc", [])).toThrow();
+  });
 });
