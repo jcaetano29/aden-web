@@ -1,5 +1,7 @@
 import { createServer } from "http";
-import { Server } from "colyseus";
+// Ver nota en rooms/GameRoom.ts: default import por interop CJS/ESM del paquete "colyseus".
+import colyseusPkg from "colyseus";
+const { Server } = colyseusPkg;
 import { WebSocketTransport } from "@colyseus/ws-transport";
 import { GameRoom } from "./rooms/GameRoom.js";
 

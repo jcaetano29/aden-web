@@ -1,4 +1,14 @@
-import { Room, Client } from "colyseus";
+// NOTA: import por default + destructuring en lugar de `import { Room, Client }`.
+// El paquete "colyseus" (CJS, bundle de esbuild) sólo anota estáticamente
+// RedisDriver/RedisPresence como named exports en su "0 && (module.exports = {...})";
+// el resto (Room, Client, Server, ...) llega vía re-export dinámico (__reExport) que
+// Node's cjs-module-lexer no detecta al hacer `import { Room } from "colyseus"` bajo ESM
+// nativo (tsx/node), lanzando "does not provide an export named 'Room'". El default import
+// sí funciona porque Node no necesita enumerar named exports para acceder a él.
+// Client es sólo un tipo (no existe en runtime), por eso se importa aparte con `import type`.
+import colyseusPkg from "colyseus";
+import type { Client } from "colyseus";
+const { Room } = colyseusPkg;
 import {
   MessageType,
   type MoveToMessage,
