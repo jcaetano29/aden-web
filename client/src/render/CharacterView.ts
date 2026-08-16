@@ -6,10 +6,11 @@ import { smoothTowards, headingFromDelta, smoothAngle } from "./motion.js";
 const SMOOTH_K = 12; // rapidez de convergencia de la interpolación
 const TURN_K = 12;
 
-// R-E1-1: los modelos KayKit miran hacia -Z en su pose de reposo; headingFromDelta
-// asume "adelante" = +Z, así que sumamos PI para que el frente visual del modelo
-// coincida con la dirección de movimiento. Calibrado durante el smoke test.
-const YAW_OFFSET = Math.PI;
+// R-E1-1: el frente del modelo KayKit vs la convención de headingFromDelta (atan2(dx,dz),
+// "adelante" = +Z). Ajuste de yaw calibrado VISUALMENTE con el usuario:
+//   0 = el modelo mira a +Z (sin corrección)   |  Math.PI = mira a -Z (de espaldas)
+//   Math.PI/2 o -Math.PI/2 = mira de costado
+const YAW_OFFSET = 0;
 
 export interface ServerState {
   x: number;
