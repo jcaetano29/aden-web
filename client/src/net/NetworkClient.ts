@@ -25,6 +25,15 @@ export interface MobSnapshot extends PlayerSnapshot {
   dead: boolean;
 }
 
+/** Campos de combate del jugador local, leídos directamente del estado sincronizado (HUD). */
+export interface SelfCombatSnapshot {
+  hp: number;
+  maxHp: number;
+  mp: number;
+  maxMp: number;
+  dead: boolean;
+}
+
 export interface RoomCallbacks {
   onAdd: (id: string, isSelf: boolean, snap: PlayerSnapshot) => void;
   onChange: (id: string, snap: PlayerSnapshot) => void;
@@ -92,5 +101,17 @@ export class NetworkClient {
 
   get sessionId(): string {
     return this.room.sessionId;
+  }
+
+  /**
+   * Snapshot de combate del jugador local (HP/MP/dead), leído en vivo del
+   * estado sincronizado (`state.players.get(sessionId)`). Sólo lectura — el
+   * HUD lo usa cada frame; nunca muta el estado (server autoritativo). Null
+   * si el propio jugador todavía no llegó al estado (frame de conexión).
+   */
+  getSelf(): SelfCombatSnapshot | null {
+    const p: any = this.room.state.players.get(this.room.sessionId);
+    if (!p) return null;
+    return { hp: p.hp, maxHp: p.maxHp, mp: p.mp, maxMp: p.maxMp, dead: p.dead };
   }
 }

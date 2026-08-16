@@ -4,6 +4,7 @@ import { EntityViews } from "./render/EntityViews.js";
 import { CharacterFactory } from "./render/CharacterFactory.js";
 import { Nameplates } from "./render/Nameplates.js";
 import { DamageNumbers } from "./render/DamageNumbers.js";
+import { Hud } from "./render/Hud.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, pickModelForSession, modelForTemplate } from "./assets/manifest.js";
@@ -18,6 +19,7 @@ async function main() {
   const nameplates = new Nameplates();
   const views = new EntityViews(renderer.scene, factory, nameplates);
   const damageNumbers = new DamageNumbers(renderer.scene);
+  const hud = new Hud();
   const net = new NetworkClient();
 
   // Objetivo actualmente seleccionado por este cliente (no autoritativo: sólo
@@ -76,6 +78,10 @@ async function main() {
     damageNumbers.update(dt);
     const self = views.selfPosition();
     if (self) renderer.followTarget(self.x, self.z);
+    const selfCombat = net.getSelf();
+    if (selfCombat) {
+      hud.update(selfCombat.hp, selfCombat.maxHp, selfCombat.mp, selfCombat.maxMp, selfCombat.dead);
+    }
     renderer.render();
     renderer.css2d.render(renderer.scene, renderer.camera);
     requestAnimationFrame(loop);
