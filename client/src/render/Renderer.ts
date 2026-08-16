@@ -56,6 +56,28 @@ export class Renderer {
     return hit ? hit.point : null;
   }
 
+  /**
+   * Raycast contra los mobs bajo el click en NDC; devuelve el mobId del hit más
+   * cercano, o null. R-E2b1-5: los mobs son SkinnedMesh dentro del root Object3D,
+   * por lo que el raycast contra los roots DEBE ser recursivo (recursive=true) —
+   * un intersectObjects no-recursivo no golpea la geometría skinned. Se resuelve
+   * el objeto golpeado (hijo) hacia su mob root/id vía `idOf`, subiendo por
+   * `.parent` hasta encontrar un id.
+   */
+  pickMobs(
+    ndcX: number,
+    ndcY: number,
+    targets: { objects: THREE.Object3D[]; idOf: (o: THREE.Object3D) => string | null },
+  ): string | null {
+    this.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.camera);
+    const hits = this.raycaster.intersectObjects(targets.objects, true);
+    for (const hit of hits) {
+      const id = targets.idOf(hit.object);
+      if (id) return id;
+    }
+    return null;
+  }
+
   render() {
     this.renderer.render(this.scene, this.camera);
   }

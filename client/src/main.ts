@@ -18,6 +18,10 @@ async function main() {
   const views = new EntityViews(renderer.scene, factory, nameplates);
   const net = new NetworkClient();
 
+  // Objetivo actualmente seleccionado por este cliente (no autoritativo: sólo
+  // se usa para saber cuándo limpiar el resaltado visual).
+  let currentTargetId: string | null = null;
+
   let name: string;
   try {
     name = prompt("Nombre de tu personaje:") ?? "Adventurer";
@@ -33,10 +37,28 @@ async function main() {
     onRemove: (id) => views.remove(id),
     onMobAdd: (id, templateId, snap) => views.addMob(id, modelForTemplate(templateId), snap),
     onMobChange: (id, snap) => views.updateMob(id, snap),
-    onMobRemove: (id) => views.removeMob(id),
+    onMobRemove: (id) => {
+      views.removeMob(id);
+      if (id === currentTargetId) currentTargetId = null;
+    },
+    onDeath: (entityId) => {
+      if (entityId === currentTargetId) {
+        currentTargetId = null;
+        views.setTargetHighlight(null);
+      }
+    },
   });
 
-  const input = new InputController(renderer, (msg) => net.sendMove(msg));
+  const input = new InputController(
+    renderer,
+    views,
+    (msg) => net.sendMove(msg),
+    (id) => {
+      currentTargetId = id;
+      net.sendSetTarget(id);
+      views.setTargetHighlight(id);
+    },
+  );
   input.attach(document.body);
 
   const clock = new THREE.Clock();

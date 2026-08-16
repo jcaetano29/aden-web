@@ -26,6 +26,7 @@ export class CharacterView {
   private lastMoving: boolean | null = null;
   private readonly idleClip: string | null;
   private readonly walkClip: string | null;
+  private targetRing: THREE.Mesh | null = null;
 
   constructor(private readonly character: Character) {
     this.idleClip = selectClip(character.clipNames, "idle");
@@ -85,7 +86,30 @@ export class CharacterView {
     this.character.root.add(ring);
   }
 
+  /** Adjunta un anillo rojo bajo los pies como indicador de "objetivo seleccionado". */
+  addTargetRing() {
+    if (this.targetRing) return;
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.7, 0.95, 24),
+      new THREE.MeshBasicMaterial({ color: 0xff3b3b, side: THREE.DoubleSide }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.03;
+    this.targetRing = ring;
+    this.character.root.add(ring);
+  }
+
+  /** Quita el anillo de objetivo, si estaba presente. */
+  removeTargetRing() {
+    if (!this.targetRing) return;
+    this.character.root.remove(this.targetRing);
+    this.targetRing.geometry.dispose();
+    (this.targetRing.material as THREE.Material).dispose();
+    this.targetRing = null;
+  }
+
   dispose() {
+    this.removeTargetRing();
     this.character.mixer.stopAllAction();
   }
 }

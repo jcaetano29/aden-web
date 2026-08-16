@@ -1,5 +1,5 @@
 import { Client, Room } from "colyseus.js";
-import { MessageType, type MoveToMessage } from "@aden/shared";
+import { MessageType, type MoveToMessage, type SetTargetMessage, type DeathEvent } from "@aden/shared";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
 
@@ -12,13 +12,21 @@ export interface PlayerSnapshot {
   moving: boolean;
 }
 
+/** Snapshot de mob: incluye combate (hp/maxHp/dead) para highlight/HUD. */
+export interface MobSnapshot extends PlayerSnapshot {
+  hp: number;
+  maxHp: number;
+  dead: boolean;
+}
+
 export interface RoomCallbacks {
   onAdd: (id: string, isSelf: boolean, snap: PlayerSnapshot) => void;
   onChange: (id: string, snap: PlayerSnapshot) => void;
   onRemove: (id: string) => void;
-  onMobAdd: (id: string, templateId: string, snap: PlayerSnapshot) => void;
-  onMobChange: (id: string, snap: PlayerSnapshot) => void;
+  onMobAdd: (id: string, templateId: string, snap: MobSnapshot) => void;
+  onMobChange: (id: string, snap: MobSnapshot) => void;
   onMobRemove: (id: string) => void;
+  onDeath: (entityId: string) => void;
 }
 
 export class NetworkClient {
@@ -44,13 +52,16 @@ export class NetworkClient {
     });
     this.room.state.players.onRemove((_player: any, id: string) => cb.onRemove(id));
 
-    const snapMob = (m: any): PlayerSnapshot => ({
+    const snapMob = (m: any): MobSnapshot => ({
       name: "",
       x: m.x,
       z: m.z,
       targetX: m.targetX,
       targetZ: m.targetZ,
       moving: m.moving,
+      hp: m.hp,
+      maxHp: m.maxHp,
+      dead: m.dead,
     });
 
     this.room.state.mobs.onAdd((mob: any, id: string) => {
@@ -58,10 +69,17 @@ export class NetworkClient {
       mob.onChange(() => cb.onMobChange(id, snapMob(mob)));
     });
     this.room.state.mobs.onRemove((_m: any, id: string) => cb.onMobRemove(id));
+
+    this.room.onMessage(MessageType.Death, (data: DeathEvent) => cb.onDeath(data.entityId));
   }
 
   sendMove(msg: MoveToMessage) {
     this.room.send(MessageType.MoveTo, msg);
+  }
+
+  sendSetTarget(targetId: string) {
+    const msg: SetTargetMessage = { targetId };
+    this.room.send(MessageType.SetTarget, msg);
   }
 
   get sessionId(): string {

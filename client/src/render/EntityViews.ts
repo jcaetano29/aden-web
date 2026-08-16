@@ -8,6 +8,9 @@ import type { PlayerSnapshot } from "../net/NetworkClient.js";
 export class EntityViews {
   private readonly views = new Map<string, CharacterView>();
   private readonly mobViews = new Map<string, CharacterView>();
+  /** root Object3D del mob -> mobId, para resolver hits de raycast (R-E2b1-5). */
+  private readonly mobRootToId = new Map<THREE.Object3D, string>();
+  private currentTargetId: string | null = null;
   private selfId: string | null = null;
 
   constructor(
@@ -49,6 +52,7 @@ export class EntityViews {
     view.setServerState(snap);
     this.scene.add(view.object);
     this.mobViews.set(id, view);
+    this.mobRootToId.set(view.object, id);
   }
 
   updateMob(id: string, state: ServerState) {
@@ -59,8 +63,40 @@ export class EntityViews {
     const view = this.mobViews.get(id);
     if (view) {
       this.scene.remove(view.object);
+      this.mobRootToId.delete(view.object);
       view.dispose();
       this.mobViews.delete(id);
+    }
+    if (this.currentTargetId === id) this.currentTargetId = null;
+  }
+
+  /**
+   * Objetos raycasteables de mobs (roots) y resolutor hit->mobId. `idOf` sube
+   * por `.parent` desde el objeto golpeado (p.ej. una SkinnedMesh hija) hasta
+   * encontrar el root registrado en `mobRootToId` (ver R-E2b1-5).
+   */
+  raycastTargets(): { objects: THREE.Object3D[]; idOf: (o: THREE.Object3D) => string | null } {
+    const objects = [...this.mobViews.values()].map((v) => v.object);
+    const idOf = (o: THREE.Object3D): string | null => {
+      let cur: THREE.Object3D | null = o;
+      while (cur) {
+        const id = this.mobRootToId.get(cur);
+        if (id) return id;
+        cur = cur.parent;
+      }
+      return null;
+    };
+    return { objects, idOf };
+  }
+
+  /** Resalta (anillo rojo) el mob objetivo actual; quita el resaltado del anterior. */
+  setTargetHighlight(mobId: string | null) {
+    if (this.currentTargetId && this.currentTargetId !== mobId) {
+      this.mobViews.get(this.currentTargetId)?.removeTargetRing();
+    }
+    this.currentTargetId = mobId;
+    if (mobId) {
+      this.mobViews.get(mobId)?.addTargetRing();
     }
   }
 
