@@ -37,3 +37,5 @@ export const AI_CONFIG = {
   wanderRadius: 6,
   wanderPauseMs: 2000,
 } as const;
+
+export type AIConfig = typeof AI_CONFIG;

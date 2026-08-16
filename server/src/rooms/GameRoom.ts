@@ -16,12 +16,15 @@ import {
   TICK_RATE,
   clampToBounds,
   SPAWN_ZONES,
+  MOB_MOVE_SPEED,
+  AI_CONFIG,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
 import { MobState } from "../state/MobState.js";
 import { advanceMovable } from "../systems/MovementSystem.js";
 import { createSpawns } from "../systems/SpawnSystem.js";
+import { stepMobAI } from "../systems/MobAISystem.js";
 
 export class GameRoom extends Room<GameState> {
   onCreate() {
@@ -54,6 +57,13 @@ export class GameRoom extends Room<GameState> {
 
   tick(dt: number) {
     this.state.players.forEach((p) => advanceMovable(p, dt));
+
+    const players = [...this.state.players.entries()].map(([id, p]) => ({ id, x: p.x, z: p.z }));
+    const dtMs = dt * 1000;
+    this.state.mobs.forEach((mob) => {
+      stepMobAI(mob, players, AI_CONFIG, Math.random, dtMs);
+      advanceMovable(mob, dt, MOB_MOVE_SPEED);
+    });
   }
 
   onJoin(client: Client, options: { name?: string }) {
