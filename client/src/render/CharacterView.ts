@@ -119,6 +119,7 @@ export class CharacterView {
   playOnce(kind: "attack" | "hit" | "death") {
     const clip = selectClip(this.character.clipNames, kind);
     if (!clip) return;
+    this.lastMoving = this.state.moving;
     if (kind === "death") {
       this.character.playOnce(clip, () => {});
       return;
