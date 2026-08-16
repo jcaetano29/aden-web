@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { CharacterFactory } from "./CharacterFactory.js";
 import { CharacterView, type ServerState } from "./CharacterView.js";
+import { Nameplates } from "./Nameplates.js";
 
 /** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
 export class EntityViews {
@@ -10,14 +11,19 @@ export class EntityViews {
   constructor(
     private readonly scene: THREE.Scene,
     private readonly factory: CharacterFactory,
+    private readonly nameplates: Nameplates,
   ) {}
 
-  add(id: string, isSelf: boolean, modelName: string, x: number, z: number) {
+  add(id: string, isSelf: boolean, modelName: string, name: string, x: number, z: number) {
     const view = new CharacterView(this.factory.create(modelName));
     view.snapTo(x, z);
     this.scene.add(view.object);
     this.views.set(id, view);
-    if (isSelf) this.selfId = id;
+    this.nameplates.add(id, name, view.object);
+    if (isSelf) {
+      this.selfId = id;
+      view.addSelfRing();
+    }
   }
 
   update(id: string, state: ServerState) {
@@ -27,6 +33,7 @@ export class EntityViews {
   remove(id: string) {
     const view = this.views.get(id);
     if (view) {
+      this.nameplates.remove(id);
       this.scene.remove(view.object);
       view.dispose();
       this.views.delete(id);

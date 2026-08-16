@@ -73,6 +73,17 @@ export class CharacterView {
     this.character.mixer.update(dt);
   }
 
+  /** Adjunta un anillo azul bajo los pies del self como indicador visual. */
+  addSelfRing() {
+    const ring = new THREE.Mesh(
+      new THREE.RingGeometry(0.6, 0.8, 24),
+      new THREE.MeshBasicMaterial({ color: 0x4fa3ff, side: THREE.DoubleSide }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.02;
+    this.character.root.add(ring);
+  }
+
   dispose() {
     this.character.mixer.stopAllAction();
   }

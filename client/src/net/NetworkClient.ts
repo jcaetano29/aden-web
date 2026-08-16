@@ -4,6 +4,7 @@ import { MessageType, type MoveToMessage } from "@aden/shared";
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
 
 export interface PlayerSnapshot {
+  name: string;
   x: number;
   z: number;
   targetX: number;
@@ -26,6 +27,7 @@ export class NetworkClient {
     const selfId = this.room.sessionId;
 
     const snap = (p: any): PlayerSnapshot => ({
+      name: p.name,
       x: p.x,
       z: p.z,
       targetX: p.targetX,
