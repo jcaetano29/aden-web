@@ -8,3 +8,10 @@
 - Uso: modelos low-poly riggeados y animados (25+ clips), formato glTF binario.
 
 CC0 no exige atribución; se incluye por buena práctica y trazabilidad.
+
+## Enemigos: KayKit Character Pack — Skeletons 1.0
+- Autor: Kay Lousberg (KayKit)
+- Licencia: CC0 1.0 (dominio público, sin atribución obligatoria)
+- Fuente: https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Skeletons-1.0
+- Archivos: Skeleton_Minion.glb, Skeleton_Warrior.glb
+- Uso: modelos low-poly riggeados y animados, formato glTF binario.

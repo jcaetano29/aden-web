@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MODEL_NAMES, modelUrl, pickModelForSession } from "./manifest.js";
+import { MODEL_NAMES, modelUrl, pickModelForSession, MOB_MODEL_NAMES, modelForTemplate } from "./manifest.js";
 
 describe("modelUrl", () => {
   it("resuelve la ruta pública del GLB", () => {
@@ -29,5 +29,16 @@ describe("pickModelForSession", () => {
 
   it("lanza error si la lista de modelos está vacía", () => {
     expect(() => pickModelForSession("abc", [])).toThrow();
+  });
+});
+
+describe("mobs", () => {
+  it("MOB_MODEL_NAMES incluye los esqueletos", () => {
+    expect(MOB_MODEL_NAMES).toContain("Skeleton_Minion");
+    expect(MOB_MODEL_NAMES).toContain("Skeleton_Warrior");
+  });
+  it("modelForTemplate mapea el templateId a su modelo", () => {
+    expect(modelForTemplate("skeleton_minion")).toBe("Skeleton_Minion");
+    expect(modelForTemplate("skeleton_warrior")).toBe("Skeleton_Warrior");
   });
 });

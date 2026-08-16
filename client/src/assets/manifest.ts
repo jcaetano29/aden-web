@@ -1,7 +1,15 @@
+import { getTemplate } from "@aden/shared";
+
 export const MODEL_NAMES = ["Knight", "Mage", "Barbarian", "Rogue"] as const;
+
+export const MOB_MODEL_NAMES = ["Skeleton_Minion", "Skeleton_Warrior"] as const;
 
 export function modelUrl(name: string): string {
   return `/models/${name}.glb`;
+}
+
+export function modelForTemplate(templateId: string): string {
+  return getTemplate(templateId).model;
 }
 
 export function pickModelForSession(sessionId: string, models: readonly string[]): string {
