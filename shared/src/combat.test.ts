@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeDamage, PLAYER_COMBAT, getMobCombat, ATTACK_RANGE } from "./combat.js";
+import { computeDamage, PLAYER_COMBAT, getMobCombat, ATTACK_RANGE, getSkill, POWER_STRIKE, TOWN, SAFE_RADIUS, PLAYER_RESPAWN_MS } from "./combat.js";
 
 describe("computeDamage", () => {
   it("baja con más pDef y sube con más pAtk/factor", () => {
@@ -29,5 +29,23 @@ describe("config", () => {
   });
   it("getMobCombat lanza para template desconocido", () => {
     expect(() => getMobCombat("dragon")).toThrow();
+  });
+});
+
+describe("skills y config defensiva", () => {
+  it("Power Strike: coste MP, cooldown y factor > 1", () => {
+    expect(POWER_STRIKE.mpCost).toBe(10);
+    expect(POWER_STRIKE.cooldownMs).toBe(4000);
+    expect(POWER_STRIKE.factor).toBeGreaterThan(1);
+    expect(getSkill("power_strike")).toBe(POWER_STRIKE);
+  });
+  it("getSkill lanza para skill desconocida", () => {
+    expect(() => getSkill("fireball")).toThrow();
+  });
+  it("jugador tiene MP; pueblo y respawn definidos", () => {
+    expect(PLAYER_COMBAT.maxMp).toBe(50);
+    expect(TOWN).toEqual({ x: 0, z: 0 });
+    expect(SAFE_RADIUS).toBeGreaterThan(0);
+    expect(PLAYER_RESPAWN_MS).toBeGreaterThan(0);
   });
 });

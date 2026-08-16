@@ -3,6 +3,7 @@ export const MessageType = {
   SetTarget: "setTarget",
   Damage: "damage",
   Death: "death",
+  UseSkill: "useSkill",
 } as const;
 
 export interface MoveToMessage {
@@ -14,7 +15,12 @@ export interface SetTargetMessage {
   targetId: string;
 }
 
+export interface UseSkillMessage {
+  skillId: string;
+}
+
 export interface DamageEvent {
+  attackerId?: string;
   targetId: string;
   amount: number;
   hp: number;
