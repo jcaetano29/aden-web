@@ -15,14 +15,29 @@ import {
   MAP_BOUNDS,
   TICK_RATE,
   clampToBounds,
+  SPAWN_ZONES,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
+import { MobState } from "../state/MobState.js";
 import { advanceMovable } from "../systems/MovementSystem.js";
+import { createSpawns } from "../systems/SpawnSystem.js";
 
 export class GameRoom extends Room<GameState> {
   onCreate() {
     this.setState(new GameState());
+
+    for (const s of createSpawns(SPAWN_ZONES, Math.random)) {
+      const mob = new MobState();
+      mob.templateId = s.templateId;
+      mob.x = s.x;
+      mob.z = s.z;
+      mob.homeX = s.x;
+      mob.homeZ = s.z;
+      mob.targetX = s.x;
+      mob.targetZ = s.z;
+      this.state.mobs.set(s.id, mob);
+    }
 
     this.onMessage(MessageType.MoveTo, (client, msg: MoveToMessage) => {
       const player = this.state.players.get(client.sessionId);
