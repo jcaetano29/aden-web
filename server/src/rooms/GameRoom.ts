@@ -23,13 +23,16 @@ import {
   getMobCombat,
   ATTACK_RANGE,
   MOB_RESPAWN_MS,
+  TOWN,
+  SAFE_RADIUS,
+  PLAYER_RESPAWN_MS,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
 import { MobState } from "../state/MobState.js";
 import { advanceMovable } from "../systems/MovementSystem.js";
 import { createSpawns } from "../systems/SpawnSystem.js";
-import { stepMobAI } from "../systems/MobAISystem.js";
+import { stepMobAI, eligiblePlayersForAggro } from "../systems/MobAISystem.js";
 import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
 
 export class GameRoom extends Room<GameState> {
@@ -95,11 +98,16 @@ export class GameRoom extends Room<GameState> {
   tick(dt: number) {
     this.state.players.forEach((p) => advanceMovable(p, dt));
 
-    const players = [...this.state.players.entries()].map(([id, p]) => ({ id, x: p.x, z: p.z }));
+    // aggro: excluye jugadores muertos y los que están en la zona segura (pueblo)
+    const aggroPlayers = eligiblePlayersForAggro(
+      [...this.state.players.entries()].map(([id, p]) => ({ id, x: p.x, z: p.z, dead: p.dead })),
+      TOWN,
+      SAFE_RADIUS,
+    );
     const dtMs = dt * 1000;
     this.state.mobs.forEach((mob) => {
       if (mob.dead) return; // R-E2b1-3: un mob muerto no deambula ni persigue
-      stepMobAI(mob, players, AI_CONFIG, Math.random, dtMs);
+      stepMobAI(mob, aggroPlayers, AI_CONFIG, Math.random, dtMs);
       advanceMovable(mob, dt, MOB_MOVE_SPEED);
     });
 
@@ -107,7 +115,7 @@ export class GameRoom extends Room<GameState> {
     this.state.players.forEach((p) => tickCooldown(p, dtMs));
 
     // auto-attack del jugador sobre su target
-    this.state.players.forEach((p) => {
+    this.state.players.forEach((p, sessionId) => {
       if (!p.targetId) return;
       const mob = this.state.mobs.get(p.targetId);
       if (!mob || mob.dead) {
@@ -117,13 +125,30 @@ export class GameRoom extends Room<GameState> {
       if (canAttack(p, mob, ATTACK_RANGE)) {
         const variance = 0.9 + Math.random() * 0.2;
         const dmg = resolveAttack(p, mob, 1, variance, PLAYER_COMBAT.attackCooldownMs);
-        this.broadcast(MessageType.Damage, { targetId: p.targetId, amount: dmg, hp: mob.hp });
+        this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
         if (mob.hp <= 0) {
           mob.dead = true;
           mob.moving = false;
           mob.respawnMs = MOB_RESPAWN_MS;
           this.broadcast(MessageType.Death, { entityId: p.targetId });
         }
+      }
+    });
+
+    // ataque de mobs sobre el jugador que persiguen (R-E2b2-2: sólo objetivo vivo)
+    this.state.mobs.forEach((mob, mobId) => {
+      if (mob.dead || !mob.aggroTargetId) return;
+      const player = this.state.players.get(mob.aggroTargetId);
+      if (!player || player.dead) return;
+      if (!canAttack(mob, player, ATTACK_RANGE)) return;
+      const variance = 0.9 + Math.random() * 0.2;
+      const dmg = resolveAttack(mob, player, 1, variance, getMobCombat(mob.templateId).attackCooldownMs);
+      this.broadcast(MessageType.Damage, { attackerId: mobId, targetId: mob.aggroTargetId, amount: dmg, hp: player.hp });
+      if (player.hp <= 0) {
+        player.dead = true;
+        player.respawnMs = PLAYER_RESPAWN_MS;
+        player.targetId = "";
+        this.broadcast(MessageType.Death, { entityId: mob.aggroTargetId });
       }
     });
 

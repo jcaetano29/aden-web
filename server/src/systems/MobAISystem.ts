@@ -19,6 +19,30 @@ export interface PlayerPos {
   z: number;
 }
 
+export interface PlayerAggroCandidate {
+  id: string;
+  x: number;
+  z: number;
+  dead: boolean;
+}
+
+/**
+ * Filtra los jugadores elegibles como objetivo de aggro: excluye a los
+ * muertos y a los que están dentro del radio seguro (pueblo). Puro —
+ * el llamador (GameRoom) arma la lista con el estado real antes de pasarla
+ * a stepMobAI, así un mob que perseguía a alguien que sale de la lista
+ * (muere o entra al pueblo) suelta el aggro en el siguiente tick.
+ */
+export function eligiblePlayersForAggro(
+  players: PlayerAggroCandidate[],
+  town: { x: number; z: number },
+  safeRadius: number,
+): PlayerPos[] {
+  return players
+    .filter((p) => !p.dead && distance2D(p.x, p.z, town.x, town.z) > safeRadius)
+    .map((p) => ({ id: p.id, x: p.x, z: p.z }));
+}
+
 export function stepMobAI(
   mob: AIMob,
   players: PlayerPos[],

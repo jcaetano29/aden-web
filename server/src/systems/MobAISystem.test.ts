@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { stepMobAI, type AIMob } from "./MobAISystem.js";
+import { stepMobAI, eligiblePlayersForAggro, type AIMob } from "./MobAISystem.js";
 import { AI_CONFIG } from "@aden/shared";
 
 function mob(over: Partial<AIMob> = {}): AIMob {
@@ -59,5 +59,36 @@ describe("stepMobAI — wander", () => {
     stepMobAI(m, [], AI_CONFIG, () => 0.5, 16);
     expect(m.wanderCooldownMs).toBeCloseTo(984);
     expect(m.moving).toBe(false);
+  });
+});
+
+describe("eligiblePlayersForAggro", () => {
+  const town = { x: 0, z: 0 };
+
+  it("excluye a un jugador muerto", () => {
+    const result = eligiblePlayersForAggro(
+      [{ id: "p1", x: 50, z: 50, dead: true }],
+      town,
+      8,
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("excluye a un jugador dentro del radio seguro del pueblo", () => {
+    const result = eligiblePlayersForAggro(
+      [{ id: "p1", x: 0, z: 0, dead: false }],
+      town,
+      8,
+    );
+    expect(result).toEqual([]);
+  });
+
+  it("incluye a un jugador vivo y lejos del pueblo", () => {
+    const result = eligiblePlayersForAggro(
+      [{ id: "p1", x: 50, z: 50, dead: false }],
+      town,
+      8,
+    );
+    expect(result).toEqual([{ id: "p1", x: 50, z: 50 }]);
   });
 });
