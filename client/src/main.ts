@@ -5,14 +5,14 @@ import { CharacterFactory } from "./render/CharacterFactory.js";
 import { Nameplates } from "./render/Nameplates.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
-import { MODEL_NAMES, pickModelForSession } from "./assets/manifest.js";
+import { MODEL_NAMES, MOB_MODEL_NAMES, pickModelForSession, modelForTemplate } from "./assets/manifest.js";
 
 async function main() {
   const app = document.getElementById("app")!;
   const renderer = new Renderer(app);
 
   const factory = new CharacterFactory();
-  await factory.preload(MODEL_NAMES);
+  await factory.preload([...MODEL_NAMES, ...MOB_MODEL_NAMES]);
 
   const nameplates = new Nameplates();
   const views = new EntityViews(renderer.scene, factory, nameplates);
@@ -31,6 +31,9 @@ async function main() {
       views.add(id, isSelf, pickModelForSession(id, MODEL_NAMES), snap),
     onChange: (id, snap) => views.update(id, snap),
     onRemove: (id) => views.remove(id),
+    onMobAdd: (id, templateId, snap) => views.addMob(id, modelForTemplate(templateId), snap),
+    onMobChange: (id, snap) => views.updateMob(id, snap),
+    onMobRemove: (id) => views.removeMob(id),
   });
 
   const input = new InputController(renderer, (msg) => net.sendMove(msg));

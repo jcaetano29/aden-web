@@ -16,6 +16,9 @@ export interface RoomCallbacks {
   onAdd: (id: string, isSelf: boolean, snap: PlayerSnapshot) => void;
   onChange: (id: string, snap: PlayerSnapshot) => void;
   onRemove: (id: string) => void;
+  onMobAdd: (id: string, templateId: string, snap: PlayerSnapshot) => void;
+  onMobChange: (id: string, snap: PlayerSnapshot) => void;
+  onMobRemove: (id: string) => void;
 }
 
 export class NetworkClient {
@@ -40,6 +43,21 @@ export class NetworkClient {
       player.onChange(() => cb.onChange(id, snap(player)));
     });
     this.room.state.players.onRemove((_player: any, id: string) => cb.onRemove(id));
+
+    const snapMob = (m: any): PlayerSnapshot => ({
+      name: "",
+      x: m.x,
+      z: m.z,
+      targetX: m.targetX,
+      targetZ: m.targetZ,
+      moving: m.moving,
+    });
+
+    this.room.state.mobs.onAdd((mob: any, id: string) => {
+      cb.onMobAdd(id, mob.templateId, snapMob(mob));
+      mob.onChange(() => cb.onMobChange(id, snapMob(mob)));
+    });
+    this.room.state.mobs.onRemove((_m: any, id: string) => cb.onMobRemove(id));
   }
 
   sendMove(msg: MoveToMessage) {

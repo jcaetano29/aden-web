@@ -7,6 +7,7 @@ import type { PlayerSnapshot } from "../net/NetworkClient.js";
 /** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
 export class EntityViews {
   private readonly views = new Map<string, CharacterView>();
+  private readonly mobViews = new Map<string, CharacterView>();
   private selfId: string | null = null;
 
   constructor(
@@ -42,8 +43,30 @@ export class EntityViews {
     }
   }
 
+  addMob(id: string, modelName: string, snap: PlayerSnapshot) {
+    const view = new CharacterView(this.factory.create(modelName));
+    view.snapTo(snap.x, snap.z);
+    view.setServerState(snap);
+    this.scene.add(view.object);
+    this.mobViews.set(id, view);
+  }
+
+  updateMob(id: string, state: ServerState) {
+    this.mobViews.get(id)?.setServerState(state);
+  }
+
+  removeMob(id: string) {
+    const view = this.mobViews.get(id);
+    if (view) {
+      this.scene.remove(view.object);
+      view.dispose();
+      this.mobViews.delete(id);
+    }
+  }
+
   updateAll(dt: number) {
     this.views.forEach((v) => v.update(dt));
+    this.mobViews.forEach((v) => v.update(dt));
   }
 
   selfPosition(): { x: number; z: number } | null {
