@@ -28,7 +28,7 @@ async function main() {
 
   await net.connect(name, {
     onAdd: (id, isSelf, snap) =>
-      views.add(id, isSelf, pickModelForSession(id, MODEL_NAMES), snap.name, snap.x, snap.z),
+      views.add(id, isSelf, pickModelForSession(id, MODEL_NAMES), snap),
     onChange: (id, snap) => views.update(id, snap),
     onRemove: (id) => views.remove(id),
   });

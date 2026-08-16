@@ -8,3 +8,11 @@ export function headingFromDelta(dx: number, dz: number): number | null {
   if (dx === 0 && dz === 0) return null;
   return Math.atan2(dx, dz);
 }
+
+/** Interpola un ángulo hacia target por el camino angular más corto (evita el giro largo en la discontinuidad de atan2). */
+export function smoothAngle(current: number, target: number, k: number, dt: number): number {
+  if (dt <= 0) return current;
+  // delta normalizado a (-PI, PI] para girar por el camino más corto
+  const delta = Math.atan2(Math.sin(target - current), Math.cos(target - current));
+  return current + delta * (1 - Math.exp(-k * dt));
+}

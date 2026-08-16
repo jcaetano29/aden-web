@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import type { Character } from "./CharacterFactory.js";
 import { selectClip } from "./animation.js";
-import { smoothTowards, headingFromDelta } from "./motion.js";
+import { smoothTowards, headingFromDelta, smoothAngle } from "./motion.js";
 
 const SMOOTH_K = 12; // rapidez de convergencia de la interpolación
 const TURN_K = 12;
@@ -60,7 +60,7 @@ export class CharacterView {
 
     // Orientación hacia la dirección de movimiento.
     if (this.desiredYaw !== null) {
-      root.rotation.y = smoothTowards(root.rotation.y, this.desiredYaw, TURN_K, dt);
+      root.rotation.y = smoothAngle(root.rotation.y, this.desiredYaw, TURN_K, dt);
     }
 
     // Animación según moving.

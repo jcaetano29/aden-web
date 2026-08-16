@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { CharacterFactory } from "./CharacterFactory.js";
 import { CharacterView, type ServerState } from "./CharacterView.js";
 import { Nameplates } from "./Nameplates.js";
+import type { PlayerSnapshot } from "../net/NetworkClient.js";
 
 /** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
 export class EntityViews {
@@ -14,12 +15,13 @@ export class EntityViews {
     private readonly nameplates: Nameplates,
   ) {}
 
-  add(id: string, isSelf: boolean, modelName: string, name: string, x: number, z: number) {
+  add(id: string, isSelf: boolean, modelName: string, snap: PlayerSnapshot) {
     const view = new CharacterView(this.factory.create(modelName));
-    view.snapTo(x, z);
+    view.snapTo(snap.x, snap.z);
+    view.setServerState(snap);
     this.scene.add(view.object);
     this.views.set(id, view);
-    this.nameplates.add(id, name, view.object);
+    this.nameplates.add(id, snap.name, view.object);
     if (isSelf) {
       this.selfId = id;
       view.addSelfRing();
