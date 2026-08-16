@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { CharacterFactory } from "./CharacterFactory.js";
 import { CharacterView, type ServerState } from "./CharacterView.js";
 import { Nameplates } from "./Nameplates.js";
-import type { PlayerSnapshot } from "../net/NetworkClient.js";
+import type { PlayerSnapshot, MobSnapshot } from "../net/NetworkClient.js";
 
 /** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
 export class EntityViews {
@@ -10,6 +10,8 @@ export class EntityViews {
   private readonly mobViews = new Map<string, CharacterView>();
   /** root Object3D del mob -> mobId, para resolver hits de raycast (R-E2b1-5). */
   private readonly mobRootToId = new Map<THREE.Object3D, string>();
+  /** mobId -> ¿muerto? (del snapshot sincronizado); usado para excluir corpses del targeting. */
+  private readonly mobDead = new Map<string, boolean>();
   private currentTargetId: string | null = null;
   private selfId: string | null = null;
 
@@ -46,17 +48,26 @@ export class EntityViews {
     }
   }
 
-  addMob(id: string, modelName: string, snap: PlayerSnapshot) {
+  addMob(id: string, modelName: string, snap: MobSnapshot) {
     const view = new CharacterView(this.factory.create(modelName));
     view.snapTo(snap.x, snap.z);
     view.setServerState(snap);
     this.scene.add(view.object);
     this.mobViews.set(id, view);
     this.mobRootToId.set(view.object, id);
+    this.mobDead.set(id, snap.dead);
   }
 
-  updateMob(id: string, state: ServerState) {
-    this.mobViews.get(id)?.setServerState(state);
+  updateMob(id: string, snap: MobSnapshot) {
+    this.mobViews.get(id)?.setServerState(snap);
+    const wasDead = this.mobDead.get(id) ?? false;
+    this.mobDead.set(id, snap.dead);
+    // Si el mob objetivo acaba de morir, el server ya no aceptará/mantendrá
+    // este target: limpiamos el resaltado de inmediato en vez de esperar al
+    // evento Death (que además puede no estar cableado aún, ver Task 6).
+    if (!wasDead && snap.dead && this.currentTargetId === id) {
+      this.setTargetHighlight(null);
+    }
   }
 
   removeMob(id: string) {
@@ -67,21 +78,30 @@ export class EntityViews {
       view.dispose();
       this.mobViews.delete(id);
     }
+    this.mobDead.delete(id);
     if (this.currentTargetId === id) this.currentTargetId = null;
   }
 
   /**
-   * Objetos raycasteables de mobs (roots) y resolutor hit->mobId. `idOf` sube
-   * por `.parent` desde el objeto golpeado (p.ej. una SkinnedMesh hija) hasta
-   * encontrar el root registrado en `mobRootToId` (ver R-E2b1-5).
+   * Objetos raycasteables de mobs (roots) y resolutor hit->mobId. Excluye
+   * mobs muertos: quedan en `mobViews` durante toda la ventana de respawn
+   * (el server no los borra del estado, sólo pone `dead=true`), así que sin
+   * este filtro un click sobre un cadáver dispararía `onPickMob` con un id
+   * que el server va a rechazar (su handler exige `!mob.dead`), dejando el
+   * resaltado del cliente desincronizado del `targetId` real del server.
+   * `idOf` sube por `.parent` desde el objeto golpeado (p.ej. una SkinnedMesh
+   * hija) hasta encontrar el root registrado en `mobRootToId` (ver R-E2b1-5),
+   * y también descarta el id si resulta estar muerto (defensa adicional).
    */
   raycastTargets(): { objects: THREE.Object3D[]; idOf: (o: THREE.Object3D) => string | null } {
-    const objects = [...this.mobViews.values()].map((v) => v.object);
+    const objects = [...this.mobViews.entries()]
+      .filter(([id]) => !this.mobDead.get(id))
+      .map(([, v]) => v.object);
     const idOf = (o: THREE.Object3D): string | null => {
       let cur: THREE.Object3D | null = o;
       while (cur) {
         const id = this.mobRootToId.get(cur);
-        if (id) return id;
+        if (id) return this.mobDead.get(id) ? null : id;
         cur = cur.parent;
       }
       return null;
