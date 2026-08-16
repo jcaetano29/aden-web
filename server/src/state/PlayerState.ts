@@ -18,6 +18,10 @@ export class PlayerState extends Schema {
   @type("number") maxMp = 0;
   @type("boolean") dead = false;
 
+  // Progression — synced to clients
+  @type("number") exp = 0;
+  @type("number") level = 1;
+
   // Combat cooldown — server-only (NO @type)
   attackCooldownMs = 0;
   skillCooldownMs = 0;
