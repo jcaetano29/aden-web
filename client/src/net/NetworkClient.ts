@@ -3,6 +3,7 @@ import {
   MessageType,
   type MoveToMessage,
   type SetTargetMessage,
+  type UseSkillMessage,
   type DamageEvent,
   type DeathEvent,
 } from "@aden/shared";
@@ -16,6 +17,8 @@ export interface PlayerSnapshot {
   targetX: number;
   targetZ: number;
   moving: boolean;
+  /** Muerto/respawneando (server-autoritativo); permite animar death/respawn de OTROS jugadores. */
+  dead: boolean;
 }
 
 /** Snapshot de mob: incluye combate (hp/maxHp/dead) para highlight/HUD. */
@@ -60,6 +63,7 @@ export class NetworkClient {
       targetX: p.targetX,
       targetZ: p.targetZ,
       moving: p.moving,
+      dead: p.dead,
     });
 
     this.room.state.players.onAdd((player: any, id: string) => {
@@ -97,6 +101,12 @@ export class NetworkClient {
   sendSetTarget(targetId: string) {
     const msg: SetTargetMessage = { targetId };
     this.room.send(MessageType.SetTarget, msg);
+  }
+
+  /** Envía la intención de usar una skill (p.ej. "power_strike"). El server resuelve target/rango/MP/cooldown. */
+  sendUseSkill(skillId: string) {
+    const msg: UseSkillMessage = { skillId };
+    this.room.send(MessageType.UseSkill, msg);
   }
 
   get sessionId(): string {

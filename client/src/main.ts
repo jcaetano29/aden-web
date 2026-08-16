@@ -7,6 +7,7 @@ import { DamageNumbers } from "./render/DamageNumbers.js";
 import { Hud } from "./render/Hud.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
+import { SkillInput } from "./input/SkillInput.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, pickModelForSession, modelForTemplate } from "./assets/manifest.js";
 
 async function main() {
@@ -46,15 +47,29 @@ async function main() {
       if (id === currentTargetId) currentTargetId = null;
     },
     onDamage: (ev) => {
-      views.onMobDamage(ev.targetId);
-      const pos = views.mobWorldPosition(ev.targetId);
-      if (pos) damageNumbers.spawn(pos, ev.amount);
+      // Feedback en el objetivo: puede ser un mob (auto-attack/Power Strike
+      // del jugador) o un jugador (contraataque de un mob) — nunca ambos.
+      if (views.hasMob(ev.targetId)) {
+        views.onMobDamage(ev.targetId);
+        const pos = views.mobWorldPosition(ev.targetId);
+        if (pos) damageNumbers.spawn(pos, ev.amount);
+      } else if (views.hasPlayer(ev.targetId)) {
+        views.onPlayerDamage(ev.targetId);
+        const pos = views.playerWorldPosition(ev.targetId);
+        if (pos) damageNumbers.spawn(pos, ev.amount);
+      }
+      // Animación de ataque en el ATACANTE (mob o jugador), vía attackerId.
+      views.playAttackerAnim(ev.attackerId);
     },
     onDeath: (entityId) => {
-      views.onMobDeath(entityId);
-      if (entityId === currentTargetId) {
-        currentTargetId = null;
-        views.setTargetHighlight(null);
+      if (views.hasMob(entityId)) {
+        views.onMobDeath(entityId);
+        if (entityId === currentTargetId) {
+          currentTargetId = null;
+          views.setTargetHighlight(null);
+        }
+      } else if (views.hasPlayer(entityId)) {
+        views.onPlayerDeath(entityId);
       }
     },
   });
@@ -70,6 +85,9 @@ async function main() {
     },
   );
   input.attach(document.body);
+
+  const skillInput = new SkillInput((id) => net.sendUseSkill(id));
+  skillInput.attach(document.body);
 
   const clock = new THREE.Clock();
   function loop() {

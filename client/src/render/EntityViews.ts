@@ -1,11 +1,12 @@
 import * as THREE from "three";
 import { CharacterFactory } from "./CharacterFactory.js";
-import { CharacterView, type ServerState } from "./CharacterView.js";
+import { CharacterView } from "./CharacterView.js";
 import { Nameplates } from "./Nameplates.js";
 import { HealthBar } from "./HealthBar.js";
 import type { PlayerSnapshot, MobSnapshot } from "../net/NetworkClient.js";
 
 const MOB_HP_BAR_Y = 2.2; // altura aprox. de la cabeza, para posicionar los damage numbers
+const PLAYER_HP_BAR_Y = 2.2; // misma altura aprox. (modelos KayKit de escala similar)
 
 /** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
 export class EntityViews {
@@ -17,6 +18,8 @@ export class EntityViews {
   private readonly mobDead = new Map<string, boolean>();
   /** mobId -> barra de HP (CSS2D) flotando sobre el mob. */
   private readonly mobHealthBars = new Map<string, HealthBar>();
+  /** playerId -> ¿muerto? (del snapshot sincronizado); detecta la transición dead->false (respawn) para salir de la pose de muerte. */
+  private readonly playerDead = new Map<string, boolean>();
   private currentTargetId: string | null = null;
   private selfId: string | null = null;
 
@@ -33,14 +36,22 @@ export class EntityViews {
     this.scene.add(view.object);
     this.views.set(id, view);
     this.nameplates.add(id, snap.name, view.object);
+    this.playerDead.set(id, snap.dead);
     if (isSelf) {
       this.selfId = id;
       view.addSelfRing();
     }
   }
 
-  update(id: string, state: ServerState) {
+  update(id: string, state: PlayerSnapshot) {
     this.views.get(id)?.setServerState(state);
+    // Respawn (dead vuelve a false): restaurar la pose de idle/walk clavada
+    // por playOnce("death") (mismo enfoque que updateMob para los mobs).
+    const wasDead = this.playerDead.get(id) ?? false;
+    this.playerDead.set(id, state.dead);
+    if (wasDead && !state.dead) {
+      this.views.get(id)?.resetAnimation();
+    }
   }
 
   remove(id: string) {
@@ -51,6 +62,7 @@ export class EntityViews {
       view.dispose();
       this.views.delete(id);
     }
+    this.playerDead.delete(id);
   }
 
   addMob(id: string, modelName: string, snap: MobSnapshot) {
@@ -102,17 +114,9 @@ export class EntityViews {
     if (this.currentTargetId === id) this.currentTargetId = null;
   }
 
-  /**
-   * Feedback visual de un hit de daño sobre un mob: animación "hit" en el mob
-   * y, si el mob golpeado es el target actual del self, animación "attack" en
-   * el propio jugador (el evento Damage no trae el id del atacante — ver
-   * Task 6 brief: se infiere así, es una simplificación aceptada).
-   */
+  /** Feedback visual de un hit de daño sobre un mob: animación "hit" en el mob. */
   onMobDamage(mobId: string) {
     this.mobViews.get(mobId)?.playOnce("hit");
-    if (mobId === this.currentTargetId && this.selfId) {
-      this.views.get(this.selfId)?.playOnce("attack");
-    }
   }
 
   /** Animación de muerte + ocultar la barra de HP (el mob sigue en `mobViews` hasta el respawn). */
@@ -129,6 +133,50 @@ export class EntityViews {
     if (!view) return null;
     const p = view.object.position;
     return new THREE.Vector3(p.x, MOB_HP_BAR_Y, p.z);
+  }
+
+  /** ¿Existe una vista de mob con este id? (para rutear Damage/Death: mob vs. jugador). */
+  hasMob(id: string): boolean {
+    return this.mobViews.has(id);
+  }
+
+  /** ¿Existe una vista de jugador con este id? (para rutear Damage/Death: mob vs. jugador). */
+  hasPlayer(id: string): boolean {
+    return this.views.has(id);
+  }
+
+  /** Feedback visual de un hit de daño sobre un jugador (propio u otro): animación "hit". */
+  onPlayerDamage(playerId: string) {
+    this.views.get(playerId)?.playOnce("hit");
+  }
+
+  /** Animación de muerte de un jugador (propio u otro). El respawn (dead->false) restaura idle en `update`. */
+  onPlayerDeath(playerId: string) {
+    this.views.get(playerId)?.playOnce("death");
+  }
+
+  /** Posición de mundo aprox. de la cabeza del jugador, para anclar damage numbers. */
+  playerWorldPosition(playerId: string): THREE.Vector3 | null {
+    const view = this.views.get(playerId);
+    if (!view) return null;
+    const p = view.object.position;
+    return new THREE.Vector3(p.x, PLAYER_HP_BAR_Y, p.z);
+  }
+
+  /**
+   * Reproduce la animación "attack" en la vista del atacante de un evento
+   * Damage, resolviendo `attackerId` contra mobs y jugadores (puede ser
+   * cualquiera de los dos: un mob atacando al jugador, o el jugador/otro
+   * jugador atacando a un mob). No-op si falta el id o no hay vista.
+   */
+  playAttackerAnim(attackerId?: string) {
+    if (!attackerId) return;
+    const mobView = this.mobViews.get(attackerId);
+    if (mobView) {
+      mobView.playOnce("attack");
+      return;
+    }
+    this.views.get(attackerId)?.playOnce("attack");
   }
 
   /**
