@@ -180,6 +180,7 @@ export class GameRoom extends Room<GameState> {
       this.broadcast(MessageType.Damage, { attackerId: mobId, targetId: mob.aggroTargetId, amount: dmg, hp: player.hp });
       if (player.hp <= 0) {
         player.dead = true;
+        player.moving = false;
         player.respawnMs = PLAYER_RESPAWN_MS;
         player.targetId = "";
         this.broadcast(MessageType.Death, { entityId: mob.aggroTargetId });
