@@ -27,4 +27,12 @@ describe("selectClip", () => {
   it("cae al primer clip si no matchea nada", () => {
     expect(selectClip(["Foo", "Bar"], "walk")).toBe("Foo");
   });
+
+  it("prefiere el idle neutro sobre variantes con arma (nombre más corto)", () => {
+    expect(selectClip(["2H_Melee_Idle", "Idle", "Unarmed_Idle"], "idle")).toBe("Idle");
+  });
+
+  it("prefiere la caminata base sobre variantes", () => {
+    expect(selectClip(["Walking_Backwards", "Walking_A"], "walk")).toBe("Walking_A");
+  });
 });

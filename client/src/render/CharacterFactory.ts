@@ -24,11 +24,6 @@ export class CharacterFactory {
       names.map(async (name) => {
         const gltf = await this.loader.loadAsync(modelUrl(name));
         this.loaded.set(name, { scene: gltf.scene, animations: gltf.animations });
-        // R-E1-2: log clip names para verificar que selectClip elige bien.
-        console.log(
-          `[aden] modelo "${name}" clips:`,
-          gltf.animations.map((c) => c.name),
-        );
       }),
     );
   }
