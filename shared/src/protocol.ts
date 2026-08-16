@@ -4,6 +4,7 @@ export const MessageType = {
   Damage: "damage",
   Death: "death",
   UseSkill: "useSkill",
+  LevelUp: "levelUp",
 } as const;
 
 export interface MoveToMessage {
@@ -28,4 +29,8 @@ export interface DamageEvent {
 
 export interface DeathEvent {
   entityId: string;
+}
+
+export interface LevelUpEvent {
+  level: number;
 }
