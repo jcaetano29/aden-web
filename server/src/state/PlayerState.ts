@@ -14,7 +14,12 @@ export class PlayerState extends Schema {
   @type("number") pAtk = 0;
   @type("number") pDef = 0;
   @type("string") targetId = "";
+  @type("number") mp = 0;
+  @type("number") maxMp = 0;
+  @type("boolean") dead = false;
 
   // Combat cooldown — server-only (NO @type)
   attackCooldownMs = 0;
+  skillCooldownMs = 0;
+  respawnMs = 0;
 }
