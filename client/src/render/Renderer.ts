@@ -43,6 +43,11 @@ export class Renderer {
     this.renderer.render(this.scene, this.camera);
   }
 
+  /** Stub temporal; se completa en Task 5 (cámara que sigue al jugador). */
+  followTarget(_x: number, _z: number): void {
+    /* completado en Task 5 */
+  }
+
   private onResize() {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();

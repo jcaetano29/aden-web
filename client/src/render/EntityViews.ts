@@ -1,34 +1,48 @@
 import * as THREE from "three";
+import { CharacterFactory } from "./CharacterFactory.js";
+import { CharacterView, type ServerState } from "./CharacterView.js";
 
-/** Mantiene sincronizados los cubos 3D con el mapa de jugadores del estado. */
+/** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
 export class EntityViews {
-  private readonly views = new Map<string, THREE.Mesh>();
+  private readonly views = new Map<string, CharacterView>();
+  private selfId: string | null = null;
 
-  constructor(private readonly scene: THREE.Scene) {}
+  constructor(
+    private readonly scene: THREE.Scene,
+    private readonly factory: CharacterFactory,
+  ) {}
 
-  add(id: string, isSelf: boolean) {
-    const mesh = new THREE.Mesh(
-      new THREE.BoxGeometry(1, 2, 1),
-      new THREE.MeshStandardMaterial({ color: isSelf ? 0x4fa3ff : 0xff7043 }),
-    );
-    mesh.position.y = 1;
-    this.scene.add(mesh);
-    this.views.set(id, mesh);
+  add(id: string, isSelf: boolean, modelName: string, x: number, z: number) {
+    const view = new CharacterView(this.factory.create(modelName));
+    view.snapTo(x, z);
+    this.scene.add(view.object);
+    this.views.set(id, view);
+    if (isSelf) this.selfId = id;
   }
 
-  update(id: string, x: number, z: number) {
-    const mesh = this.views.get(id);
-    if (!mesh) return;
-    // interpolación suave hacia la posición del servidor
-    mesh.position.x += (x - mesh.position.x) * 0.2;
-    mesh.position.z += (z - mesh.position.z) * 0.2;
+  update(id: string, state: ServerState) {
+    this.views.get(id)?.setServerState(state);
   }
 
   remove(id: string) {
-    const mesh = this.views.get(id);
-    if (mesh) {
-      this.scene.remove(mesh);
+    const view = this.views.get(id);
+    if (view) {
+      this.scene.remove(view.object);
+      view.dispose();
       this.views.delete(id);
     }
+  }
+
+  updateAll(dt: number) {
+    this.views.forEach((v) => v.update(dt));
+  }
+
+  selfPosition(): { x: number; z: number } | null {
+    if (!this.selfId) return null;
+    return this.views.get(this.selfId)?.position ?? null;
+  }
+
+  entries(): Array<[string, CharacterView]> {
+    return [...this.views.entries()];
   }
 }
