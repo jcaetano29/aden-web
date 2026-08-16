@@ -13,6 +13,7 @@ import {
   MessageType,
   type MoveToMessage,
   type SetTargetMessage,
+  type UseSkillMessage,
   MAP_BOUNDS,
   TICK_RATE,
   clampToBounds,
@@ -26,6 +27,7 @@ import {
   TOWN,
   SAFE_RADIUS,
   PLAYER_RESPAWN_MS,
+  getSkill,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -45,7 +47,7 @@ export class GameRoom extends Room<GameState> {
 
     this.onMessage(MessageType.MoveTo, (client, msg: MoveToMessage) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player) return;
+      if (!player || player.dead) return;
       const target = clampToBounds(msg.x, msg.z, MAP_BOUNDS);
       player.targetX = target.x;
       player.targetZ = target.z;
@@ -54,13 +56,39 @@ export class GameRoom extends Room<GameState> {
 
     this.onMessage(MessageType.SetTarget, (client, msg: SetTargetMessage) => {
       const player = this.state.players.get(client.sessionId);
-      if (!player) return;
+      if (!player || player.dead) return;
       // objetivo válido: un mob existente y vivo, o "" para limpiar
       if (
         msg.targetId === "" ||
         (this.state.mobs.has(msg.targetId) && !this.state.mobs.get(msg.targetId)!.dead)
       ) {
         player.targetId = msg.targetId;
+      }
+    });
+
+    this.onMessage(MessageType.UseSkill, (client, msg: UseSkillMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.dead) return;
+      let skill;
+      try {
+        skill = getSkill(msg.skillId);
+      } catch {
+        return;
+      }
+      const mob = p.targetId ? this.state.mobs.get(p.targetId) : undefined;
+      if (!mob || mob.dead) return;
+      if (p.mp < skill.mpCost || p.skillCooldownMs > 0) return;
+      if (!canAttack(p, mob, ATTACK_RANGE)) return;
+      const variance = 0.9 + Math.random() * 0.2;
+      const dmg = resolveAttack(p, mob, skill.factor, variance, PLAYER_COMBAT.attackCooldownMs);
+      p.mp -= skill.mpCost;
+      p.skillCooldownMs = skill.cooldownMs;
+      this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
+      if (mob.hp <= 0) {
+        mob.dead = true;
+        mob.moving = false;
+        mob.respawnMs = MOB_RESPAWN_MS;
+        this.broadcast(MessageType.Death, { entityId: p.targetId });
       }
     });
 
@@ -96,7 +124,10 @@ export class GameRoom extends Room<GameState> {
   }
 
   tick(dt: number) {
-    this.state.players.forEach((p) => advanceMovable(p, dt));
+    this.state.players.forEach((p) => {
+      if (p.dead) return; // un jugador muerto no se mueve
+      advanceMovable(p, dt);
+    });
 
     // aggro: excluye jugadores muertos y los que están en la zona segura (pueblo)
     const aggroPlayers = eligiblePlayersForAggro(
@@ -111,12 +142,15 @@ export class GameRoom extends Room<GameState> {
       advanceMovable(mob, dt, MOB_MOVE_SPEED);
     });
 
-    // cooldowns de jugadores
-    this.state.players.forEach((p) => tickCooldown(p, dtMs));
+    // cooldowns de jugadores (ataque + skill)
+    this.state.players.forEach((p) => {
+      tickCooldown(p, dtMs);
+      if (p.skillCooldownMs > 0) p.skillCooldownMs = Math.max(0, p.skillCooldownMs - dtMs);
+    });
 
     // auto-attack del jugador sobre su target
     this.state.players.forEach((p, sessionId) => {
-      if (!p.targetId) return;
+      if (p.dead || !p.targetId) return;
       const mob = this.state.mobs.get(p.targetId);
       if (!mob || mob.dead) {
         p.targetId = "";
@@ -162,6 +196,21 @@ export class GameRoom extends Room<GameState> {
         }
       }
     });
+
+    // respawn del jugador en el pueblo
+    this.state.players.forEach((p) => {
+      if (!p.dead) return;
+      p.respawnMs -= dtMs;
+      if (p.respawnMs <= 0) {
+        p.hp = p.maxHp;
+        p.mp = p.maxMp;
+        p.dead = false;
+        p.x = p.targetX = TOWN.x;
+        p.z = p.targetZ = TOWN.z;
+        p.moving = false;
+        p.targetId = "";
+      }
+    });
   }
 
   onJoin(client: Client, options: { name?: string }) {
@@ -171,7 +220,12 @@ export class GameRoom extends Room<GameState> {
     player.maxHp = PLAYER_COMBAT.maxHp;
     player.pAtk = PLAYER_COMBAT.pAtk;
     player.pDef = PLAYER_COMBAT.pDef;
+    player.mp = PLAYER_COMBAT.maxMp ?? 0;
+    player.maxMp = PLAYER_COMBAT.maxMp ?? 0;
+    player.dead = false;
     player.attackCooldownMs = 0;
+    player.skillCooldownMs = 0;
+    player.respawnMs = 0;
     player.targetId = "";
     this.state.players.set(client.sessionId, player);
   }
