@@ -5,9 +5,12 @@
   "workspaces": ["shared", "server", "client"],
   "scripts": {
     "test": "npm run test --workspaces --if-present",
-    "dev": "npm run dev --workspace @aden/server & npm run dev --workspace @aden/client"
+    "dev": "concurrently -k -n server,client -c blue,green \"npm run dev --workspace @aden/server\" \"npm run dev --workspace @aden/client\"",
+    "dev:server": "npm run dev --workspace @aden/server",
+    "dev:client": "npm run dev --workspace @aden/client"
   },
   "devDependencies": {
+    "concurrently": "^9.1.0",
     "typescript": "^5.4.0",
     "vitest": "^1.6.0"
   }
