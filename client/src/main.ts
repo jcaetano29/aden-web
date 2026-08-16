@@ -16,7 +16,13 @@ async function main() {
   const views = new EntityViews(renderer.scene, factory);
   const net = new NetworkClient();
 
-  const name = prompt("Nombre de tu personaje:") ?? "Adventurer";
+  let name: string;
+  try {
+    name = prompt("Nombre de tu personaje:") ?? "Adventurer";
+  } catch {
+    // prompt() puede no estar disponible en algunos contextos (p.ej. embebido); fallback seguro.
+    name = "Adventurer";
+  }
 
   await net.connect(name, {
     onAdd: (id, isSelf, snap) =>
