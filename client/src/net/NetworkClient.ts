@@ -6,6 +6,7 @@ import {
   type UseSkillMessage,
   type DamageEvent,
   type DeathEvent,
+  type LevelUpEvent,
 } from "@aden/shared";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
@@ -35,6 +36,9 @@ export interface SelfCombatSnapshot {
   mp: number;
   maxMp: number;
   dead: boolean;
+  /** EXP y nivel sincronizados por el server (autoritativo); el HUD sólo los muestra. */
+  exp: number;
+  level: number;
 }
 
 export interface RoomCallbacks {
@@ -46,6 +50,8 @@ export interface RoomCallbacks {
   onMobRemove: (id: string) => void;
   onDamage: (ev: DamageEvent) => void;
   onDeath: (entityId: string) => void;
+  /** Disparado cuando el server sube de nivel al jugador local (mensaje dirigido `levelUp`). */
+  onLevelUp: (level: number) => void;
 }
 
 export class NetworkClient {
@@ -92,6 +98,7 @@ export class NetworkClient {
 
     this.room.onMessage(MessageType.Damage, (data: DamageEvent) => cb.onDamage(data));
     this.room.onMessage(MessageType.Death, (data: DeathEvent) => cb.onDeath(data.entityId));
+    this.room.onMessage(MessageType.LevelUp, (data: LevelUpEvent) => cb.onLevelUp(data.level));
   }
 
   sendMove(msg: MoveToMessage) {
@@ -122,6 +129,14 @@ export class NetworkClient {
   getSelf(): SelfCombatSnapshot | null {
     const p: any = this.room.state.players.get(this.room.sessionId);
     if (!p) return null;
-    return { hp: p.hp, maxHp: p.maxHp, mp: p.mp, maxMp: p.maxMp, dead: p.dead };
+    return {
+      hp: p.hp,
+      maxHp: p.maxHp,
+      mp: p.mp,
+      maxMp: p.maxMp,
+      dead: p.dead,
+      exp: p.exp,
+      level: p.level,
+    };
   }
 }

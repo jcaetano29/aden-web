@@ -72,6 +72,7 @@ async function main() {
         views.onPlayerDeath(entityId);
       }
     },
+    onLevelUp: (level) => hud.flashLevelUp(level),
   });
 
   const input = new InputController(
@@ -98,7 +99,15 @@ async function main() {
     if (self) renderer.followTarget(self.x, self.z);
     const selfCombat = net.getSelf();
     if (selfCombat) {
-      hud.update(selfCombat.hp, selfCombat.maxHp, selfCombat.mp, selfCombat.maxMp, selfCombat.dead);
+      hud.update(
+        selfCombat.hp,
+        selfCombat.maxHp,
+        selfCombat.mp,
+        selfCombat.maxMp,
+        selfCombat.dead,
+        selfCombat.exp,
+        selfCombat.level,
+      );
     }
     renderer.render();
     renderer.css2d.render(renderer.scene, renderer.camera);
