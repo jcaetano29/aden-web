@@ -28,6 +28,8 @@ import {
   SAFE_RADIUS,
   PLAYER_RESPAWN_MS,
   getSkill,
+  gainExp,
+  getMobExp,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -85,10 +87,7 @@ export class GameRoom extends Room<GameState> {
       p.skillCooldownMs = skill.cooldownMs;
       this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
       if (mob.hp <= 0) {
-        mob.dead = true;
-        mob.moving = false;
-        mob.respawnMs = MOB_RESPAWN_MS;
-        this.broadcast(MessageType.Death, { entityId: p.targetId });
+        this.killMob(mob, p.targetId, client.sessionId);
       }
     });
 
@@ -121,6 +120,27 @@ export class GameRoom extends Room<GameState> {
 
     this.state.mobs.set(id, mob);
     return mob;
+  }
+
+  /**
+   * Centraliza la muerte de un mob: marca dead/respawn y notifica por broadcast (R-E3a-3:
+   * mismo comportamiento que antes). Si se pasa killerId, otorga EXP a ese jugador y, si sube
+   * de nivel, le envía LevelUp SOLO a él (R-E3a-1: mensaje dirigido, no broadcast).
+   */
+  private killMob(mob: MobState, mobId: string, killerId?: string) {
+    mob.dead = true;
+    mob.moving = false;
+    mob.respawnMs = MOB_RESPAWN_MS;
+    this.broadcast(MessageType.Death, { entityId: mobId });
+
+    const killer = killerId ? this.state.players.get(killerId) : undefined;
+    if (killer && !killer.dead) {
+      const lvls = gainExp(killer, getMobExp(mob.templateId));
+      if (lvls > 0) {
+        const client = this.clients.find((c) => c.sessionId === killerId);
+        client?.send(MessageType.LevelUp, { level: killer.level });
+      }
+    }
   }
 
   tick(dt: number) {
@@ -161,10 +181,7 @@ export class GameRoom extends Room<GameState> {
         const dmg = resolveAttack(p, mob, 1, variance, PLAYER_COMBAT.attackCooldownMs);
         this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
         if (mob.hp <= 0) {
-          mob.dead = true;
-          mob.moving = false;
-          mob.respawnMs = MOB_RESPAWN_MS;
-          this.broadcast(MessageType.Death, { entityId: p.targetId });
+          this.killMob(mob, p.targetId, sessionId);
         }
       }
     });
@@ -228,6 +245,8 @@ export class GameRoom extends Room<GameState> {
     player.skillCooldownMs = 0;
     player.respawnMs = 0;
     player.targetId = "";
+    player.exp = 0;
+    player.level = 1;
     this.state.players.set(client.sessionId, player);
   }
 
