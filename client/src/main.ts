@@ -3,6 +3,7 @@ import { Renderer } from "./render/Renderer.js";
 import { EntityViews } from "./render/EntityViews.js";
 import { CharacterFactory } from "./render/CharacterFactory.js";
 import { Nameplates } from "./render/Nameplates.js";
+import { DamageNumbers } from "./render/DamageNumbers.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, pickModelForSession, modelForTemplate } from "./assets/manifest.js";
@@ -16,6 +17,7 @@ async function main() {
 
   const nameplates = new Nameplates();
   const views = new EntityViews(renderer.scene, factory, nameplates);
+  const damageNumbers = new DamageNumbers(renderer.scene);
   const net = new NetworkClient();
 
   // Objetivo actualmente seleccionado por este cliente (no autoritativo: sólo
@@ -41,7 +43,13 @@ async function main() {
       views.removeMob(id);
       if (id === currentTargetId) currentTargetId = null;
     },
+    onDamage: (ev) => {
+      views.onMobDamage(ev.targetId);
+      const pos = views.mobWorldPosition(ev.targetId);
+      if (pos) damageNumbers.spawn(pos, ev.amount);
+    },
     onDeath: (entityId) => {
+      views.onMobDeath(entityId);
       if (entityId === currentTargetId) {
         currentTargetId = null;
         views.setTargetHighlight(null);
@@ -65,6 +73,7 @@ async function main() {
   function loop() {
     const dt = clock.getDelta();
     views.updateAll(dt);
+    damageNumbers.update(dt);
     const self = views.selfPosition();
     if (self) renderer.followTarget(self.x, self.z);
     renderer.render();

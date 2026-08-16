@@ -108,6 +108,38 @@ export class CharacterView {
     this.targetRing = null;
   }
 
+  /**
+   * Reproduce una animación no-loop de combate ("attack" | "hit" | "death"),
+   * resuelta por substring sobre el pool de clips (ver `selectClip`). Si no hay
+   * match, no hace nada (no-op gracioso). "death" queda clavado en el último
+   * frame (clampWhenFinished) — no vuelve a idle/walk solo; ver `resetAnimation`
+   * para restaurarlo tras un respawn. "attack"/"hit" vuelven a idle/walk según
+   * `moving` al terminar.
+   */
+  playOnce(kind: "attack" | "hit" | "death") {
+    const clip = selectClip(this.character.clipNames, kind);
+    if (!clip) return;
+    if (kind === "death") {
+      this.character.playOnce(clip, () => {});
+      return;
+    }
+    this.character.playOnce(clip, () => {
+      const back = this.state.moving ? this.walkClip : this.idleClip;
+      if (back) this.character.play(back);
+      this.lastMoving = this.state.moving;
+    });
+  }
+
+  /**
+   * Fuerza la vuelta a idle/walk (según `moving` actual). Usado tras un
+   * respawn para salir de la pose de muerte clavada por `playOnce("death")`.
+   */
+  resetAnimation() {
+    const clip = this.state.moving ? this.walkClip : this.idleClip;
+    if (clip) this.character.play(clip);
+    this.lastMoving = this.state.moving;
+  }
+
   dispose() {
     this.removeTargetRing();
     this.character.mixer.stopAllAction();

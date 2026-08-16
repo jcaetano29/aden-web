@@ -13,6 +13,13 @@ export interface Character {
   mixer: THREE.AnimationMixer;
   clipNames: string[];
   play(name: string): void;
+  /**
+   * Reproduce `name` una sola vez (LoopOnce + clampWhenFinished, queda clavado
+   * en el último frame) y llama a `onFinished` cuando termina. Si se llama de
+   * nuevo (once u otro `play`) antes de terminar, el callback pendiente se
+   * descarta silenciosamente (no se acumulan).
+   */
+  playOnce(name: string, onFinished: () => void): void;
 }
 
 export class CharacterFactory {
@@ -38,6 +45,19 @@ export class CharacterFactory {
       actions.set(clip.name, mixer.clipAction(clip));
     }
     let current: THREE.AnimationAction | null = null;
+    // Estado del one-shot activo (si hay uno), para saber a cuál corresponde
+    // el evento "finished" del mixer (que se dispara para CUALQUIER acción).
+    let onceAction: THREE.AnimationAction | null = null;
+    let onceCallback: (() => void) | null = null;
+
+    mixer.addEventListener("finished", (e: { action: THREE.AnimationAction }) => {
+      if (e.action !== onceAction) return;
+      const cb = onceCallback;
+      onceAction = null;
+      onceCallback = null;
+      cb?.();
+    });
+
     return {
       root,
       mixer,
@@ -45,9 +65,26 @@ export class CharacterFactory {
       play(name: string) {
         const next = actions.get(name);
         if (!next || next === current) return;
+        next.setLoop(THREE.LoopRepeat, Infinity);
         next.reset().fadeIn(0.2).play();
         if (current) current.fadeOut(0.2);
         current = next;
+        onceAction = null;
+        onceCallback = null;
+      },
+      playOnce(name: string, onFinished: () => void) {
+        const next = actions.get(name);
+        if (!next) {
+          onFinished();
+          return;
+        }
+        next.setLoop(THREE.LoopOnce, 1);
+        next.clampWhenFinished = true;
+        next.reset().fadeIn(0.1).play();
+        if (current && current !== next) current.fadeOut(0.1);
+        current = next;
+        onceAction = next;
+        onceCallback = onFinished;
       },
     };
   }

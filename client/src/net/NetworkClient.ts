@@ -1,5 +1,11 @@
 import { Client, Room } from "colyseus.js";
-import { MessageType, type MoveToMessage, type SetTargetMessage, type DeathEvent } from "@aden/shared";
+import {
+  MessageType,
+  type MoveToMessage,
+  type SetTargetMessage,
+  type DamageEvent,
+  type DeathEvent,
+} from "@aden/shared";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
 
@@ -26,6 +32,7 @@ export interface RoomCallbacks {
   onMobAdd: (id: string, templateId: string, snap: MobSnapshot) => void;
   onMobChange: (id: string, snap: MobSnapshot) => void;
   onMobRemove: (id: string) => void;
+  onDamage: (ev: DamageEvent) => void;
   onDeath: (entityId: string) => void;
 }
 
@@ -70,6 +77,7 @@ export class NetworkClient {
     });
     this.room.state.mobs.onRemove((_m: any, id: string) => cb.onMobRemove(id));
 
+    this.room.onMessage(MessageType.Damage, (data: DamageEvent) => cb.onDamage(data));
     this.room.onMessage(MessageType.Death, (data: DeathEvent) => cb.onDeath(data.entityId));
   }
 

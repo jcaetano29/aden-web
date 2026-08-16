@@ -2,7 +2,10 @@ import * as THREE from "three";
 import { CharacterFactory } from "./CharacterFactory.js";
 import { CharacterView, type ServerState } from "./CharacterView.js";
 import { Nameplates } from "./Nameplates.js";
+import { HealthBar } from "./HealthBar.js";
 import type { PlayerSnapshot, MobSnapshot } from "../net/NetworkClient.js";
+
+const MOB_HP_BAR_Y = 2.2; // altura aprox. de la cabeza, para posicionar los damage numbers
 
 /** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
 export class EntityViews {
@@ -12,6 +15,8 @@ export class EntityViews {
   private readonly mobRootToId = new Map<THREE.Object3D, string>();
   /** mobId -> ¿muerto? (del snapshot sincronizado); usado para excluir corpses del targeting. */
   private readonly mobDead = new Map<string, boolean>();
+  /** mobId -> barra de HP (CSS2D) flotando sobre el mob. */
+  private readonly mobHealthBars = new Map<string, HealthBar>();
   private currentTargetId: string | null = null;
   private selfId: string | null = null;
 
@@ -56,10 +61,17 @@ export class EntityViews {
     this.mobViews.set(id, view);
     this.mobRootToId.set(view.object, id);
     this.mobDead.set(id, snap.dead);
+
+    const bar = new HealthBar();
+    bar.attach(view.object);
+    bar.update(snap.hp, snap.maxHp);
+    bar.setVisible(!snap.dead);
+    this.mobHealthBars.set(id, bar);
   }
 
   updateMob(id: string, snap: MobSnapshot) {
     this.mobViews.get(id)?.setServerState(snap);
+    this.mobHealthBars.get(id)?.update(snap.hp, snap.maxHp);
     const wasDead = this.mobDead.get(id) ?? false;
     this.mobDead.set(id, snap.dead);
     // Si el mob objetivo acaba de morir, el server ya no aceptará/mantendrá
@@ -67,6 +79,12 @@ export class EntityViews {
     // evento Death (que además puede no estar cableado aún, ver Task 6).
     if (!wasDead && snap.dead && this.currentTargetId === id) {
       this.setTargetHighlight(null);
+    }
+    // Respawn (hp vuelve, dead pasa a false): restaurar barra y salir de la
+    // pose de muerte clavada por playOnce("death").
+    if (wasDead && !snap.dead) {
+      this.mobHealthBars.get(id)?.setVisible(true);
+      this.mobViews.get(id)?.resetAnimation();
     }
   }
 
@@ -78,8 +96,39 @@ export class EntityViews {
       view.dispose();
       this.mobViews.delete(id);
     }
+    this.mobHealthBars.get(id)?.remove();
+    this.mobHealthBars.delete(id);
     this.mobDead.delete(id);
     if (this.currentTargetId === id) this.currentTargetId = null;
+  }
+
+  /**
+   * Feedback visual de un hit de daño sobre un mob: animación "hit" en el mob
+   * y, si el mob golpeado es el target actual del self, animación "attack" en
+   * el propio jugador (el evento Damage no trae el id del atacante — ver
+   * Task 6 brief: se infiere así, es una simplificación aceptada).
+   */
+  onMobDamage(mobId: string) {
+    this.mobViews.get(mobId)?.playOnce("hit");
+    if (mobId === this.currentTargetId && this.selfId) {
+      this.views.get(this.selfId)?.playOnce("attack");
+    }
+  }
+
+  /** Animación de muerte + ocultar la barra de HP (el mob sigue en `mobViews` hasta el respawn). */
+  onMobDeath(mobId: string) {
+    this.mobViews.get(mobId)?.playOnce("death");
+    this.mobHealthBars.get(mobId)?.setVisible(false);
+    this.mobDead.set(mobId, true);
+    if (this.currentTargetId === mobId) this.setTargetHighlight(null);
+  }
+
+  /** Posición de mundo aprox. de la cabeza del mob, para anclar damage numbers. */
+  mobWorldPosition(mobId: string): THREE.Vector3 | null {
+    const view = this.mobViews.get(mobId);
+    if (!view) return null;
+    const p = view.object.position;
+    return new THREE.Vector3(p.x, MOB_HP_BAR_Y, p.z);
   }
 
   /**
