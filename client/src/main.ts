@@ -9,6 +9,8 @@ import { DamageNumbers } from "./render/DamageNumbers.js";
 import { Hud } from "./render/Hud.js";
 import { InventoryPanel } from "./render/InventoryPanel.js";
 import { Npc } from "./render/Npc.js";
+import { Merchant } from "./render/Merchant.js";
+import { ShopPanel } from "./render/ShopPanel.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
@@ -28,8 +30,16 @@ async function main() {
   const damageNumbers = new DamageNumbers(renderer.scene);
   const groundItems = new GroundItems(renderer.scene);
   const hud = new Hud();
-  const inventoryPanel = new InventoryPanel();
   const npc = new Npc(renderer.scene, renderer.css2d);
+  const merchant = new Merchant(renderer.scene, renderer.css2d);
+  const shopPanel = new ShopPanel((itemId) => {
+    net.sendBuyItem(itemId);
+    hud.toast(`¡Compraste ${getItem(itemId).name}!`, "#2ecc40");
+  });
+  const inventoryPanel = new InventoryPanel(
+    document.body,
+    (itemId) => net.sendUseItem(itemId),
+  );
   const net = new NetworkClient();
 
   // Objetivo actualmente seleccionado por este cliente (no autoritativo: sólo
@@ -115,6 +125,18 @@ async function main() {
     }
   }
 
+  // Interacción con el Mercader: abre la tienda si estás lo suficientemente cerca.
+  function interactMerchant() {
+    const self = net.getSelf();
+    const pos = views.selfPosition();
+    if (!self || !pos) return;
+    if (distance2D(pos.x, pos.z, TOWN.x, TOWN.z) > 4) {
+      hud.toast("Acercate al Mercader para comprar", "#ffe066");
+      return;
+    }
+    shopPanel.toggle();
+  }
+
   const input = new InputController(
     renderer,
     views,
@@ -126,6 +148,8 @@ async function main() {
     },
     () => interactNpc(),
     npc.object,
+    () => interactMerchant(),
+    merchant.object,
   );
   input.attach(document.body);
 
@@ -134,9 +158,29 @@ async function main() {
 
   // Tecla "i" → alterna el panel de inventario. No conflictúa con "1"/Space
   // (Power Strike) ni con el resto de InputController (movimiento/click).
+  // Tecla "q" → usa una Poción de Vida (si la tienes y HP < maxHp).
   document.body.addEventListener("keydown", (e) => {
     if (e.key === "i" || e.key === "I" || e.code === "KeyI") {
       inventoryPanel.toggle();
+    }
+    if (e.key === "q" || e.key === "Q" || e.code === "KeyQ") {
+      const self = net.getSelf();
+      const inv = net.getInventory();
+      if (!self) {
+        hud.toast("Esperando al servidor...", "#fff");
+        return;
+      }
+      if (self.hp >= self.maxHp) {
+        hud.toast("Ya tenés la vida llena", "#ffe066");
+        return;
+      }
+      const potion = inv.find((it) => it.itemTemplateId === "health_potion");
+      if (!potion || potion.qty < 1) {
+        hud.toast("No tenés pociones de vida", "#ff6b6b");
+        return;
+      }
+      net.sendUseItem("health_potion");
+      hud.toast("Usaste una Poción de Vida", "#2ecc40");
     }
   });
 
@@ -150,6 +194,7 @@ async function main() {
     if (self) renderer.followTarget(self.x, self.z, dt);
     const selfCombat = net.getSelf();
     npc.update(dt);
+    merchant.update(dt);
     if (selfCombat) {
       hud.update(
         selfCombat.hp,
@@ -174,6 +219,10 @@ async function main() {
         }
       }
       npc.setReady(ready);
+      // Refrescar el oro mostrado en la tienda si está abierta
+      if (shopPanel.isOpen()) {
+        shopPanel.updateGold(selfCombat.gold);
+      }
     }
     inventoryPanel.update(
       net.getInventory().map((it) => ({ ...it, name: getItem(it.itemTemplateId).name })),
