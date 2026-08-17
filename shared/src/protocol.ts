@@ -6,6 +6,8 @@ export const MessageType = {
   UseSkill: "useSkill",
   LevelUp: "levelUp",
   InteractNpc: "interactNpc",
+  UseItem: "useItem",
+  BuyItem: "buyItem",
 } as const;
 
 export interface MoveToMessage {
@@ -38,4 +40,13 @@ export interface LevelUpEvent {
 
 export interface InteractNpcMessage {
   npcId?: string;
+}
+
+export interface UseItemMessage {
+  itemTemplateId: string;
+}
+
+export interface BuyItemMessage {
+  itemTemplateId: string;
+  qty?: number;
 }

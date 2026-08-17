@@ -3,18 +3,31 @@ export interface ItemTemplate {
   name: string;
   type: "material" | "currency" | "consumable";
   stackable: boolean;
+  heal?: number;
 }
 
 export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
   gold: { id: "gold", name: "Oro", type: "currency", stackable: true },
   bone: { id: "bone", name: "Hueso", type: "material", stackable: true },
-  health_potion: { id: "health_potion", name: "Poción de Vida", type: "consumable", stackable: true },
+  health_potion: { id: "health_potion", name: "Poción de Vida", type: "consumable", stackable: true, heal: 60 },
 };
 
 export function getItem(id: string): ItemTemplate {
   const t = ITEM_TEMPLATES[id];
   if (!t) throw new Error(`getItem: ítem desconocido ${id}`);
   return t;
+}
+
+export const SHOP_PRICES: Record<string, number> = {
+  health_potion: 15,
+};
+
+export const SHOP_STOCK: string[] = ["health_potion"];
+
+export function getShopPrice(id: string): number {
+  const price = SHOP_PRICES[id];
+  if (price === undefined) throw new Error(`getShopPrice: ítem no a la venta ${id}`);
+  return price;
 }
 
 export interface DropEntry {

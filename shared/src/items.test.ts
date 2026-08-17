@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getItem, ITEM_TEMPLATES, rollDrops, addToInventory, DROP_TABLES } from "./items.js";
+import { getItem, ITEM_TEMPLATES, rollDrops, addToInventory, DROP_TABLES, getShopPrice, SHOP_PRICES, SHOP_STOCK } from "./items.js";
 
 describe("items", () => {
   it("getItem devuelve el template y lanza si falta", () => {
@@ -33,5 +33,23 @@ describe("addToInventory", () => {
     addToInventory(inv, "bone", 1);
     expect(inv.get("gold")).toBe(8);
     expect(inv.get("bone")).toBe(1);
+  });
+});
+
+describe("shop config", () => {
+  it("getShopPrice retorna el precio para health_potion", () => {
+    expect(getShopPrice("health_potion")).toBe(15);
+  });
+
+  it("getShopPrice lanza para ítem no a la venta", () => {
+    expect(() => getShopPrice("nope")).toThrow();
+  });
+
+  it("health_potion tiene heal = 60", () => {
+    expect(getItem("health_potion").heal).toBe(60);
+  });
+
+  it("SHOP_STOCK incluye health_potion", () => {
+    expect(SHOP_STOCK).toContain("health_potion");
   });
 });
