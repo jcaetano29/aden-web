@@ -1,3 +1,5 @@
+import { PLAYER_COMBAT } from "./combat.js";
+
 export const EXP_BASE = 100;
 export const EXP_POW = 1.5;
 
@@ -24,6 +26,16 @@ export interface Leveled {
   pDef: number;
   hp: number;
   mp: number;
+}
+
+export function statsForLevel(level: number): { maxHp: number; maxMp: number; pAtk: number; pDef: number } {
+  const n = Math.max(0, level - 1);
+  return {
+    maxHp: PLAYER_COMBAT.maxHp + n * LEVEL_GROWTH.hp,
+    maxMp: (PLAYER_COMBAT.maxMp ?? 0) + n * LEVEL_GROWTH.mp,
+    pAtk: PLAYER_COMBAT.pAtk + n * LEVEL_GROWTH.pAtk,
+    pDef: PLAYER_COMBAT.pDef + n * LEVEL_GROWTH.pDef,
+  };
 }
 
 export function gainExp(p: Leveled, amount: number): number {

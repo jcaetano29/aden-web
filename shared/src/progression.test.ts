@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { expToNextLevel, gainExp, getMobExp, LEVEL_GROWTH, type Leveled } from "./progression.js";
+import { expToNextLevel, gainExp, getMobExp, LEVEL_GROWTH, statsForLevel, type Leveled } from "./progression.js";
+import { PLAYER_COMBAT } from "./combat.js";
 
 function p(over: Partial<Leveled> = {}): Leveled {
   return { exp: 0, level: 1, maxHp: 100, maxMp: 50, pAtk: 15, pDef: 10, hp: 100, mp: 50, ...over };
@@ -38,5 +39,19 @@ describe("getMobExp", () => {
     expect(getMobExp("skeleton_minion")).toBe(15);
     expect(getMobExp("skeleton_warrior")).toBe(40);
     expect(getMobExp("dragon")).toBe(0);
+  });
+});
+
+describe("statsForLevel", () => {
+  it("nivel 1 = base de PLAYER_COMBAT", () => {
+    expect(statsForLevel(1)).toEqual({
+      maxHp: PLAYER_COMBAT.maxHp, maxMp: PLAYER_COMBAT.maxMp ?? 0,
+      pAtk: PLAYER_COMBAT.pAtk, pDef: PLAYER_COMBAT.pDef,
+    });
+  });
+  it("nivel 3 aplica el crecimiento dos veces", () => {
+    const s = statsForLevel(3);
+    expect(s.maxHp).toBe(PLAYER_COMBAT.maxHp + 2 * LEVEL_GROWTH.hp);
+    expect(s.pAtk).toBe(PLAYER_COMBAT.pAtk + 2 * LEVEL_GROWTH.pAtk);
   });
 });
