@@ -11,6 +11,9 @@ describe("InMemoryPersistence", () => {
       pos_x: 5,
       pos_z: -3,
       inventory: { gold: 10, bone: 2 },
+      gold: 100,
+      questId: "q1",
+      questProgress: 2,
     };
 
     await persistence.save("Aiden", data);
@@ -33,6 +36,9 @@ describe("InMemoryPersistence", () => {
       pos_x: 0,
       pos_z: 0,
       inventory: { gold: 1 },
+      gold: 0,
+      questId: "q1",
+      questProgress: 0,
     };
 
     await persistence.save("Mob", data);
@@ -41,6 +47,6 @@ describe("InMemoryPersistence", () => {
     loaded!.inventory.gold = 999;
 
     const reloaded = await persistence.load("Mob");
-    expect(reloaded).toEqual({ level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: { gold: 1 } });
+    expect(reloaded).toEqual({ level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: { gold: 1 }, gold: 0, questId: "q1", questProgress: 0 });
   });
 });

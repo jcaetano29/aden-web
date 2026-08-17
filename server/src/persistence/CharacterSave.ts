@@ -4,6 +4,9 @@ export interface CharacterSave {
   pos_x: number;
   pos_z: number;
   inventory: Record<string, number>;
+  gold: number;
+  questId: string;
+  questProgress: number;
 }
 
 export interface Persistable {
@@ -12,6 +15,9 @@ export interface Persistable {
   x: number;
   z: number;
   inventory: { forEach(cb: (v: { qty: number }, k: string) => void): void };
+  gold: number;
+  questId: string;
+  questProgress: number;
 }
 
 export function toCharacterSave(p: Persistable): CharacterSave {
@@ -26,6 +32,9 @@ export function toCharacterSave(p: Persistable): CharacterSave {
     pos_x: p.x,
     pos_z: p.z,
     inventory,
+    gold: p.gold,
+    questId: p.questId,
+    questProgress: p.questProgress,
   };
 }
 

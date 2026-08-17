@@ -36,6 +36,7 @@ import {
   DROP_DESPAWN_MS,
   distance2D,
   statsForLevel,
+  firstQuestId,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -313,6 +314,9 @@ export class GameRoom extends Room<GameState> {
     player.targetId = "";
     player.exp = 0;
     player.level = 1;
+    player.questId = firstQuestId();
+    player.questProgress = 0;
+    player.gold = 0;
     this.state.players.set(client.sessionId, player);
 
     // Etapa 3c: cargar el save (si existe) y aplicarlo sobre el player ya insertado en el
@@ -331,6 +335,9 @@ export class GameRoom extends Room<GameState> {
       player.mp = st.maxMp;
       player.x = player.targetX = save.pos_x;
       player.z = player.targetZ = save.pos_z;
+      player.gold = save.gold ?? 0;
+      player.questId = save.questId ?? firstQuestId();
+      player.questProgress = save.questProgress ?? 0;
       for (const [id, qty] of inventoryRecordToEntries(save.inventory)) {
         const it = new InventoryItemState();
         it.itemTemplateId = id;
