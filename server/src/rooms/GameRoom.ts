@@ -36,6 +36,10 @@ import {
   DROP_DESPAWN_MS,
   distance2D,
   statsForLevel,
+  firstQuestId,
+  getQuest,
+  nextQuestId,
+  getItem,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -112,8 +116,47 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
+    // Etapa 4b-1: handler de interacción con NPC (aceptar/entregar misiones)
+    this.onMessage(MessageType.InteractNpc, (client) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.dead) return;
+
+      // Verificar proximidad al pueblo (opcional pero recomendado)
+      if (distance2D(p.x, p.z, TOWN.x, TOWN.z) > 4) return;
+
+      // Si no hay misión activa, asignar la primera
+      if (p.questId === "") {
+        p.questId = firstQuestId();
+        p.questProgress = 0;
+        return;
+      }
+
+      try {
+        const q = getQuest(p.questId);
+
+        // Si la misión está completa, entregarla
+        if (p.questProgress >= q.amount) {
+          this.grantExp(p, client, q.rewardExp);
+          p.gold += q.rewardGold;
+          p.questId = nextQuestId(p.questId);
+          p.questProgress = 0;
+        }
+        // Si no está completa, no-op (el cliente muestra "todavía no terminaste")
+      } catch {
+        // Quest no encontrada, ignorar
+      }
+    });
+
     const dt = 1 / TICK_RATE;
     this.setSimulationInterval(() => this.tick(dt), 1000 / TICK_RATE);
+  }
+
+  /** Otorga EXP a un jugador y envía LevelUp si sube de nivel (Etapa 4b-1: reutilizable en quests). */
+  private grantExp(player: PlayerState, client: Client, amount: number) {
+    const lvls = gainExp(player, amount);
+    if (lvls > 0) {
+      client.send(MessageType.LevelUp, { level: player.level });
+    }
   }
 
   /** Crea (o resetea al respawnear) un mob con posición/home/target y stats de combate. */
@@ -156,10 +199,21 @@ export class GameRoom extends Room<GameState> {
 
     const killer = killerId ? this.state.players.get(killerId) : undefined;
     if (killer && !killer.dead) {
-      const lvls = gainExp(killer, getMobExp(mob.templateId));
-      if (lvls > 0) {
-        const client = this.clients.find((c) => c.sessionId === killerId);
-        client?.send(MessageType.LevelUp, { level: killer.level });
+      const client = this.clients.find((c) => c.sessionId === killerId);
+      if (client) {
+        this.grantExp(killer, client, getMobExp(mob.templateId));
+      }
+
+      // Etapa 4b-1: progreso de misión al matar mob
+      if (killer.questId !== "") {
+        try {
+          const q = getQuest(killer.questId);
+          if (q.mobTemplateId === mob.templateId && killer.questProgress < q.amount) {
+            killer.questProgress++;
+          }
+        } catch {
+          // Quest no encontrada, ignorar
+        }
       }
     }
 
@@ -257,14 +311,21 @@ export class GameRoom extends Room<GameState> {
       for (const id of pickupIds) {
         const it = this.state.droppedItems.get(id);
         if (!it) continue; // ya recogido/despawneado en este mismo tick
-        const existing = p.inventory.get(it.itemTemplateId);
-        if (existing) {
-          existing.qty += it.qty;
+
+        // Etapa 4b-1: oro como moneda (currency → gold, no al inventario)
+        const itemDef = getItem(it.itemTemplateId);
+        if (itemDef.type === "currency") {
+          p.gold += it.qty;
         } else {
-          const inv = new InventoryItemState();
-          inv.itemTemplateId = it.itemTemplateId;
-          inv.qty = it.qty;
-          p.inventory.set(it.itemTemplateId, inv);
+          const existing = p.inventory.get(it.itemTemplateId);
+          if (existing) {
+            existing.qty += it.qty;
+          } else {
+            const inv = new InventoryItemState();
+            inv.itemTemplateId = it.itemTemplateId;
+            inv.qty = it.qty;
+            p.inventory.set(it.itemTemplateId, inv);
+          }
         }
         this.state.droppedItems.delete(id);
       }
@@ -313,6 +374,9 @@ export class GameRoom extends Room<GameState> {
     player.targetId = "";
     player.exp = 0;
     player.level = 1;
+    player.questId = firstQuestId();
+    player.questProgress = 0;
+    player.gold = 0;
     this.state.players.set(client.sessionId, player);
 
     // Etapa 3c: cargar el save (si existe) y aplicarlo sobre el player ya insertado en el
@@ -331,6 +395,9 @@ export class GameRoom extends Room<GameState> {
       player.mp = st.maxMp;
       player.x = player.targetX = save.pos_x;
       player.z = player.targetZ = save.pos_z;
+      player.gold = save.gold ?? 0;
+      player.questId = save.questId ?? firstQuestId();
+      player.questProgress = save.questProgress ?? 0;
       for (const [id, qty] of inventoryRecordToEntries(save.inventory)) {
         const it = new InventoryItemState();
         it.itemTemplateId = id;

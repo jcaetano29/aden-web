@@ -1,4 +1,4 @@
-import { expToNextLevel } from "@aden/shared";
+import { expToNextLevel, getQuest } from "@aden/shared";
 
 const BAR_WIDTH_PX = 160;
 const BAR_HEIGHT_PX = 14;
@@ -23,6 +23,8 @@ export class Hud {
   private readonly deathBanner: HTMLDivElement;
   private readonly levelUpBanner: HTMLDivElement;
   private levelUpTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly questLabel: HTMLDivElement;
+  private readonly goldLabel: HTMLDivElement;
 
   constructor(parent: HTMLElement = document.body) {
     this.root = document.createElement("div");
@@ -49,6 +51,18 @@ export class Hud {
     this.root.appendChild(mpRow);
     this.root.appendChild(expRow);
 
+    // Línea de misión
+    this.questLabel = document.createElement("div");
+    this.questLabel.style.cssText = "margin-top:4px;";
+    this.questLabel.textContent = "Sin misión";
+    this.root.appendChild(this.questLabel);
+
+    // Línea de oro
+    this.goldLabel = document.createElement("div");
+    this.goldLabel.style.cssText = "margin-top:4px;";
+    this.goldLabel.textContent = "Oro: 0";
+    this.root.appendChild(this.goldLabel);
+
     this.deathBanner = document.createElement("div");
     this.deathBanner.textContent = "Has muerto — respawneando…";
     this.deathBanner.style.cssText =
@@ -72,6 +86,7 @@ export class Hud {
   /**
    * Refleja hp/maxHp (rojo), mp/maxMp (azul), exp/expToNextLevel(level)
    * (amarillo) y el nivel actual; muestra el cartel de muerte cuando `dead`.
+   * También refleja gold, questId y questProgress para el tracker de misión.
    */
   update(
     hp: number,
@@ -81,6 +96,9 @@ export class Hud {
     dead: boolean,
     exp: number,
     level: number,
+    gold: number = 0,
+    questId: string = "",
+    questProgress: number = 0,
   ) {
     const hpRatio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     const mpRatio = maxMp > 0 ? Math.max(0, Math.min(1, mp / maxMp)) : 0;
@@ -95,6 +113,26 @@ export class Hud {
     this.expFill.style.width = `${expRatio * 100}%`;
     this.expLabel.textContent = `EXP ${Math.max(0, Math.round(exp))}/${Math.round(expNeeded)}`;
     this.levelLabel.textContent = `Nv. ${level}`;
+
+    // Actualizar quest tracker
+    if (questId === "") {
+      this.questLabel.textContent = "Sin misión";
+    } else {
+      try {
+        const quest = getQuest(questId);
+        const questText = `${quest.title} — ${questProgress}/${quest.amount}`;
+        if (questProgress >= quest.amount) {
+          this.questLabel.textContent = questText + " — ¡Volvé al NPC!";
+        } else {
+          this.questLabel.textContent = questText;
+        }
+      } catch {
+        this.questLabel.textContent = "Misión desconocida";
+      }
+    }
+
+    // Actualizar oro
+    this.goldLabel.textContent = `Oro: ${Math.round(gold)}`;
   }
 
   /** Muestra "¡Subiste a nivel {level}!" centrado ~2s y luego lo oculta. */

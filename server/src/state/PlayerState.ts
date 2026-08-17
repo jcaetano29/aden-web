@@ -22,6 +22,9 @@ export class PlayerState extends Schema {
   // Progression — synced to clients
   @type("number") exp = 0;
   @type("number") level = 1;
+  @type("string") questId = "";
+  @type("number") questProgress = 0;
+  @type("number") gold = 0;
 
   // Combat cooldown — server-only (NO @type)
   attackCooldownMs = 0;

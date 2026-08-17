@@ -8,6 +8,7 @@ import { Nameplates } from "./render/Nameplates.js";
 import { DamageNumbers } from "./render/DamageNumbers.js";
 import { Hud } from "./render/Hud.js";
 import { InventoryPanel } from "./render/InventoryPanel.js";
+import { Npc } from "./render/Npc.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
@@ -28,6 +29,7 @@ async function main() {
   const groundItems = new GroundItems(renderer.scene);
   const hud = new Hud();
   const inventoryPanel = new InventoryPanel();
+  const npc = new Npc(renderer.scene, renderer.css2d);
   const net = new NetworkClient();
 
   // Objetivo actualmente seleccionado por este cliente (no autoritativo: sólo
@@ -93,6 +95,8 @@ async function main() {
       net.sendSetTarget(id);
       views.setTargetHighlight(id);
     },
+    () => net.sendInteractNpc(),
+    npc.object,
   );
   input.attach(document.body);
 
@@ -125,6 +129,9 @@ async function main() {
         selfCombat.dead,
         selfCombat.exp,
         selfCombat.level,
+        selfCombat.gold,
+        selfCombat.questId,
+        selfCombat.questProgress,
       );
     }
     inventoryPanel.update(
