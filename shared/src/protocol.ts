@@ -5,6 +5,7 @@ export const MessageType = {
   Death: "death",
   UseSkill: "useSkill",
   LevelUp: "levelUp",
+  InteractNpc: "interactNpc",
 } as const;
 
 export interface MoveToMessage {
@@ -33,4 +34,8 @@ export interface DeathEvent {
 
 export interface LevelUpEvent {
   level: number;
+}
+
+export interface InteractNpcMessage {
+  npcId?: string;
 }
