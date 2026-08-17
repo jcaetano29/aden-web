@@ -1,4 +1,5 @@
-import { Schema, type } from "@colyseus/schema";
+import { Schema, type, MapSchema } from "@colyseus/schema";
+import { InventoryItemState } from "./InventoryItemState.js";
 
 export class PlayerState extends Schema {
   @type("number") x = 0;
@@ -26,4 +27,7 @@ export class PlayerState extends Schema {
   attackCooldownMs = 0;
   skillCooldownMs = 0;
   respawnMs = 0;
+
+  // Inventory — synced to client
+  @type({ map: InventoryItemState }) inventory = new MapSchema<InventoryItemState>();
 }
