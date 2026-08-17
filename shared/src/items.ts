@@ -60,3 +60,8 @@ export function addToInventory(inv: Map<string, number>, itemTemplateId: string,
 
 export const PICKUP_RANGE = 2.5;
 export const DROP_DESPAWN_MS = 60000;
+// Delay antes de que un ítem del piso pueda levantarse: como el rango de pickup
+// es igual al de ataque, sin esto el loot se recogía en el mismo tick que caía
+// (el jugador mata al mob parado encima) y nunca se veía. Con el delay, aterriza
+// y queda visible ~1.5s antes de vacuumearse.
+export const PICKUP_DELAY_MS = 1500;

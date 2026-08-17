@@ -32,6 +32,7 @@ import {
   getMobExp,
   rollDrops,
   PICKUP_RANGE,
+  PICKUP_DELAY_MS,
   DROP_DESPAWN_MS,
   distance2D,
   statsForLevel,
@@ -170,6 +171,7 @@ export class GameRoom extends Room<GameState> {
       item.x = mob.x + (Math.random() - 0.5) * 1.5;
       item.z = mob.z + (Math.random() - 0.5) * 1.5;
       item.despawnMs = DROP_DESPAWN_MS;
+      item.pickDelayMs = PICKUP_DELAY_MS; // visible al caer, no pickable hasta que expire
       this.state.droppedItems.set(`${mobId}_${d.itemTemplateId}_${this.dropSeq++}`, item);
     }
   }
@@ -239,6 +241,7 @@ export class GameRoom extends Room<GameState> {
     const despawnIds: string[] = [];
     this.state.droppedItems.forEach((it, id) => {
       it.despawnMs -= dtMs;
+      if (it.pickDelayMs > 0) it.pickDelayMs -= dtMs;
       if (it.despawnMs <= 0) despawnIds.push(id);
     });
     for (const id of despawnIds) this.state.droppedItems.delete(id);
@@ -248,7 +251,8 @@ export class GameRoom extends Room<GameState> {
       if (p.dead) return; // un jugador muerto no recoge ítems
       const pickupIds: string[] = [];
       this.state.droppedItems.forEach((it, id) => {
-        if (distance2D(p.x, p.z, it.x, it.z) <= PICKUP_RANGE) pickupIds.push(id);
+        // sólo pickable si ya pasó el delay (loot visible al caer) y está en rango
+        if (it.pickDelayMs <= 0 && distance2D(p.x, p.z, it.x, it.z) <= PICKUP_RANGE) pickupIds.push(id);
       });
       for (const id of pickupIds) {
         const it = this.state.droppedItems.get(id);

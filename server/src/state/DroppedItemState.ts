@@ -8,4 +8,5 @@ export class DroppedItemState extends Schema {
 
   // Server-only (NO @type)
   despawnMs = 0;
+  pickDelayMs = 0; // no pickable hasta que llegue a 0 (loot visible al caer)
 }
