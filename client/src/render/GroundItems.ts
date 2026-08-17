@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import { getItem } from "@aden/shared";
 
-const ITEM_Y = 0.5;
-const ROTATE_SPEED = 1.2; // rad/s
-const BOB_SPEED = 2.0; // rad/s del seno de bob
-const BOB_HEIGHT = 0.12; // amplitud del bob, unidades de mundo
+const ITEM_Y = 0.7;
+const ROTATE_SPEED = 1.4; // rad/s
+const BOB_SPEED = 2.2; // rad/s del seno de bob
+const BOB_HEIGHT = 0.22; // amplitud del bob, unidades de mundo
 
 const COLOR_BY_TYPE: Record<string, number> = {
   currency: 0xffd700,
@@ -15,6 +15,7 @@ const DEFAULT_COLOR = 0xffffff;
 
 interface ActiveItem {
   mesh: THREE.Mesh;
+  light: THREE.PointLight;
   bornAt: number;
 }
 
@@ -26,7 +27,7 @@ interface ActiveItem {
  */
 export class GroundItems {
   private readonly items = new Map<string, ActiveItem>();
-  private readonly geometry = new THREE.OctahedronGeometry(0.35);
+  private readonly geometry = new THREE.OctahedronGeometry(0.5);
 
   constructor(private readonly scene: THREE.Scene) {}
 
@@ -39,18 +40,23 @@ export class GroundItems {
       // itemTemplateId desconocido (no debería pasar si server/shared están en sync):
       // usar color default en vez de romper el render.
     }
-    const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.25 });
+    const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.7 });
     const mesh = new THREE.Mesh(this.geometry, material);
     mesh.position.set(x, ITEM_Y, z);
+    // lucecita del color del ítem para que "brille" en el piso
+    const light = new THREE.PointLight(color, 1.2, 4);
+    light.position.set(0, 0, 0);
+    mesh.add(light);
     this.scene.add(mesh);
-    this.items.set(id, { mesh, bornAt: performance.now() });
+    this.items.set(id, { mesh, light, bornAt: performance.now() });
   }
 
   remove(id: string) {
     const entry = this.items.get(id);
     if (!entry) return;
+    entry.mesh.remove(entry.light);
     this.scene.remove(entry.mesh);
-    entry.mesh.material instanceof THREE.Material && entry.mesh.material.dispose();
+    if (entry.mesh.material instanceof THREE.Material) entry.mesh.material.dispose();
     this.items.delete(id);
   }
 
