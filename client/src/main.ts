@@ -13,7 +13,7 @@ import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, pickModelForSession, modelForTemplate } from "./assets/manifest.js";
-import { getItem } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -86,6 +86,35 @@ async function main() {
     onItemRemove: (id) => groundItems.remove(id),
   });
 
+  // Interacción con el NPC de misiones: da feedback claro (el server es
+  // autoritativo y silencioso si no corresponde, así que el cliente explica
+  // qué pasó). Espeja el gate de cercanía del server (radio ~4 del pueblo).
+  function interactNpc() {
+    const self = net.getSelf();
+    const pos = views.selfPosition();
+    if (!self || !pos) return;
+    if (distance2D(pos.x, pos.z, TOWN.x, TOWN.z) > 4) {
+      hud.toast("Acercate al Anciano del Pueblo para hablarle", "#ffe066");
+      return; // el server lo rechazaría igual; guiamos al jugador
+    }
+    net.sendInteractNpc();
+    if (self.questId === "") {
+      hud.toast("¡Nueva misión asignada!", "#2ecc40");
+      return;
+    }
+    try {
+      const q = getQuest(self.questId);
+      if (self.questProgress >= q.amount) {
+        hud.toast(`¡Misión completada!  +${q.rewardExp} EXP   +${q.rewardGold} oro`, "#2ecc40");
+      } else {
+        const faltan = q.amount - self.questProgress;
+        hud.toast(`«${q.title}» — te faltan ${faltan} (${self.questProgress}/${q.amount})`, "#fff");
+      }
+    } catch {
+      /* questId desconocido: ignorar el feedback, el server ya recibió el intent */
+    }
+  }
+
   const input = new InputController(
     renderer,
     views,
@@ -95,7 +124,7 @@ async function main() {
       net.sendSetTarget(id);
       views.setTargetHighlight(id);
     },
-    () => net.sendInteractNpc(),
+    () => interactNpc(),
     npc.object,
   );
   input.attach(document.body);
@@ -120,6 +149,7 @@ async function main() {
     const self = views.selfPosition();
     if (self) renderer.followTarget(self.x, self.z, dt);
     const selfCombat = net.getSelf();
+    npc.update(dt);
     if (selfCombat) {
       hud.update(
         selfCombat.hp,
@@ -133,6 +163,17 @@ async function main() {
         selfCombat.questId,
         selfCombat.questProgress,
       );
+      // El "!" del NPC se pone verde ("✓") cuando la misión activa está lista
+      // para entregar → confirma visualmente que el server contó el progreso.
+      let ready = false;
+      if (selfCombat.questId) {
+        try {
+          ready = selfCombat.questProgress >= getQuest(selfCombat.questId).amount;
+        } catch {
+          ready = false;
+        }
+      }
+      npc.setReady(ready);
     }
     inventoryPanel.update(
       net.getInventory().map((it) => ({ ...it, name: getItem(it.itemTemplateId).name })),

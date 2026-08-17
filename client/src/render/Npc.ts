@@ -13,6 +13,11 @@ export class Npc {
   readonly object: THREE.Object3D;
   private readonly css2dNameplate: CSS2DObject;
   private readonly css2dIndicator: CSS2DObject;
+  private readonly indicatorDiv: HTMLDivElement;
+  private readonly indicatorMat: THREE.MeshStandardMaterial;
+  private readonly indicatorMesh: THREE.Mesh;
+  private ready = false;
+  private pulse = 0;
 
   constructor(scene: THREE.Scene, css2dLayer: any) {
     // Crear root del NPC
@@ -44,6 +49,8 @@ export class Npc {
     const indicator = new THREE.Mesh(indicatorGeom, indicatorMat);
     indicator.position.y = 2.4;
     this.object.add(indicator);
+    this.indicatorMat = indicatorMat;
+    this.indicatorMesh = indicator;
 
     // Nameplate CSS2D: "Anciano del Pueblo"
     const nameplateDiv = document.createElement("div");
@@ -62,6 +69,38 @@ export class Npc {
     this.css2dIndicator = new CSS2DObject(indicatorDiv);
     this.css2dIndicator.position.set(0, 2.5, 0);
     this.object.add(this.css2dIndicator);
+    this.indicatorDiv = indicatorDiv;
+  }
+
+  /**
+   * Cambia el indicador según el estado de la misión del jugador local:
+   * - `ready=false` (misión activa, aún incompleta): "!" amarillo.
+   * - `ready=true` (misión completa, lista para entregar): "✓" verde.
+   * Da feedback claro de que el server registró el progreso: al llegar a n/n,
+   * el cartel del NPC cambia de amarillo a verde.
+   */
+  setReady(ready: boolean): void {
+    if (ready === this.ready) return;
+    this.ready = ready;
+    const color = ready ? 0x2ecc40 : 0xffff00;
+    const hex = ready ? "#2ecc40" : "#ffff00";
+    this.indicatorMat.color.setHex(color);
+    this.indicatorMat.emissive.setHex(color);
+    this.indicatorDiv.textContent = ready ? "✓" : "!";
+    this.indicatorDiv.style.color = hex;
+    this.css2dNameplate.element instanceof HTMLElement &&
+      ((this.css2dNameplate.element as HTMLElement).style.color = hex);
+  }
+
+  /**
+   * Animación de flotación/pulso del indicador (llamar cada frame con dt en s).
+   * Un leve bob + escala para que el "!"/"✓" llame la atención.
+   */
+  update(dt: number): void {
+    this.pulse += dt;
+    const s = 1 + Math.sin(this.pulse * 3) * 0.18;
+    this.indicatorMesh.scale.setScalar(s);
+    this.indicatorMesh.position.y = 2.4 + Math.sin(this.pulse * 2) * 0.1;
   }
 
   /**

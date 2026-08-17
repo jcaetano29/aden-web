@@ -25,6 +25,8 @@ export class Hud {
   private levelUpTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly questLabel: HTMLDivElement;
   private readonly goldLabel: HTMLDivElement;
+  private readonly toastBanner: HTMLDivElement;
+  private toastTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(parent: HTMLElement = document.body) {
     this.root = document.createElement("div");
@@ -51,9 +53,10 @@ export class Hud {
     this.root.appendChild(mpRow);
     this.root.appendChild(expRow);
 
-    // Línea de misión
+    // Línea de misión (resaltada para que se note el objetivo)
     this.questLabel = document.createElement("div");
-    this.questLabel.style.cssText = "margin-top:4px;";
+    this.questLabel.style.cssText =
+      "margin-top:4px;font-weight:bold;color:#ffe066;";
     this.questLabel.textContent = "Sin misión";
     this.root.appendChild(this.questLabel);
 
@@ -78,9 +81,32 @@ export class Hud {
       "font:bold 26px sans-serif;color:#ffd54f;text-shadow:0 0 6px #000,0 0 12px #000;" +
       "background:rgba(0,0,0,0.5);padding:10px 20px;border-radius:6px;";
 
+    this.toastBanner = document.createElement("div");
+    this.toastBanner.style.cssText =
+      "position:fixed;left:50%;top:18%;transform:translate(-50%,-50%);" +
+      "pointer-events:none;z-index:1000;display:none;text-align:center;" +
+      "font:bold 18px sans-serif;color:#fff;text-shadow:0 0 6px #000,0 0 12px #000;" +
+      "background:rgba(0,0,0,0.55);padding:8px 18px;border-radius:6px;max-width:70vw;";
+
     parent.appendChild(this.root);
     parent.appendChild(this.deathBanner);
     parent.appendChild(this.levelUpBanner);
+    parent.appendChild(this.toastBanner);
+  }
+
+  /**
+   * Mensaje transitorio centrado arriba (feedback de interacción con el NPC):
+   * p.ej. "acercate al Anciano", "te faltan 3 esqueletos", "¡misión entregada!".
+   * Se auto-oculta a los `ms` milisegundos.
+   */
+  toast(msg: string, color = "#fff", ms = 2200): void {
+    this.toastBanner.textContent = msg;
+    this.toastBanner.style.color = color;
+    this.toastBanner.style.display = "";
+    if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => {
+      this.toastBanner.style.display = "none";
+    }, ms);
   }
 
   /**
