@@ -11,6 +11,7 @@
     "@aden/shared": "*",
     "@colyseus/schema": "^2.0.0",
     "@colyseus/ws-transport": "^0.15.3",
+    "@supabase/supabase-js": "^2.112.3",
     "colyseus": "^0.15.0"
   },
   "devDependencies": {
