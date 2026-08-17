@@ -334,11 +334,20 @@ export class GameRoom extends Room<GameState> {
         player.inventory.set(id, it);
       }
     }
+
+    // Etapa 3c (fix race save-before-load): recién ahora, con el save (si existía) ya
+    // aplicado por completo, el jugador es seguro de persistir. Antes de esta línea,
+    // saveAll()/onLeave() deben ignorarlo para no pisar el registro real con defaults
+    // de nivel 1 (ver guardas en saveAll y onLeave).
+    player.loaded = true;
   }
 
   /** Guarda el estado de todos los jugadores conectados (fire-and-forget, periódico). */
   private async saveAll() {
     this.state.players.forEach((p) => {
+      // Etapa 3c: si el load de onJoin todavía no aplicó, p tiene los defaults de nivel 1;
+      // guardarlo pisaría el registro real. Se salta hasta que loaded === true.
+      if (!p.loaded) return;
       this.persistence.save(p.name, toCharacterSave(p)).catch((e) => console.error("[aden] save fail", p.name, e));
     });
   }
@@ -346,10 +355,14 @@ export class GameRoom extends Room<GameState> {
   async onLeave(client: Client) {
     const player = this.state.players.get(client.sessionId);
     if (player) {
-      try {
-        await this.persistence.save(player.name, toCharacterSave(player));
-      } catch (e) {
-        console.error("[aden] save fail on leave", player.name, e);
+      // Etapa 3c: si se desconectó antes de que el load resolviera, no hay nada nuevo que
+      // valga la pena persistir y guardar pisaría el registro real con defaults.
+      if (player.loaded) {
+        try {
+          await this.persistence.save(player.name, toCharacterSave(player));
+        } catch (e) {
+          console.error("[aden] save fail on leave", player.name, e);
+        }
       }
     }
     this.state.players.delete(client.sessionId);

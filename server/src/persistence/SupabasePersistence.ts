@@ -35,15 +35,18 @@ export class SupabasePersistence implements PersistenceService {
   }
 
   async save(name: string, data: CharacterSave): Promise<void> {
-    const { error } = await this.client.from("characters").upsert({
-      name,
-      level: data.level,
-      exp: data.exp,
-      pos_x: data.pos_x,
-      pos_z: data.pos_z,
-      inventory: data.inventory,
-      updated_at: new Date().toISOString(),
-    });
+    const { error } = await this.client.from("characters").upsert(
+      {
+        name,
+        level: data.level,
+        exp: data.exp,
+        pos_x: data.pos_x,
+        pos_z: data.pos_z,
+        inventory: data.inventory,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "name" },
+    );
 
     if (error) {
       console.error("[aden] SupabasePersistence.save error:", error.message);

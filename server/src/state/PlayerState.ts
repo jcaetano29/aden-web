@@ -28,6 +28,12 @@ export class PlayerState extends Schema {
   skillCooldownMs = 0;
   respawnMs = 0;
 
+  // Etapa 3c: true una vez que onJoin terminó de aplicar (o no) el save cargado.
+  // Server-only (NO @type) — usado para evitar que un save en curso (defaults de
+  // nivel 1) pise el registro real si el jugador se desconecta o si el saveAll
+  // periódico corre antes de que el load() resuelva.
+  loaded = false;
+
   // Inventory — synced to client
   @type({ map: InventoryItemState }) inventory = new MapSchema<InventoryItemState>();
 }
