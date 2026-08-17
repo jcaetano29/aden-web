@@ -34,6 +34,7 @@ import {
   PICKUP_RANGE,
   DROP_DESPAWN_MS,
   distance2D,
+  statsForLevel,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -44,13 +45,23 @@ import { advanceMovable } from "../systems/MovementSystem.js";
 import { createSpawns } from "../systems/SpawnSystem.js";
 import { stepMobAI, eligiblePlayersForAggro } from "../systems/MobAISystem.js";
 import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
+import { createPersistence } from "../persistence/createPersistence.js";
+import type { PersistenceService } from "../persistence/PersistenceService.js";
+import { toCharacterSave, inventoryRecordToEntries } from "../persistence/CharacterSave.js";
+
+/** Intervalo de guardado periódico de personajes (Etapa 3c). */
+const SAVE_INTERVAL_MS = 15000;
 
 export class GameRoom extends Room<GameState> {
   /** Contador para generar ids únicos de ítems dropeados (R-E3b-3). */
   private dropSeq = 0;
+  /** Servicio de persistencia de personajes (Supabase si hay env, si no in-memory). */
+  private persistence!: PersistenceService;
 
   onCreate() {
     this.setState(new GameState());
+    this.persistence = createPersistence();
+    this.clock.setInterval(() => this.saveAll(), SAVE_INTERVAL_MS);
 
     for (const s of createSpawns(SPAWN_ZONES, Math.random)) {
       this.spawnMob(s.id, s.templateId, s.x, s.z);
@@ -282,7 +293,7 @@ export class GameRoom extends Room<GameState> {
     });
   }
 
-  onJoin(client: Client, options: { name?: string }) {
+  async onJoin(client: Client, options: { name?: string }) {
     const player = new PlayerState();
     player.name = options?.name ?? "Adventurer";
     player.hp = PLAYER_COMBAT.maxHp;
@@ -299,9 +310,48 @@ export class GameRoom extends Room<GameState> {
     player.exp = 0;
     player.level = 1;
     this.state.players.set(client.sessionId, player);
+
+    // Etapa 3c: cargar el save (si existe) y aplicarlo sobre el player ya insertado en el
+    // estado. Mientras el load está en curso, el jugador ya es válido con los defaults de
+    // nivel 1 seteados arriba (R-E3c-2: onJoin async, se actualiza al resolver la promesa).
+    const save = await this.persistence.load(player.name);
+    if (save) {
+      player.level = save.level;
+      player.exp = save.exp;
+      const st = statsForLevel(save.level);
+      player.maxHp = st.maxHp;
+      player.maxMp = st.maxMp;
+      player.pAtk = st.pAtk;
+      player.pDef = st.pDef;
+      player.hp = st.maxHp;
+      player.mp = st.maxMp;
+      player.x = player.targetX = save.pos_x;
+      player.z = player.targetZ = save.pos_z;
+      for (const [id, qty] of inventoryRecordToEntries(save.inventory)) {
+        const it = new InventoryItemState();
+        it.itemTemplateId = id;
+        it.qty = qty;
+        player.inventory.set(id, it);
+      }
+    }
   }
 
-  onLeave(client: Client) {
+  /** Guarda el estado de todos los jugadores conectados (fire-and-forget, periódico). */
+  private async saveAll() {
+    this.state.players.forEach((p) => {
+      this.persistence.save(p.name, toCharacterSave(p)).catch((e) => console.error("[aden] save fail", p.name, e));
+    });
+  }
+
+  async onLeave(client: Client) {
+    const player = this.state.players.get(client.sessionId);
+    if (player) {
+      try {
+        await this.persistence.save(player.name, toCharacterSave(player));
+      } catch (e) {
+        console.error("[aden] save fail on leave", player.name, e);
+      }
+    }
     this.state.players.delete(client.sessionId);
   }
 }
