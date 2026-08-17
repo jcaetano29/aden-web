@@ -30,16 +30,25 @@ import {
   getSkill,
   gainExp,
   getMobExp,
+  rollDrops,
+  PICKUP_RANGE,
+  DROP_DESPAWN_MS,
+  distance2D,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
 import { MobState } from "../state/MobState.js";
+import { DroppedItemState } from "../state/DroppedItemState.js";
+import { InventoryItemState } from "../state/InventoryItemState.js";
 import { advanceMovable } from "../systems/MovementSystem.js";
 import { createSpawns } from "../systems/SpawnSystem.js";
 import { stepMobAI, eligiblePlayersForAggro } from "../systems/MobAISystem.js";
 import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
 
 export class GameRoom extends Room<GameState> {
+  /** Contador para generar ids únicos de ítems dropeados (R-E3b-3). */
+  private dropSeq = 0;
+
   onCreate() {
     this.setState(new GameState());
 
@@ -141,6 +150,17 @@ export class GameRoom extends Room<GameState> {
         client?.send(MessageType.LevelUp, { level: killer.level });
       }
     }
+
+    // Loot (R-E3b-2): rodar drop table del mob y crear ítems en el piso con scatter.
+    for (const d of rollDrops(mob.templateId, Math.random)) {
+      const item = new DroppedItemState();
+      item.itemTemplateId = d.itemTemplateId;
+      item.qty = d.qty;
+      item.x = mob.x + (Math.random() - 0.5) * 1.5;
+      item.z = mob.z + (Math.random() - 0.5) * 1.5;
+      item.despawnMs = DROP_DESPAWN_MS;
+      this.state.droppedItems.set(`${mobId}_${d.itemTemplateId}_${this.dropSeq++}`, item);
+    }
   }
 
   tick(dt: number) {
@@ -201,6 +221,37 @@ export class GameRoom extends Room<GameState> {
         player.respawnMs = PLAYER_RESPAWN_MS;
         player.targetId = "";
         this.broadcast(MessageType.Death, { entityId: mob.aggroTargetId });
+      }
+    });
+
+    // despawn de ítems del piso (R-E3b-4: collect-then-delete, seguro sobre MapSchema)
+    const despawnIds: string[] = [];
+    this.state.droppedItems.forEach((it, id) => {
+      it.despawnMs -= dtMs;
+      if (it.despawnMs <= 0) despawnIds.push(id);
+    });
+    for (const id of despawnIds) this.state.droppedItems.delete(id);
+
+    // auto-pickup por proximidad (R-E3b-1: stacking sobre MapSchema; R-E3b-4: collect-then-delete)
+    this.state.players.forEach((p) => {
+      if (p.dead) return; // un jugador muerto no recoge ítems
+      const pickupIds: string[] = [];
+      this.state.droppedItems.forEach((it, id) => {
+        if (distance2D(p.x, p.z, it.x, it.z) <= PICKUP_RANGE) pickupIds.push(id);
+      });
+      for (const id of pickupIds) {
+        const it = this.state.droppedItems.get(id);
+        if (!it) continue; // ya recogido/despawneado en este mismo tick
+        const existing = p.inventory.get(it.itemTemplateId);
+        if (existing) {
+          existing.qty += it.qty;
+        } else {
+          const inv = new InventoryItemState();
+          inv.itemTemplateId = it.itemTemplateId;
+          inv.qty = it.qty;
+          p.inventory.set(it.itemTemplateId, inv);
+        }
+        this.state.droppedItems.delete(id);
       }
     });
 
