@@ -7,6 +7,7 @@ import {
   type DamageEvent,
   type DeathEvent,
   type LevelUpEvent,
+  type InteractNpcMessage,
 } from "@aden/shared";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
@@ -39,6 +40,10 @@ export interface SelfCombatSnapshot {
   /** EXP y nivel sincronizados por el server (autoritativo); el HUD sólo los muestra. */
   exp: number;
   level: number;
+  /** Campos de misión y oro, sincronizados por el server. */
+  gold: number;
+  questId: string;
+  questProgress: number;
 }
 
 export interface RoomCallbacks {
@@ -124,6 +129,12 @@ export class NetworkClient {
     this.room.send(MessageType.UseSkill, msg);
   }
 
+  /** Envía la intención de interactuar con el NPC (aceptar/entregar misión). */
+  sendInteractNpc() {
+    const msg: InteractNpcMessage = {};
+    this.room.send(MessageType.InteractNpc, msg);
+  }
+
   get sessionId(): string {
     return this.room.sessionId;
   }
@@ -145,6 +156,9 @@ export class NetworkClient {
       dead: p.dead,
       exp: p.exp,
       level: p.level,
+      gold: p.gold ?? 0,
+      questId: p.questId ?? "",
+      questProgress: p.questProgress ?? 0,
     };
   }
 
