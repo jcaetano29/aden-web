@@ -6,10 +6,12 @@ import { CharacterFactory } from "./render/CharacterFactory.js";
 import { Nameplates } from "./render/Nameplates.js";
 import { DamageNumbers } from "./render/DamageNumbers.js";
 import { Hud } from "./render/Hud.js";
+import { InventoryPanel } from "./render/InventoryPanel.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, pickModelForSession, modelForTemplate } from "./assets/manifest.js";
+import { getItem } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -23,6 +25,7 @@ async function main() {
   const damageNumbers = new DamageNumbers(renderer.scene);
   const groundItems = new GroundItems(renderer.scene);
   const hud = new Hud();
+  const inventoryPanel = new InventoryPanel();
   const net = new NetworkClient();
 
   // Objetivo actualmente seleccionado por este cliente (no autoritativo: sólo
@@ -94,6 +97,14 @@ async function main() {
   const skillInput = new SkillInput((id) => net.sendUseSkill(id));
   skillInput.attach(document.body);
 
+  // Tecla "i" → alterna el panel de inventario. No conflictúa con "1"/Space
+  // (Power Strike) ni con el resto de InputController (movimiento/click).
+  document.body.addEventListener("keydown", (e) => {
+    if (e.key === "i" || e.key === "I" || e.code === "KeyI") {
+      inventoryPanel.toggle();
+    }
+  });
+
   const clock = new THREE.Clock();
   function loop() {
     const dt = clock.getDelta();
@@ -114,6 +125,9 @@ async function main() {
         selfCombat.level,
       );
     }
+    inventoryPanel.update(
+      net.getInventory().map((it) => ({ ...it, name: getItem(it.itemTemplateId).name })),
+    );
     renderer.render();
     renderer.css2d.render(renderer.scene, renderer.camera);
     requestAnimationFrame(loop);

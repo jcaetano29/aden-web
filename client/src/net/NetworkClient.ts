@@ -147,4 +147,20 @@ export class NetworkClient {
       level: p.level,
     };
   }
+
+  /**
+   * Inventario del jugador local, leído en vivo del estado sincronizado
+   * (`state.players.get(sessionId).inventory`, un MapSchema). Sólo lectura —
+   * el panel de inventario lo usa para re-renderizar la lista. Array vacío
+   * si el propio jugador todavía no llegó al estado.
+   */
+  getInventory(): { itemTemplateId: string; qty: number }[] {
+    const p: any = this.room.state.players.get(this.room.sessionId);
+    if (!p) return [];
+    const out: { itemTemplateId: string; qty: number }[] = [];
+    p.inventory.forEach((item: any) => {
+      out.push({ itemTemplateId: item.itemTemplateId, qty: item.qty });
+    });
+    return out;
+  }
 }
