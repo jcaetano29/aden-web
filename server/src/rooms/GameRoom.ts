@@ -14,6 +14,8 @@ import {
   type MoveToMessage,
   type SetTargetMessage,
   type UseSkillMessage,
+  type BuyItemMessage,
+  type UseItemMessage,
   MAP_BOUNDS,
   TICK_RATE,
   clampToBounds,
@@ -40,6 +42,7 @@ import {
   getQuest,
   nextQuestId,
   getItem,
+  getShopPrice,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -62,6 +65,19 @@ export class GameRoom extends Room<GameState> {
   private dropSeq = 0;
   /** Servicio de persistencia de personajes (Supabase si hay env, si no in-memory). */
   private persistence!: PersistenceService;
+
+  /** Agrega ítems al inventario del jugador (reutilizable en compra y pickup). */
+  private addToInventory(player: PlayerState, itemTemplateId: string, qty: number): void {
+    const existing = player.inventory.get(itemTemplateId);
+    if (existing) {
+      existing.qty += qty;
+    } else {
+      const inv = new InventoryItemState();
+      inv.itemTemplateId = itemTemplateId;
+      inv.qty = qty;
+      player.inventory.set(itemTemplateId, inv);
+    }
+  }
 
   onCreate() {
     this.setState(new GameState());
@@ -144,6 +160,68 @@ export class GameRoom extends Room<GameState> {
         // Si no está completa, no-op (el cliente muestra "todavía no terminaste")
       } catch {
         // Quest no encontrada, ignorar
+      }
+    });
+
+    // Etapa 4b-2: handler de compra en el mercader
+    this.onMessage(MessageType.BuyItem, (client, msg: BuyItemMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.dead) return;
+
+      // Gate de proximidad al pueblo (igual que interactNpc)
+      if (distance2D(p.x, p.z, TOWN.x, TOWN.z) > 4) return;
+
+      // Validar cantidad
+      const qty = Math.max(1, Math.floor(msg?.qty ?? 1));
+
+      // Obtener precio (si no está a la venta, getShopPrice lanza, así que no-op)
+      let price: number;
+      try {
+        price = getShopPrice(msg.itemTemplateId) * qty;
+      } catch {
+        return; // ítem no a la venta
+      }
+
+      // Verificar si tiene suficiente oro
+      if (p.gold < price) return; // no suficiente, no-op
+
+      // Deducir oro y agregar al inventario
+      p.gold -= price;
+      this.addToInventory(p, msg.itemTemplateId, qty);
+    });
+
+    // Etapa 4b-2: handler de uso de ítems (pociones)
+    this.onMessage(MessageType.UseItem, (client, msg: UseItemMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.dead) return;
+
+      // Obtener definición del ítem
+      let template;
+      try {
+        template = getItem(msg.itemTemplateId);
+      } catch {
+        return; // ítem desconocido
+      }
+
+      // Verificar que sea consumible y tenga curación
+      if (template.type !== "consumable" || !template.heal) return;
+
+      // Buscar en el inventario
+      const invEntry = p.inventory.get(msg.itemTemplateId);
+      if (!invEntry || invEntry.qty < 1) return; // no tiene el ítem
+
+      // Si está a full HP, no hacer nada
+      if (p.hp >= p.maxHp) return;
+
+      // Curar hasta maxHp
+      p.hp = Math.min(p.maxHp, p.hp + template.heal);
+
+      // Decrementar cantidad
+      invEntry.qty -= 1;
+
+      // Si llega a 0, eliminar la entrada
+      if (invEntry.qty <= 0) {
+        p.inventory.delete(msg.itemTemplateId);
       }
     });
 
@@ -317,15 +395,7 @@ export class GameRoom extends Room<GameState> {
         if (itemDef.type === "currency") {
           p.gold += it.qty;
         } else {
-          const existing = p.inventory.get(it.itemTemplateId);
-          if (existing) {
-            existing.qty += it.qty;
-          } else {
-            const inv = new InventoryItemState();
-            inv.itemTemplateId = it.itemTemplateId;
-            inv.qty = it.qty;
-            p.inventory.set(it.itemTemplateId, inv);
-          }
+          this.addToInventory(p, it.itemTemplateId, it.qty);
         }
         this.state.droppedItems.delete(id);
       }

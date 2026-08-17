@@ -8,6 +8,8 @@ import {
   type DeathEvent,
   type LevelUpEvent,
   type InteractNpcMessage,
+  type BuyItemMessage,
+  type UseItemMessage,
 } from "@aden/shared";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
@@ -133,6 +135,18 @@ export class NetworkClient {
   sendInteractNpc() {
     const msg: InteractNpcMessage = {};
     this.room.send(MessageType.InteractNpc, msg);
+  }
+
+  /** Envía la intención de comprar un ítem en la tienda. */
+  sendBuyItem(itemTemplateId: string, qty = 1) {
+    const msg: BuyItemMessage = { itemTemplateId, qty };
+    this.room.send(MessageType.BuyItem, msg);
+  }
+
+  /** Envía la intención de usar un ítem consumible (p.ej. poción). */
+  sendUseItem(itemTemplateId: string) {
+    const msg: UseItemMessage = { itemTemplateId };
+    this.room.send(MessageType.UseItem, msg);
   }
 
   get sessionId(): string {

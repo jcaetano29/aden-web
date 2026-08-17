@@ -1,15 +1,23 @@
+import { getItem } from "@aden/shared";
+
 /**
  * Panel HTML de inventario (tecla "i"): overlay fijo, oculto por defecto, que
  * lista los ítems del jugador local con nombre y cantidad. Sólo refleja el
  * inventario sincronizado por el server (`update(...)`) — nunca lo muta
- * (cliente no-autoritativo).
+ * (cliente no-autoritativo). Los ítems consumibles tienen un botón "Usar" que
+ * dispara el callback `onUseItem`.
  */
 export class InventoryPanel {
   private readonly root: HTMLDivElement;
   private readonly list: HTMLDivElement;
   private visible = false;
+  private onUseItem?: (itemTemplateId: string) => void;
 
-  constructor(parent: HTMLElement = document.body) {
+  constructor(
+    parent: HTMLElement = document.body,
+    onUseItem?: (itemTemplateId: string) => void,
+  ) {
+    this.onUseItem = onUseItem;
     this.root = document.createElement("div");
     this.root.style.cssText =
       "position:fixed;right:12px;top:12px;display:none;pointer-events:none;z-index:1000;" +
@@ -34,7 +42,8 @@ export class InventoryPanel {
     this.root.style.display = this.visible ? "" : "none";
   }
 
-  /** Re-renderiza la lista de ítems ("{name} x{qty}"); "(vacío)" si no hay ninguno. */
+  /** Re-renderiza la lista de ítems ("{name} x{qty}"); "(vacío)" si no hay ninguno.
+   *  Para ítems consumibles, agrega un botón "Usar". */
   update(entries: { itemTemplateId: string; qty: number; name: string }[]) {
     this.list.innerHTML = "";
     if (entries.length === 0) {
@@ -45,9 +54,31 @@ export class InventoryPanel {
       return;
     }
     for (const e of entries) {
-      const row = document.createElement("div");
-      row.textContent = `${e.name} x${e.qty}`;
-      this.list.appendChild(row);
+      try {
+        const item = getItem(e.itemTemplateId);
+        const row = document.createElement("div");
+        row.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:6px;";
+
+        const label = document.createElement("div");
+        label.textContent = `${e.name} x${e.qty}`;
+        row.appendChild(label);
+
+        if (item.type === "consumable") {
+          const useBtn = document.createElement("button");
+          useBtn.textContent = "Usar";
+          useBtn.style.cssText =
+            "padding:2px 6px;background:#2ecc40;color:#000;border:none;border-radius:3px;" +
+            "font:10px bold sans-serif;cursor:pointer;pointer-events:auto;";
+          useBtn.addEventListener("click", () => {
+            if (this.onUseItem) this.onUseItem(e.itemTemplateId);
+          });
+          row.appendChild(useBtn);
+        }
+
+        this.list.appendChild(row);
+      } catch {
+        // Ignorar ítems con id inválido
+      }
     }
   }
 

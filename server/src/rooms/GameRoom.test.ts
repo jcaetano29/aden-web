@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
-import { MessageType, MAP_BOUNDS, getQuest, firstQuestId } from "@aden/shared";
+import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem } from "@aden/shared";
 import appConfig from "../testServer.js";
 
 describe("GameRoom", () => {
@@ -97,5 +97,66 @@ describe("GameRoom", () => {
     await room.waitForNextPatch();
     expect(p.questId).toBe(q.id); // no entrego
     expect(p.gold).toBe(0);
+  });
+
+  it("compra una pocion en el mercader: baja el oro y la agrega al inventario", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Comprador" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = p.z = 0; // en el pueblo
+    p.gold = 20;
+    const price = getShopPrice("health_potion"); // 15
+    client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
+    await room.waitForNextPatch();
+    expect(p.gold).toBe(20 - price);
+    expect(p.inventory.get("health_potion")?.qty).toBe(1);
+  });
+
+  it("no compra si no alcanza el oro (no-op)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Comprador" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = p.z = 0;
+    p.gold = 5; // < 15
+    client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
+    await room.waitForNextPatch();
+    expect(p.gold).toBe(5); // intacto
+    expect(p.inventory.get("health_potion")).toBeUndefined();
+  });
+
+  it("usa una pocion: sube el HP y descuenta del inventario (borra si queda en 0)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Herido" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = p.z = 0;
+    p.gold = 20;
+    client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
+    await room.waitForNextPatch();
+    const heal = getItem("health_potion").heal!;
+    p.hp = Math.max(1, p.maxHp - heal - 5); // asegura hp < maxHp con margen
+    const hpBefore = p.hp;
+    client.send(MessageType.UseItem, { itemTemplateId: "health_potion" });
+    await room.waitForNextPatch();
+    expect(p.hp).toBe(Math.min(p.maxHp, hpBefore + heal));
+    expect(p.inventory.get("health_potion")).toBeUndefined(); // entrada borrada al llegar a 0
+  });
+
+  it("no usa la pocion a HP lleno (no-op)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Sano" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = p.z = 0;
+    p.gold = 20;
+    client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
+    await room.waitForNextPatch();
+    p.hp = p.maxHp; // lleno
+    client.send(MessageType.UseItem, { itemTemplateId: "health_potion" });
+    await room.waitForNextPatch();
+    expect(p.hp).toBe(p.maxHp);
+    expect(p.inventory.get("health_potion")?.qty).toBe(1); // no se gastó
   });
 });
