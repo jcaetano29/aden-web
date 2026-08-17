@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
+import { smoothTowards } from "./motion.js";
 
 export class Renderer {
   readonly scene = new THREE.Scene();
@@ -25,19 +26,14 @@ export class Renderer {
     this.css2dRenderer.domElement.style.pointerEvents = "none";
     container.appendChild(this.css2dRenderer.domElement);
 
-    this.scene.background = new THREE.Color(0x1a1a2a);
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const dir = new THREE.DirectionalLight(0xffffff, 0.8);
-    dir.position.set(10, 20, 10);
-    this.scene.add(dir);
-
+    // El cielo, la niebla y las luces los agrega Environment (para no sobre-iluminar).
     this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
     this.camera.position.set(0, 30, 30);
     this.camera.lookAt(0, 0, 0);
 
     this.ground = new THREE.Mesh(
       new THREE.PlaneGeometry(100, 100),
-      new THREE.MeshStandardMaterial({ color: 0x33443a }),
+      new THREE.MeshStandardMaterial({ color: 0x4a7c3a }),
     );
     this.ground.rotation.x = -Math.PI / 2;
     this.scene.add(this.ground);
@@ -82,10 +78,16 @@ export class Renderer {
     this.renderer.render(this.scene, this.camera);
   }
 
-  /** Cámara en tercera persona que sigue al self con offset fijo (isométrica-ish). */
-  followTarget(x: number, z: number): void {
-    const offset = new THREE.Vector3(0, 22, 22);
-    this.camera.position.set(x + offset.x, offset.y, z + offset.z);
+  /**
+   * Cámara en tercera persona que sigue al self con offset fijo, suavizada:
+   * en vez de teletransportarse cada frame, converge hacia (target+offset) con
+   * `smoothTowards` (independiente del framerate) → seguimiento fluido.
+   */
+  followTarget(x: number, z: number, dt: number): void {
+    const K = 6; // rapidez de convergencia
+    this.camera.position.x = smoothTowards(this.camera.position.x, x, K, dt);
+    this.camera.position.y = smoothTowards(this.camera.position.y, 22, K, dt);
+    this.camera.position.z = smoothTowards(this.camera.position.z, z + 22, K, dt);
     this.camera.lookAt(x, 1, z);
   }
 

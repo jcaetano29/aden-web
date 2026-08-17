@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { Renderer } from "./render/Renderer.js";
+import { Environment } from "./render/Environment.js";
 import { EntityViews } from "./render/EntityViews.js";
 import { GroundItems } from "./render/GroundItems.js";
 import { CharacterFactory } from "./render/CharacterFactory.js";
@@ -16,6 +17,7 @@ import { getItem } from "@aden/shared";
 async function main() {
   const app = document.getElementById("app")!;
   const renderer = new Renderer(app);
+  new Environment(renderer.scene); // cielo, niebla, luces y props procedurales
 
   const factory = new CharacterFactory();
   await factory.preload([...MODEL_NAMES, ...MOB_MODEL_NAMES]);
@@ -112,7 +114,7 @@ async function main() {
     damageNumbers.update(dt);
     groundItems.update(dt);
     const self = views.selfPosition();
-    if (self) renderer.followTarget(self.x, self.z);
+    if (self) renderer.followTarget(self.x, self.z, dt);
     const selfCombat = net.getSelf();
     if (selfCombat) {
       hud.update(
