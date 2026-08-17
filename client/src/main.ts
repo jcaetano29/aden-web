@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Renderer } from "./render/Renderer.js";
 import { EntityViews } from "./render/EntityViews.js";
+import { GroundItems } from "./render/GroundItems.js";
 import { CharacterFactory } from "./render/CharacterFactory.js";
 import { Nameplates } from "./render/Nameplates.js";
 import { DamageNumbers } from "./render/DamageNumbers.js";
@@ -20,6 +21,7 @@ async function main() {
   const nameplates = new Nameplates();
   const views = new EntityViews(renderer.scene, factory, nameplates);
   const damageNumbers = new DamageNumbers(renderer.scene);
+  const groundItems = new GroundItems(renderer.scene);
   const hud = new Hud();
   const net = new NetworkClient();
 
@@ -73,6 +75,8 @@ async function main() {
       }
     },
     onLevelUp: (level) => hud.flashLevelUp(level),
+    onItemAdd: (id, itemTemplateId, x, z) => groundItems.add(id, itemTemplateId, x, z),
+    onItemRemove: (id) => groundItems.remove(id),
   });
 
   const input = new InputController(
@@ -95,6 +99,7 @@ async function main() {
     const dt = clock.getDelta();
     views.updateAll(dt);
     damageNumbers.update(dt);
+    groundItems.update(dt);
     const self = views.selfPosition();
     if (self) renderer.followTarget(self.x, self.z);
     const selfCombat = net.getSelf();

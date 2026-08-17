@@ -48,6 +48,9 @@ export interface RoomCallbacks {
   onMobAdd: (id: string, templateId: string, snap: MobSnapshot) => void;
   onMobChange: (id: string, snap: MobSnapshot) => void;
   onMobRemove: (id: string) => void;
+  /** Ítem droppeado en el piso (sincronizado desde `state.droppedItems`). */
+  onItemAdd: (id: string, itemTemplateId: string, x: number, z: number) => void;
+  onItemRemove: (id: string) => void;
   onDamage: (ev: DamageEvent) => void;
   onDeath: (entityId: string) => void;
   /** Disparado cuando el server sube de nivel al jugador local (mensaje dirigido `levelUp`). */
@@ -95,6 +98,11 @@ export class NetworkClient {
       mob.onChange(() => cb.onMobChange(id, snapMob(mob)));
     });
     this.room.state.mobs.onRemove((_m: any, id: string) => cb.onMobRemove(id));
+
+    this.room.state.droppedItems.onAdd((it: any, id: string) =>
+      cb.onItemAdd(id, it.itemTemplateId, it.x, it.z),
+    );
+    this.room.state.droppedItems.onRemove((_it: any, id: string) => cb.onItemRemove(id));
 
     this.room.onMessage(MessageType.Damage, (data: DamageEvent) => cb.onDamage(data));
     this.room.onMessage(MessageType.Death, (data: DeathEvent) => cb.onDeath(data.entityId));
