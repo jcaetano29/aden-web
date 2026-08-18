@@ -10,6 +10,7 @@ export class InputController {
     private readonly views: EntityViews,
     private readonly onMove: (msg: MoveToMessage) => void,
     private readonly onPickMob: (mobId: string) => void,
+    private readonly onPickPlayer: (playerId: string) => void,
     private readonly onInteractNpc?: () => void,
     private readonly npcObject?: THREE.Object3D,
     private readonly onInteractMerchant?: () => void,
@@ -50,6 +51,13 @@ export class InputController {
       const mobId = this.renderer.pickMobs(ndcX, ndcY, this.views.raycastTargets());
       if (mobId) {
         this.onPickMob(mobId);
+        return;
+      }
+
+      // Raycast a otros jugadores (targeting PvP) — mismo mecanismo que mobs.
+      const playerId = this.renderer.pickMobs(ndcX, ndcY, this.views.raycastPlayerTargets());
+      if (playerId) {
+        this.onPickPlayer(playerId);
         return;
       }
 

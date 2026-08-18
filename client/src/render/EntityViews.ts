@@ -18,6 +18,8 @@ export class EntityViews {
   private readonly mobViews = new Map<string, CharacterView>();
   /** root Object3D del mob -> mobId, para resolver hits de raycast (R-E2b1-5). */
   private readonly mobRootToId = new Map<THREE.Object3D, string>();
+  /** root Object3D del jugador -> sessionId, para resolver hits de raycast al targetear otro jugador (PvP). */
+  private readonly playerRootToId = new Map<THREE.Object3D, string>();
   /** mobId -> ¿muerto? (del snapshot sincronizado); usado para excluir corpses del targeting. */
   private readonly mobDead = new Map<string, boolean>();
   /** mobId -> barra de HP (CSS2D) flotando sobre el mob. */
@@ -41,6 +43,7 @@ export class EntityViews {
     view.setServerState(snap);
     this.scene.add(view.object);
     this.views.set(id, view);
+    this.playerRootToId.set(view.object, id);
     this.nameplates.add(id, snap.name, view.object);
     this.playerDead.set(id, snap.dead);
     if (isSelf) {
@@ -65,10 +68,12 @@ export class EntityViews {
     if (view) {
       this.nameplates.remove(id);
       this.scene.remove(view.object);
+      this.playerRootToId.delete(view.object);
       view.dispose();
       this.views.delete(id);
     }
     this.playerDead.delete(id);
+    if (this.currentTargetId === id) this.currentTargetId = null;
   }
 
   addMob(id: string, modelName: string, templateId: string, snap: MobSnapshot) {
@@ -250,14 +255,45 @@ export class EntityViews {
     return { objects, idOf };
   }
 
-  /** Resalta (anillo rojo) el mob objetivo actual; quita el resaltado del anterior. */
-  setTargetHighlight(mobId: string | null) {
-    if (this.currentTargetId && this.currentTargetId !== mobId) {
+  /**
+   * Objetos raycasteables de OTROS jugadores (root) y resolutor hit->sessionId,
+   * para permitir targetear jugadores en PvP (mismo patrón que raycastTargets()
+   * para mobs). Excluye al propio jugador (self) y a jugadores muertos: el
+   * server rechaza SetTarget contra sí mismo o contra un jugador muerto
+   * (`msg.targetId !== client.sessionId && !!other && !other.dead`), así que
+   * un click sobre uno de esos casos no debe ni intentarlo.
+   */
+  raycastPlayerTargets(): { objects: THREE.Object3D[]; idOf: (o: THREE.Object3D) => string | null } {
+    const objects = [...this.views.entries()]
+      .filter(([id]) => id !== this.selfId && !this.playerDead.get(id))
+      .map(([, v]) => v.object);
+    const idOf = (o: THREE.Object3D): string | null => {
+      let cur: THREE.Object3D | null = o;
+      while (cur) {
+        const id = this.playerRootToId.get(cur);
+        if (id) return id === this.selfId || this.playerDead.get(id) ? null : id;
+        cur = cur.parent;
+      }
+      return null;
+    };
+    return { objects, idOf };
+  }
+
+  /**
+   * Resalta (anillo rojo) el objetivo actual —mob o jugador (PvP)— y quita el
+   * resaltado del anterior. El id puede resolver en `mobViews` o en `views`
+   * (namespaces distintos: mobId vs. sessionId nunca colisionan), así que se
+   * intenta en ambos mapas sin necesidad de que el llamador distinga el tipo.
+   */
+  setTargetHighlight(id: string | null) {
+    if (this.currentTargetId && this.currentTargetId !== id) {
       this.mobViews.get(this.currentTargetId)?.removeTargetRing();
+      this.views.get(this.currentTargetId)?.removeTargetRing();
     }
-    this.currentTargetId = mobId;
-    if (mobId) {
-      this.mobViews.get(mobId)?.addTargetRing();
+    this.currentTargetId = id;
+    if (id) {
+      this.mobViews.get(id)?.addTargetRing();
+      this.views.get(id)?.addTargetRing();
     }
   }
 
