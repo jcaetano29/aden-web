@@ -40,12 +40,27 @@ describe("skills y config defensiva", () => {
     expect(getSkill("power_strike")).toBe(POWER_STRIKE);
   });
   it("getSkill lanza para skill desconocida", () => {
-    expect(() => getSkill("fireball")).toThrow();
+    expect(() => getSkill("nope")).toThrow();
   });
   it("jugador tiene MP; pueblo y respawn definidos", () => {
     expect(PLAYER_COMBAT.maxMp).toBe(50);
     expect(TOWN).toEqual({ x: 0, z: 0 });
     expect(SAFE_RADIUS).toBeGreaterThan(0);
     expect(PLAYER_RESPAWN_MS).toBeGreaterThan(0);
+  });
+  it("las 4 skills característica están definidas", () => {
+    const skill = getSkill("shield_bash");
+    expect(skill.mpCost).toBe(8);
+    expect(skill.cooldownMs).toBe(5000);
+    expect(skill.factor).toBe(2.0);
+
+    expect(getSkill("fireball").mpCost).toBe(22);
+    expect(getSkill("fireball").factor).toBe(3.6);
+
+    expect(getSkill("brutal_strike").mpCost).toBe(12);
+    expect(getSkill("brutal_strike").factor).toBe(3.0);
+
+    expect(getSkill("backstab").mpCost).toBe(8);
+    expect(getSkill("backstab").factor).toBe(2.8);
   });
 });

@@ -35,6 +35,10 @@ export const POWER_STRIKE: SkillConfig = { id: "power_strike", mpCost: 10, coold
 
 export const SKILLS: Record<string, SkillConfig> = {
   power_strike: POWER_STRIKE,
+  shield_bash: { id: "shield_bash", mpCost: 8, cooldownMs: 5000, factor: 2.0 },
+  fireball: { id: "fireball", mpCost: 22, cooldownMs: 4500, factor: 3.6 },
+  brutal_strike: { id: "brutal_strike", mpCost: 12, cooldownMs: 4000, factor: 3.0 },
+  backstab: { id: "backstab", mpCost: 8, cooldownMs: 2500, factor: 2.8 },
 };
 
 export function getSkill(id: string): SkillConfig {

@@ -1,4 +1,5 @@
 import { PLAYER_COMBAT } from "./combat.js";
+import { getClass } from "./classes.js";
 
 export const EXP_BASE = 100;
 export const EXP_POW = 1.5;
@@ -28,26 +29,32 @@ export interface Leveled {
   mp: number;
 }
 
-export function statsForLevel(level: number): { maxHp: number; maxMp: number; pAtk: number; pDef: number } {
+export function statsForClass(className: string, level: number): { maxHp: number; maxMp: number; pAtk: number; pDef: number } {
+  const cls = getClass(className);
   const n = Math.max(0, level - 1);
   return {
-    maxHp: PLAYER_COMBAT.maxHp + n * LEVEL_GROWTH.hp,
-    maxMp: (PLAYER_COMBAT.maxMp ?? 0) + n * LEVEL_GROWTH.mp,
-    pAtk: PLAYER_COMBAT.pAtk + n * LEVEL_GROWTH.pAtk,
-    pDef: PLAYER_COMBAT.pDef + n * LEVEL_GROWTH.pDef,
+    maxHp: cls.base.maxHp + n * cls.growth.hp,
+    maxMp: (cls.base.maxMp ?? 0) + n * cls.growth.mp,
+    pAtk: cls.base.pAtk + n * cls.growth.pAtk,
+    pDef: cls.base.pDef + n * cls.growth.pDef,
   };
 }
 
-export function gainExp(p: Leveled, amount: number): number {
+export function statsForLevel(level: number): { maxHp: number; maxMp: number; pAtk: number; pDef: number } {
+  return statsForClass("knight", level);
+}
+
+export function gainExp(p: Leveled, amount: number, className = "knight"): number {
   p.exp += amount;
   let gained = 0;
   while (p.exp >= expToNextLevel(p.level)) {
     p.exp -= expToNextLevel(p.level);
     p.level += 1;
-    p.maxHp += LEVEL_GROWTH.hp;
-    p.maxMp += LEVEL_GROWTH.mp;
-    p.pAtk += LEVEL_GROWTH.pAtk;
-    p.pDef += LEVEL_GROWTH.pDef;
+    const newStats = statsForClass(className, p.level);
+    p.maxHp = newStats.maxHp;
+    p.maxMp = newStats.maxMp;
+    p.pAtk = newStats.pAtk;
+    p.pDef = newStats.pDef;
     gained += 1;
   }
   if (gained > 0) {
