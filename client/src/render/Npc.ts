@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import { TOWN } from "@aden/shared";
+import { TOWN, ELDER_NAME } from "@aden/shared";
 
 /**
  * NPC quest-giver en el pueblo. Usa un mesh geométrico simple (tall box + sphere
@@ -52,9 +52,9 @@ export class Npc {
     this.indicatorMat = indicatorMat;
     this.indicatorMesh = indicator;
 
-    // Nameplate CSS2D: "Anciano del Pueblo"
+    // Nameplate CSS2D: Anciano Rowan
     const nameplateDiv = document.createElement("div");
-    nameplateDiv.textContent = "Anciano del Pueblo";
+    nameplateDiv.textContent = ELDER_NAME;
     nameplateDiv.style.cssText =
       "color:#ffff00;font:bold 12px sans-serif;text-shadow:0 0 3px #000;pointer-events:none;white-space:nowrap;";
     this.css2dNameplate = new CSS2DObject(nameplateDiv);

@@ -14,11 +14,13 @@ import { Merchant } from "./render/Merchant.js";
 import { ShopPanel } from "./render/ShopPanel.js";
 import { ClassSelect } from "./render/ClassSelect.js";
 import { Minimap } from "./render/Minimap.js";
+import { StoryCard } from "./render/StoryCard.js";
+import { DialogPanel } from "./render/DialogPanel.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss, ELDER_NAME, firstQuestId } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -45,6 +47,8 @@ async function main() {
     (itemId) => net.sendUseItem(itemId),
   );
   const classSelect = new ClassSelect();
+  const storyCard = new StoryCard();
+  const dialog = new DialogPanel();
 
   // Minimapa (esquina sup. der.) con marcadores fijos: NPCs y la arena del jefe.
   const minimap = new Minimap();
@@ -70,6 +74,9 @@ async function main() {
 
   // Esperar la selección de clase antes de conectar
   const className = await classSelect.select();
+
+  // Mostrar la premisa narrativa una sola vez
+  await storyCard.show();
 
   await net.connect(name, className, {
     onAdd: (id, isSelf, snap) =>
@@ -113,32 +120,62 @@ async function main() {
     onItemRemove: (id) => groundItems.remove(id),
   });
 
-  // Interacción con el NPC de misiones: da feedback claro (el server es
-  // autoritativo y silencioso si no corresponde, así que el cliente explica
-  // qué pasó). Espeja el gate de cercanía del server (radio ~4 del pueblo).
+  // Interacción con el NPC de misiones: diálogo narrativo contextual.
+  // El server es autoritativo; el diálogo es presentación.
   function interactNpc() {
     const self = net.getSelf();
     const pos = views.selfPosition();
     if (!self || !pos) return;
+
+    // Gate de cercanía (espeja el del server)
     if (distance2D(pos.x, pos.z, TOWN.x, TOWN.z) > 4) {
-      hud.toast("Acercate al Anciano del Pueblo para hablarle", "#ffe066");
-      return; // el server lo rechazaría igual; guiamos al jugador
-    }
-    net.sendInteractNpc();
-    if (self.questId === "") {
-      hud.toast("¡Nueva misión asignada!", "#2ecc40");
+      hud.toast(`Acercate al ${ELDER_NAME} para hablarle`, "#ffe066");
       return;
     }
+
+    // Si no hay misión asignada: ofrecer la primera
+    if (self.questId === "") {
+      try {
+        const firstQuestId_ = firstQuestId();
+        const q = getQuest(firstQuestId_);
+        dialog.open({
+          speaker: ELDER_NAME,
+          text: q.intro,
+          actionLabel: "Aceptar",
+          onAction: () => net.sendInteractNpc(),
+        });
+      } catch {
+        // No hay quests disponibles (no debería pasar)
+        hud.toast("No hay misiones disponibles", "#ff6b6b");
+      }
+      return;
+    }
+
+    // Hay una misión activa
     try {
       const q = getQuest(self.questId);
+
+      // Si la misión está completada: mostrar diálogo de entrega
       if (self.questProgress >= q.amount) {
-        hud.toast(`¡Misión completada!  +${q.rewardExp} EXP   +${q.rewardGold} oro`, "#2ecc40");
+        dialog.open({
+          speaker: ELDER_NAME,
+          text: q.done,
+          actionLabel: "Continuar",
+          onAction: () => net.sendInteractNpc(),
+        });
       } else {
-        const faltan = q.amount - self.questProgress;
-        hud.toast(`«${q.title}» — te faltan ${faltan} (${self.questProgress}/${q.amount})`, "#fff");
+        // Misión en progreso: recordatorio + progreso
+        const progressText = `${q.intro}\n\n(Progreso: ${self.questProgress}/${q.amount})`;
+        dialog.open({
+          speaker: ELDER_NAME,
+          text: progressText,
+          actionLabel: "Entendido",
+          onAction: () => {},
+        });
       }
     } catch {
-      /* questId desconocido: ignorar el feedback, el server ya recibió el intent */
+      // questId desconocido
+      hud.toast("Error desconocido en la misión", "#ff6b6b");
     }
   }
 
