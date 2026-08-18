@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
 import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass } from "@aden/shared";
 import appConfig from "../testServer.js";
+import { MobState } from "../state/MobState.js";
 
 describe("GameRoom", () => {
   let colyseus: ColyseusTestServer;
@@ -184,5 +185,75 @@ describe("GameRoom", () => {
     const p = room.state.players.get(c.sessionId)!;
     expect(p.className).toBe("knight");
     expect(getClass(p.className).skillId).toBe("shield_bash");
+  });
+
+  it("skill de curación (second_wind) sube el HP y gasta MP", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    p.hp = 10; // herido
+    const mpBefore = p.mp;
+    c.send(MessageType.UseSkill, { skillId: "second_wind" });
+    await room.waitForNextPatch();
+    expect(p.hp).toBeGreaterThan(10); // se curó ~40% maxHp
+    expect(p.mp).toBeLessThan(mpBefore); // gastó MP
+  });
+
+  it("skill de buff (rage) activa el multiplicador de ataque temporal", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Barb", className: "barbarian" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)! as any;
+    c.send(MessageType.UseSkill, { skillId: "rage" });
+    await room.waitForNextPatch();
+    expect(p.atkBuffMs).toBeGreaterThan(0);
+    expect(p.atkBuffMult).toBe(1.5);
+  });
+
+  it("una skill fuera del kit de la clase es no-op (knight no castea fireball)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    const mpBefore = p.mp;
+    c.send(MessageType.UseSkill, { skillId: "fireball" }); // no está en el kit del knight
+    await room.waitForNextPatch();
+    expect(p.mp).toBe(mpBefore); // no gastó nada
+  });
+
+  it("la misma skill en cooldown no se puede recastear inmediatamente", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    p.hp = 10;
+    c.send(MessageType.UseSkill, { skillId: "second_wind" });
+    await room.waitForNextPatch();
+    const hpAfterFirst = p.hp;
+    p.hp = 10; // volver a herir
+    c.send(MessageType.UseSkill, { skillId: "second_wind" }); // en cooldown
+    await room.waitForNextPatch();
+    expect(p.hp).toBe(10); // no curó de nuevo
+    expect(hpAfterFirst).toBeGreaterThan(10); // la primera sí curó
+  });
+
+  it("veneno (poison) hace daño por tiempo al mob objetivo", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Pica", className: "rogue" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    // Crear un mob pegado al jugador (dentro de rango)
+    const mob = new MobState();
+    mob.templateId = "skeleton_minion";
+    mob.hp = 100; mob.maxHp = 100; mob.pDef = 5; mob.dead = false;
+    mob.x = p.x; mob.z = p.z;
+    room.state.mobs.set("mob-test", mob);
+    p.targetId = "mob-test";
+    c.send(MessageType.UseSkill, { skillId: "poison" });
+    await room.waitForNextPatch();
+    // Avanzar ~1s de simulación para que el veneno tickee (cada 0.5s)
+    for (let i = 0; i < 16; i++) await room.waitForNextSimulationTick();
+    expect(mob.hp).toBeLessThan(100); // el veneno bajó su HP sin volver a atacar
   });
 });
