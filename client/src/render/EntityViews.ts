@@ -3,6 +3,7 @@ import { CharacterFactory } from "./CharacterFactory.js";
 import { CharacterView } from "./CharacterView.js";
 import { Nameplates } from "./Nameplates.js";
 import { HealthBar } from "./HealthBar.js";
+import { isBoss, scaleForTemplate, getTemplate } from "@aden/shared";
 import type { PlayerSnapshot, MobSnapshot } from "../net/NetworkClient.js";
 
 const MOB_HP_BAR_Y = 2.2; // altura aprox. de la cabeza, para posicionar los damage numbers
@@ -65,14 +66,20 @@ export class EntityViews {
     this.playerDead.delete(id);
   }
 
-  addMob(id: string, modelName: string, snap: MobSnapshot) {
+  addMob(id: string, modelName: string, templateId: string, snap: MobSnapshot) {
     const view = new CharacterView(this.factory.create(modelName));
     view.snapTo(snap.x, snap.z);
     view.setServerState(snap);
+    view.object.scale.setScalar(scaleForTemplate(templateId));
     this.scene.add(view.object);
     this.mobViews.set(id, view);
     this.mobRootToId.set(view.object, id);
     this.mobDead.set(id, snap.dead);
+
+    // Boss nameplate en rojo
+    if (isBoss(templateId)) {
+      this.nameplates.add(id, getTemplate(templateId).name, view.object, "#ff5252");
+    }
 
     const bar = new HealthBar();
     bar.attach(view.object);
@@ -108,6 +115,7 @@ export class EntityViews {
       view.dispose();
       this.mobViews.delete(id);
     }
+    this.nameplates.remove(id);
     this.mobHealthBars.get(id)?.remove();
     this.mobHealthBars.delete(id);
     this.mobDead.delete(id);

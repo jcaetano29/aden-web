@@ -46,6 +46,7 @@ import {
   getShopPrice,
   getClass,
   isValidClass,
+  respawnForTemplate,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -325,7 +326,7 @@ export class GameRoom extends Room<GameState> {
   private killMob(mob: MobState, mobId: string, killerId?: string) {
     mob.dead = true;
     mob.moving = false;
-    mob.respawnMs = MOB_RESPAWN_MS;
+    mob.respawnMs = respawnForTemplate(mob.templateId) ?? MOB_RESPAWN_MS;
     this.broadcast(MessageType.Death, { entityId: mobId });
 
     const killer = killerId ? this.state.players.get(killerId) : undefined;

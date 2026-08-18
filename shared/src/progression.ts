@@ -13,6 +13,7 @@ export const LEVEL_GROWTH = { hp: 20, mp: 5, pAtk: 3, pDef: 2 } as const;
 export const MOB_EXP: Record<string, number> = {
   skeleton_minion: 15,
   skeleton_warrior: 40,
+  skeleton_king: 300,
 };
 export function getMobExp(templateId: string): number {
   return MOB_EXP[templateId] ?? 0;

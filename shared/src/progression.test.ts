@@ -53,6 +53,10 @@ describe("getMobExp", () => {
     expect(getMobExp("skeleton_warrior")).toBe(40);
     expect(getMobExp("dragon")).toBe(0);
   });
+
+  it("skeleton_king (jefe) da 300 EXP", () => {
+    expect(getMobExp("skeleton_king")).toBe(300);
+  });
 });
 
 describe("statsForLevel", () => {

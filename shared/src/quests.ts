@@ -32,9 +32,17 @@ export const QUESTS: Record<string, Quest> = {
     rewardExp: 150,
     rewardGold: 80,
   },
+  q4: {
+    id: "q4",
+    title: "Derrota al Rey Esqueleto",
+    mobTemplateId: "skeleton_king",
+    amount: 1,
+    rewardExp: 400,
+    rewardGold: 200,
+  },
 };
 
-export const QUEST_ORDER: string[] = ["q1", "q2", "q3"];
+export const QUEST_ORDER: string[] = ["q1", "q2", "q3", "q4"];
 
 export function getQuest(id: string): Quest {
   const quest = QUESTS[id];

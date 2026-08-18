@@ -66,7 +66,7 @@ async function main() {
       views.add(id, isSelf, modelForClass(snap.className ?? "knight"), snap),
     onChange: (id, snap) => views.update(id, snap),
     onRemove: (id) => views.remove(id),
-    onMobAdd: (id, templateId, snap) => views.addMob(id, modelForTemplate(templateId), snap),
+    onMobAdd: (id, templateId, snap) => views.addMob(id, modelForTemplate(templateId), templateId, snap),
     onMobChange: (id, snap) => views.updateMob(id, snap),
     onMobRemove: (id) => {
       views.removeMob(id);

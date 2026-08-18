@@ -52,8 +52,12 @@ describe("nextQuestId", () => {
     expect(nextQuestId("q2")).toBe("q3");
   });
 
-  it("retorna q1 cuando la quest actual es q3 (loop)", () => {
-    expect(nextQuestId("q3")).toBe("q1");
+  it("retorna q4 cuando la quest actual es q3", () => {
+    expect(nextQuestId("q3")).toBe("q4");
+  });
+
+  it("retorna q1 cuando la quest actual es q4 (loop)", () => {
+    expect(nextQuestId("q4")).toBe("q1");
   });
 
   it("retorna q1 cuando la quest actual no existe (fallback)", () => {
@@ -63,6 +67,18 @@ describe("nextQuestId", () => {
 
 describe("QUEST_ORDER", () => {
   it("contiene las quests en orden correcto", () => {
-    expect(QUEST_ORDER).toEqual(["q1", "q2", "q3"]);
+    expect(QUEST_ORDER).toEqual(["q1", "q2", "q3", "q4"]);
+  });
+});
+
+describe("getQuest q4", () => {
+  it("retorna la quest q4 con valores correctos (Rey Esqueleto)", () => {
+    const q = getQuest("q4");
+    expect(q.id).toBe("q4");
+    expect(q.title).toBe("Derrota al Rey Esqueleto");
+    expect(q.mobTemplateId).toBe("skeleton_king");
+    expect(q.amount).toBe(1);
+    expect(q.rewardExp).toBe(400);
+    expect(q.rewardGold).toBe(200);
   });
 });
