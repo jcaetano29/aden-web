@@ -5,11 +5,12 @@ import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 export class Nameplates {
   private readonly labels = new Map<string, CSS2DObject>();
 
-  add(id: string, name: string, parent: THREE.Object3D) {
+  add(id: string, name: string, parent: THREE.Object3D, color?: string) {
     const div = document.createElement("div");
     div.textContent = name;
+    const textColor = color ?? "#fff";
     div.style.cssText =
-      "color:#fff;font:12px sans-serif;text-shadow:0 0 3px #000;pointer-events:none;white-space:nowrap;";
+      `color:${textColor};font:12px sans-serif;text-shadow:0 0 3px #000;pointer-events:none;white-space:nowrap;`;
     const label = new CSS2DObject(div);
     label.position.set(0, 2.4, 0); // sobre la cabeza
     parent.add(label);
