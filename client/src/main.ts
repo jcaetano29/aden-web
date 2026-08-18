@@ -13,11 +13,12 @@ import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ShopPanel } from "./render/ShopPanel.js";
 import { ClassSelect } from "./render/ClassSelect.js";
+import { Minimap } from "./render/Minimap.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -44,6 +45,15 @@ async function main() {
     (itemId) => net.sendUseItem(itemId),
   );
   const classSelect = new ClassSelect();
+
+  // Minimapa (esquina sup. der.) con marcadores fijos: NPCs y la arena del jefe.
+  const minimap = new Minimap();
+  const bossZone = SPAWN_ZONES.find((z) => isBoss(z.templateId));
+  minimap.setMarkers([
+    { x: TOWN.x, z: TOWN.z, label: "!", color: "#ffd54f" }, // Anciano (misiones)
+    { x: merchant.object.position.x, z: merchant.object.position.z, label: "$", color: "#f4c430" }, // Mercader
+    ...(bossZone ? [{ x: bossZone.centerX, z: bossZone.centerZ, label: "♛", color: "#ff5252" }] : []), // arena del jefe (♛)
+  ]);
   const net = new NetworkClient();
 
   // Objetivo actualmente seleccionado por este cliente (no autoritativo: sólo
@@ -237,6 +247,7 @@ async function main() {
     const selfCombat = net.getSelf();
     npc.update(dt);
     merchant.update(dt);
+    minimap.update(net.getMinimapEntities());
     if (selfCombat) {
       hud.update(
         selfCombat.hp,

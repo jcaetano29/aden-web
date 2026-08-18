@@ -10,6 +10,7 @@ import {
   type InteractNpcMessage,
   type BuyItemMessage,
   type UseItemMessage,
+  isBoss,
 } from "@aden/shared";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
@@ -194,6 +195,24 @@ export class NetworkClient {
     const out: { itemTemplateId: string; qty: number }[] = [];
     p.inventory.forEach((item: any) => {
       out.push({ itemTemplateId: item.itemTemplateId, qty: item.qty });
+    });
+    return out;
+  }
+
+  /**
+   * Posiciones de todas las entidades vivas para el minimapa: el jugador local
+   * ("self"), otros jugadores ("player"), mobs comunes ("mob") y jefes ("boss").
+   * Sólo lectura del estado sincronizado; los muertos se omiten.
+   */
+  getMinimapEntities(): { x: number; z: number; kind: "self" | "player" | "mob" | "boss" }[] {
+    const out: { x: number; z: number; kind: "self" | "player" | "mob" | "boss" }[] = [];
+    this.room.state.players.forEach((p: any, id: string) => {
+      if (p.dead) return;
+      out.push({ x: p.x, z: p.z, kind: id === this.room.sessionId ? "self" : "player" });
+    });
+    this.room.state.mobs.forEach((m: any) => {
+      if (m.dead) return;
+      out.push({ x: m.x, z: m.z, kind: isBoss(m.templateId) ? "boss" : "mob" });
     });
     return out;
   }
