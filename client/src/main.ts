@@ -11,11 +11,12 @@ import { InventoryPanel } from "./render/InventoryPanel.js";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ShopPanel } from "./render/ShopPanel.js";
+import { ClassSelect } from "./render/ClassSelect.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
-import { MODEL_NAMES, MOB_MODEL_NAMES, pickModelForSession, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D } from "@aden/shared";
+import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
+import { getItem, getQuest, TOWN, distance2D, getClass } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -40,6 +41,7 @@ async function main() {
     document.body,
     (itemId) => net.sendUseItem(itemId),
   );
+  const classSelect = new ClassSelect();
   const net = new NetworkClient();
 
   // Objetivo actualmente seleccionado por este cliente (no autoritativo: sólo
@@ -54,9 +56,12 @@ async function main() {
     name = "Adventurer";
   }
 
-  await net.connect(name, {
+  // Esperar la selección de clase antes de conectar
+  const className = await classSelect.select();
+
+  await net.connect(name, className, {
     onAdd: (id, isSelf, snap) =>
-      views.add(id, isSelf, pickModelForSession(id, MODEL_NAMES), snap),
+      views.add(id, isSelf, modelForClass(snap.className ?? "knight"), snap),
     onChange: (id, snap) => views.update(id, snap),
     onRemove: (id) => views.remove(id),
     onMobAdd: (id, templateId, snap) => views.addMob(id, modelForTemplate(templateId), snap),
@@ -153,7 +158,7 @@ async function main() {
   );
   input.attach(document.body);
 
-  const skillInput = new SkillInput((id) => net.sendUseSkill(id));
+  const skillInput = new SkillInput(getClass(className).skillId, (id) => net.sendUseSkill(id));
   skillInput.attach(document.body);
 
   // Tecla "i" → alterna el panel de inventario. No conflictúa con "1"/Space
@@ -184,6 +189,8 @@ async function main() {
     }
   });
 
+  const skillId = getClass(className).skillId;
+
   const clock = new THREE.Clock();
   function loop() {
     const dt = clock.getDelta();
@@ -207,6 +214,8 @@ async function main() {
         selfCombat.gold,
         selfCombat.questId,
         selfCombat.questProgress,
+        className,
+        skillId,
       );
       // El "!" del NPC se pone verde ("✓") cuando la misión activa está lista
       // para entregar → confirma visualmente que el server contó el progreso.

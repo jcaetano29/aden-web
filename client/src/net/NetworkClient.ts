@@ -23,6 +23,8 @@ export interface PlayerSnapshot {
   moving: boolean;
   /** Muerto/respawneando (server-autoritativo); permite animar death/respawn de OTROS jugadores. */
   dead: boolean;
+  /** Clase del jugador (knight/mage/barbarian/rogue); se sincroniza desde el server. Solo para jugadores. */
+  className?: string;
 }
 
 /** Snapshot de mob: incluye combate (hp/maxHp/dead) para highlight/HUD. */
@@ -46,6 +48,8 @@ export interface SelfCombatSnapshot {
   gold: number;
   questId: string;
   questProgress: number;
+  /** Clase del jugador local. */
+  className: string;
 }
 
 export interface RoomCallbacks {
@@ -67,9 +71,9 @@ export interface RoomCallbacks {
 export class NetworkClient {
   private room!: Room;
 
-  async connect(name: string, cb: RoomCallbacks): Promise<void> {
+  async connect(name: string, className: string, cb: RoomCallbacks): Promise<void> {
     const client = new Client(SERVER_URL);
-    this.room = await client.joinOrCreate("game", { name });
+    this.room = await client.joinOrCreate("game", { name, className });
     const selfId = this.room.sessionId;
 
     const snap = (p: any): PlayerSnapshot => ({
@@ -80,6 +84,7 @@ export class NetworkClient {
       targetZ: p.targetZ,
       moving: p.moving,
       dead: p.dead,
+      className: p.className,
     });
 
     this.room.state.players.onAdd((player: any, id: string) => {
@@ -173,6 +178,7 @@ export class NetworkClient {
       gold: p.gold ?? 0,
       questId: p.questId ?? "",
       questProgress: p.questProgress ?? 0,
+      className: p.className ?? "knight",
     };
   }
 

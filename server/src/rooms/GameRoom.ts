@@ -38,11 +38,14 @@ import {
   DROP_DESPAWN_MS,
   distance2D,
   statsForLevel,
+  statsForClass,
   firstQuestId,
   getQuest,
   nextQuestId,
   getItem,
   getShopPrice,
+  getClass,
+  isValidClass,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -112,9 +115,10 @@ export class GameRoom extends Room<GameState> {
     this.onMessage(MessageType.UseSkill, (client, msg: UseSkillMessage) => {
       const p = this.state.players.get(client.sessionId);
       if (!p || p.dead) return;
+      const skillId = getClass(p.className).skillId;
       let skill;
       try {
-        skill = getSkill(msg.skillId);
+        skill = getSkill(skillId);
       } catch {
         return;
       }
@@ -123,7 +127,7 @@ export class GameRoom extends Room<GameState> {
       if (p.mp < skill.mpCost || p.skillCooldownMs > 0) return;
       if (!canAttack(p, mob, ATTACK_RANGE)) return;
       const variance = 0.9 + Math.random() * 0.2;
-      const dmg = resolveAttack(p, mob, skill.factor, variance, PLAYER_COMBAT.attackCooldownMs);
+      const dmg = resolveAttack(p, mob, skill.factor, variance, getClass(p.className).base.attackCooldownMs);
       p.mp -= skill.mpCost;
       p.skillCooldownMs = skill.cooldownMs;
       this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
@@ -231,7 +235,7 @@ export class GameRoom extends Room<GameState> {
 
   /** Otorga EXP a un jugador y envía LevelUp si sube de nivel (Etapa 4b-1: reutilizable en quests). */
   private grantExp(player: PlayerState, client: Client, amount: number) {
-    const lvls = gainExp(player, amount);
+    const lvls = gainExp(player, amount, player.className);
     if (lvls > 0) {
       client.send(MessageType.LevelUp, { level: player.level });
     }
@@ -343,7 +347,7 @@ export class GameRoom extends Room<GameState> {
       }
       if (canAttack(p, mob, ATTACK_RANGE)) {
         const variance = 0.9 + Math.random() * 0.2;
-        const dmg = resolveAttack(p, mob, 1, variance, PLAYER_COMBAT.attackCooldownMs);
+        const dmg = resolveAttack(p, mob, 1, variance, getClass(p.className).base.attackCooldownMs);
         this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
         if (mob.hp <= 0) {
           this.killMob(mob, p.targetId, sessionId);
@@ -428,15 +432,18 @@ export class GameRoom extends Room<GameState> {
     });
   }
 
-  async onJoin(client: Client, options: { name?: string }) {
+  async onJoin(client: Client, options: { name?: string; className?: string }) {
     const player = new PlayerState();
     player.name = options?.name ?? "Adventurer";
-    player.hp = PLAYER_COMBAT.maxHp;
-    player.maxHp = PLAYER_COMBAT.maxHp;
-    player.pAtk = PLAYER_COMBAT.pAtk;
-    player.pDef = PLAYER_COMBAT.pDef;
-    player.mp = PLAYER_COMBAT.maxMp ?? 0;
-    player.maxMp = PLAYER_COMBAT.maxMp ?? 0;
+    const className = isValidClass(options?.className) ? options.className! : "knight";
+    player.className = className;
+    const st = statsForClass(className, 1);
+    player.hp = st.maxHp;
+    player.maxHp = st.maxHp;
+    player.pAtk = st.pAtk;
+    player.pDef = st.pDef;
+    player.mp = st.maxMp;
+    player.maxMp = st.maxMp;
     player.dead = false;
     player.attackCooldownMs = 0;
     player.skillCooldownMs = 0;
@@ -454,9 +461,10 @@ export class GameRoom extends Room<GameState> {
     // nivel 1 seteados arriba (R-E3c-2: onJoin async, se actualiza al resolver la promesa).
     const save = await this.persistence.load(player.name);
     if (save) {
+      player.className = save.className ?? "knight";
       player.level = save.level;
       player.exp = save.exp;
-      const st = statsForLevel(save.level);
+      const st = statsForClass(player.className, save.level);
       player.maxHp = st.maxHp;
       player.maxMp = st.maxMp;
       player.pAtk = st.pAtk;
