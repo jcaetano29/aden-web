@@ -29,8 +29,16 @@ export class PlayerState extends Schema {
 
   // Combat cooldown — server-only (NO @type)
   attackCooldownMs = 0;
-  skillCooldownMs = 0;
   respawnMs = 0;
+
+  // Per-skill cooldowns — server-only (NO @type)
+  skillCooldowns = new Map<string, number>();
+
+  // Buff fields — server-only (NO @type)
+  atkBuffMs = 0;
+  atkBuffMult = 1;
+  defBuffMs = 0;
+  defBuffMult = 1;
 
   // Etapa 3c: true una vez que onJoin terminó de aplicar (o no) el save cargado.
   // Server-only (NO @type) — usado para evitar que un save en curso (defaults de

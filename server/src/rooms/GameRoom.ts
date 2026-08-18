@@ -115,24 +115,73 @@ export class GameRoom extends Room<GameState> {
     this.onMessage(MessageType.UseSkill, (client, msg: UseSkillMessage) => {
       const p = this.state.players.get(client.sessionId);
       if (!p || p.dead) return;
-      const skillId = getClass(p.className).skillId;
+
+      // Validate that skillId is in the class kit
+      const kit = getClass(p.className).skills;
+      if (!kit.includes(msg.skillId)) return;
+
       let skill;
       try {
-        skill = getSkill(skillId);
+        skill = getSkill(msg.skillId);
       } catch {
         return;
       }
-      const mob = p.targetId ? this.state.mobs.get(p.targetId) : undefined;
-      if (!mob || mob.dead) return;
-      if (p.mp < skill.mpCost || p.skillCooldownMs > 0) return;
-      if (!canAttack(p, mob, ATTACK_RANGE)) return;
-      const variance = 0.9 + Math.random() * 0.2;
-      const dmg = resolveAttack(p, mob, skill.factor, variance, getClass(p.className).base.attackCooldownMs);
-      p.mp -= skill.mpCost;
-      p.skillCooldownMs = skill.cooldownMs;
-      this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
-      if (mob.hp <= 0) {
-        this.killMob(mob, p.targetId, client.sessionId);
+
+      // Check MP and cooldown
+      if (p.mp < skill.mpCost) return;
+      if ((p.skillCooldowns.get(skill.id) ?? 0) > 0) return;
+
+      // Branch by skill type
+      if (skill.type === "damage") {
+        // Damage skill: requires mob target in range
+        const mob = p.targetId ? this.state.mobs.get(p.targetId) : undefined;
+        if (!mob || mob.dead) return;
+        if (!canAttack(p, mob, ATTACK_RANGE)) return;
+
+        // All checks passed: spend resources
+        p.mp -= skill.mpCost;
+        p.skillCooldowns.set(skill.id, skill.cooldownMs);
+
+        const variance = 0.9 + Math.random() * 0.2;
+        const dmg = resolveAttack(p, mob, skill.factor ?? 1, variance, getClass(p.className).base.attackCooldownMs);
+        this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
+        if (mob.hp <= 0) {
+          this.killMob(mob, p.targetId, client.sessionId);
+        }
+      } else if (skill.type === "heal") {
+        // Heal skill: no target needed
+        p.mp -= skill.mpCost;
+        p.skillCooldowns.set(skill.id, skill.cooldownMs);
+
+        const healAmount = Math.round(p.maxHp * (skill.healPct ?? 0));
+        p.hp = Math.min(p.maxHp, p.hp + healAmount);
+      } else if (skill.type === "buff") {
+        // Buff skill: no target needed, set buff on caster
+        p.mp -= skill.mpCost;
+        p.skillCooldowns.set(skill.id, skill.cooldownMs);
+
+        if (skill.buffStat === "pAtk") {
+          p.atkBuffMs = skill.buffMs ?? 0;
+          p.atkBuffMult = skill.buffMult ?? 1;
+        } else if (skill.buffStat === "pDef") {
+          p.defBuffMs = skill.buffMs ?? 0;
+          p.defBuffMult = skill.buffMult ?? 1;
+        }
+      } else if (skill.type === "dot") {
+        // DoT skill: requires mob target in range
+        const mob = p.targetId ? this.state.mobs.get(p.targetId) : undefined;
+        if (!mob || mob.dead) return;
+        if (!canAttack(p, mob, ATTACK_RANGE)) return;
+
+        // All checks passed: spend resources
+        p.mp -= skill.mpCost;
+        p.skillCooldowns.set(skill.id, skill.cooldownMs);
+
+        // Apply poison to mob (replaces any previous poison)
+        mob.dotMs = skill.dotMs ?? 0;
+        mob.dotDps = skill.dotDps ?? 0;
+        mob.dotAttackerId = client.sessionId;
+        mob.dotAccumMs = 0;
       }
     });
 
@@ -331,10 +380,37 @@ export class GameRoom extends Room<GameState> {
       advanceMovable(mob, dt, MOB_MOVE_SPEED);
     });
 
-    // cooldowns de jugadores (ataque + skill)
+    // cooldowns de jugadores (ataque + skill) y buffs
     this.state.players.forEach((p) => {
       tickCooldown(p, dtMs);
-      if (p.skillCooldownMs > 0) p.skillCooldownMs = Math.max(0, p.skillCooldownMs - dtMs);
+
+      // Decrement per-skill cooldowns
+      for (const [skillId, cooldownMs] of p.skillCooldowns.entries()) {
+        const newCd = Math.max(0, cooldownMs - dtMs);
+        if (newCd <= 0) {
+          p.skillCooldowns.delete(skillId);
+        } else {
+          p.skillCooldowns.set(skillId, newCd);
+        }
+      }
+
+      // Decrement attack buff
+      if (p.atkBuffMs > 0) {
+        p.atkBuffMs = Math.max(0, p.atkBuffMs - dtMs);
+        if (p.atkBuffMs <= 0) {
+          p.atkBuffMs = 0;
+          p.atkBuffMult = 1;
+        }
+      }
+
+      // Decrement defense buff
+      if (p.defBuffMs > 0) {
+        p.defBuffMs = Math.max(0, p.defBuffMs - dtMs);
+        if (p.defBuffMs <= 0) {
+          p.defBuffMs = 0;
+          p.defBuffMult = 1;
+        }
+      }
     });
 
     // auto-attack del jugador sobre su target
@@ -370,6 +446,43 @@ export class GameRoom extends Room<GameState> {
         player.respawnMs = PLAYER_RESPAWN_MS;
         player.targetId = "";
         this.broadcast(MessageType.Death, { entityId: mob.aggroTargetId });
+      }
+    });
+
+    // DoT ticks: aplicar daño por veneno a mobs
+    this.state.mobs.forEach((mob, mobId) => {
+      if (mob.dead || mob.dotMs <= 0) return;
+
+      mob.dotAccumMs += dtMs;
+
+      // Tick de daño cada 500ms
+      while (mob.dotAccumMs >= 500) {
+        const dmg = Math.max(1, Math.round(mob.dotDps * 0.5));
+        mob.hp = Math.max(0, mob.hp - dmg);
+
+        this.broadcast(MessageType.Damage, {
+          attackerId: mob.dotAttackerId,
+          targetId: mobId,
+          amount: dmg,
+          hp: mob.hp,
+        });
+
+        mob.dotAccumMs -= 500;
+
+        if (mob.hp <= 0) {
+          // Mob muere por veneno: ruta la exp/loot al atacante que enveneno
+          this.killMob(mob, mobId, mob.dotAttackerId);
+          return; // Exit early to avoid further processing of this mob
+        }
+      }
+
+      // Decrement DoT duration
+      mob.dotMs = Math.max(0, mob.dotMs - dtMs);
+      if (mob.dotMs <= 0) {
+        mob.dotMs = 0;
+        mob.dotDps = 0;
+        mob.dotAttackerId = "";
+        mob.dotAccumMs = 0;
       }
     });
 
@@ -446,9 +559,13 @@ export class GameRoom extends Room<GameState> {
     player.maxMp = st.maxMp;
     player.dead = false;
     player.attackCooldownMs = 0;
-    player.skillCooldownMs = 0;
     player.respawnMs = 0;
     player.targetId = "";
+    player.skillCooldowns.clear();
+    player.atkBuffMs = 0;
+    player.atkBuffMult = 1;
+    player.defBuffMs = 0;
+    player.defBuffMult = 1;
     player.exp = 0;
     player.level = 1;
     player.questId = firstQuestId();
