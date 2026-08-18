@@ -1,4 +1,4 @@
-import { expToNextLevel, getQuest } from "@aden/shared";
+import { expToNextLevel, getQuest, getClass, getSkill } from "@aden/shared";
 
 const BAR_WIDTH_PX = 160;
 const BAR_HEIGHT_PX = 14;
@@ -20,6 +20,8 @@ export class Hud {
   private readonly expFill: HTMLDivElement;
   private readonly expLabel: HTMLDivElement;
   private readonly levelLabel: HTMLDivElement;
+  private readonly classLabel: HTMLDivElement;
+  private readonly skillLabel: HTMLDivElement;
   private readonly deathBanner: HTMLDivElement;
   private readonly levelUpBanner: HTMLDivElement;
   private levelUpTimer: ReturnType<typeof setTimeout> | null = null;
@@ -39,6 +41,16 @@ export class Hud {
     this.levelLabel.style.cssText = "font-weight:bold;";
     this.levelLabel.textContent = "Nv. 1";
     this.root.appendChild(this.levelLabel);
+
+    this.classLabel = document.createElement("div");
+    this.classLabel.style.cssText = "font-size:12px;color:#aaa;";
+    this.classLabel.textContent = "Clase: —";
+    this.root.appendChild(this.classLabel);
+
+    this.skillLabel = document.createElement("div");
+    this.skillLabel.style.cssText = "font-size:12px;color:#aaa;";
+    this.skillLabel.textContent = "Skill: —";
+    this.root.appendChild(this.skillLabel);
 
     const [hpRow, hpFill, hpLabel] = makeBar(BAR_WIDTH_PX, BAR_HEIGHT_PX, "#8b1e1e", "#e53935");
     const [mpRow, mpFill, mpLabel] = makeBar(BAR_WIDTH_PX, BAR_HEIGHT_PX, "#12305c", "#2979ff");
@@ -112,7 +124,8 @@ export class Hud {
   /**
    * Refleja hp/maxHp (rojo), mp/maxMp (azul), exp/expToNextLevel(level)
    * (amarillo) y el nivel actual; muestra el cartel de muerte cuando `dead`.
-   * También refleja gold, questId y questProgress para el tracker de misión.
+   * También refleja gold, questId y questProgress para el tracker de misión,
+   * y la clase + skill del jugador.
    */
   update(
     hp: number,
@@ -125,6 +138,8 @@ export class Hud {
     gold: number = 0,
     questId: string = "",
     questProgress: number = 0,
+    className: string = "knight",
+    skillId: string = "power_strike",
   ) {
     const hpRatio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     const mpRatio = maxMp > 0 ? Math.max(0, Math.min(1, mp / maxMp)) : 0;
@@ -139,6 +154,21 @@ export class Hud {
     this.expFill.style.width = `${expRatio * 100}%`;
     this.expLabel.textContent = `EXP ${Math.max(0, Math.round(exp))}/${Math.round(expNeeded)}`;
     this.levelLabel.textContent = `Nv. ${level}`;
+
+    // Actualizar clase y skill
+    try {
+      const classDef = getClass(className);
+      this.classLabel.textContent = `Clase: ${classDef.name}`;
+    } catch {
+      this.classLabel.textContent = "Clase: —";
+    }
+
+    try {
+      const skillDef = getSkill(skillId);
+      this.skillLabel.textContent = `Skill: ${skillDef.id}`;
+    } catch {
+      this.skillLabel.textContent = "Skill: —";
+    }
 
     // Actualizar quest tracker
     if (questId === "") {
