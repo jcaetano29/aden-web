@@ -133,6 +133,10 @@ async function main() {
         }
       } else if (views.hasPlayer(entityId)) {
         views.onPlayerDeath(entityId);
+        if (entityId === currentTargetId) {
+          currentTargetId = null;
+          views.setTargetHighlight(null);
+        }
       }
     },
     onLevelUp: (level) => hud.flashLevelUp(level),

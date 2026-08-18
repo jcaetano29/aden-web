@@ -202,6 +202,7 @@ export class EntityViews {
   /** Animación de muerte de un jugador (propio u otro). El respawn (dead->false) restaura idle en `update`. */
   onPlayerDeath(playerId: string) {
     this.views.get(playerId)?.playOnce("death");
+    if (this.currentTargetId === playerId) this.setTargetHighlight(null);
   }
 
   /** Posición de mundo aprox. de la cabeza del jugador, para anclar damage numbers. */
