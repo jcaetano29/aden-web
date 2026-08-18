@@ -10,6 +10,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
   gold: { id: "gold", name: "Oro", type: "currency", stackable: true },
   bone: { id: "bone", name: "Hueso", type: "material", stackable: true },
   health_potion: { id: "health_potion", name: "Poción de Vida", type: "consumable", stackable: true, heal: 60 },
+  skull_crown: { id: "skull_crown", name: "Corona del Rey Esqueleto", type: "material", stackable: false },
 };
 
 export function getItem(id: string): ItemTemplate {
@@ -46,6 +47,12 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemTemplateId: "gold", chance: 1.0, qtyMin: 3, qtyMax: 10 },
     { itemTemplateId: "bone", chance: 0.7, qtyMin: 1, qtyMax: 3 },
     { itemTemplateId: "health_potion", chance: 0.15, qtyMin: 1, qtyMax: 1 },
+  ],
+  skeleton_king: [
+    { itemTemplateId: "gold", chance: 1.0, qtyMin: 50, qtyMax: 100 },
+    { itemTemplateId: "health_potion", chance: 1.0, qtyMin: 2, qtyMax: 3 },
+    { itemTemplateId: "skull_crown", chance: 1.0, qtyMin: 1, qtyMax: 1 },
+    { itemTemplateId: "bone", chance: 1.0, qtyMin: 3, qtyMax: 5 },
   ],
 };
 

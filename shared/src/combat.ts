@@ -16,6 +16,7 @@ export const PLAYER_COMBAT: CombatStats = { maxHp: 100, maxMp: 50, pAtk: 15, pDe
 export const MOB_COMBAT: Record<string, CombatStats> = {
   skeleton_minion: { maxHp: 30, pAtk: 8, pDef: 5, attackCooldownMs: 2000 },
   skeleton_warrior: { maxHp: 60, pAtk: 14, pDef: 12, attackCooldownMs: 1800 },
+  skeleton_king: { maxHp: 600, pAtk: 24, pDef: 18, attackCooldownMs: 2200 },
 };
 
 export function getMobCombat(templateId: string): CombatStats {

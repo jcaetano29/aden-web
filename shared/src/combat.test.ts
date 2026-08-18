@@ -27,6 +27,15 @@ describe("config", () => {
     expect(getMobCombat("skeleton_warrior").pDef).toBe(12);
     expect(ATTACK_RANGE).toBe(2.5);
   });
+
+  it("skeleton_king (jefe) tiene stats potentes", () => {
+    const boss = getMobCombat("skeleton_king");
+    expect(boss.maxHp).toBe(600);
+    expect(boss.pAtk).toBe(24);
+    expect(boss.pDef).toBe(18);
+    expect(boss.attackCooldownMs).toBe(2200);
+  });
+
   it("getMobCombat lanza para template desconocido", () => {
     expect(() => getMobCombat("dragon")).toThrow();
   });

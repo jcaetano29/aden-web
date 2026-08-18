@@ -6,6 +6,14 @@ describe("items", () => {
     expect(getItem("gold").type).toBe("currency");
     expect(() => getItem("excalibur")).toThrow();
   });
+
+  it("skull_crown es un trofeo material no-stackable del Rey Esqueleto", () => {
+    const skull = getItem("skull_crown");
+    expect(skull.id).toBe("skull_crown");
+    expect(skull.name).toBe("Corona del Rey Esqueleto");
+    expect(skull.type).toBe("material");
+    expect(skull.stackable).toBe(false);
+  });
 });
 
 describe("rollDrops", () => {
@@ -22,6 +30,19 @@ describe("rollDrops", () => {
   });
   it("mob sin tabla dropea vacío", () => {
     expect(rollDrops("dragon", () => 0)).toEqual([]);
+  });
+
+  it("skeleton_king con rng=0 dropea todo (gold, health_potion, skull_crown, bone)", () => {
+    const drops = rollDrops("skeleton_king", () => 0);
+    const ids = drops.map((d) => d.itemTemplateId);
+    expect(ids).toContain("gold");
+    expect(ids).toContain("health_potion");
+    expect(ids).toContain("skull_crown");
+    expect(ids).toContain("bone");
+    expect(drops.find((d) => d.itemTemplateId === "gold")?.qty).toBeGreaterThanOrEqual(50);
+    expect(drops.find((d) => d.itemTemplateId === "health_potion")?.qty).toBeGreaterThanOrEqual(2);
+    expect(drops.find((d) => d.itemTemplateId === "skull_crown")?.qty).toBe(1);
+    expect(drops.find((d) => d.itemTemplateId === "bone")?.qty).toBeGreaterThanOrEqual(3);
   });
 });
 
