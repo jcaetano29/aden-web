@@ -7,3 +7,4 @@ export * from "./progression.js";
 export * from "./items.js";
 export * from "./quests.js";
 export * from "./classes.js";
+export * from "./story.js";
