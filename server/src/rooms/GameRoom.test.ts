@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
-import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass } from "@aden/shared";
+import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat } from "@aden/shared";
 import appConfig from "../testServer.js";
 import { MobState } from "../state/MobState.js";
 
@@ -236,6 +236,49 @@ describe("GameRoom", () => {
     await room.waitForNextPatch();
     expect(p.hp).toBe(10); // no curó de nuevo
     expect(hpAfterFirst).toBeGreaterThan(10); // la primera sí curó
+  });
+
+  // Helper: arma un mob con aggro sobre el jugador, pegado a él y fuera del pueblo.
+  function setupMeleeMob(room: any, sessionId: string, p: any) {
+    p.x = p.targetX = 20; p.z = p.targetZ = 20; // fuera de la zona segura (SAFE_RADIUS 8)
+    const mob = new MobState();
+    mob.templateId = "skeleton_minion";
+    const mc = getMobCombat("skeleton_minion");
+    mob.hp = mob.maxHp = mc.maxHp; mob.pAtk = mc.pAtk; mob.pDef = mc.pDef; mob.dead = false;
+    mob.x = mob.homeX = p.x; mob.z = mob.homeZ = p.z; // home = su posición → no leashea
+    mob.aggroTargetId = sessionId;
+    room.state.mobs.set("mob-atk", mob);
+    return mob;
+  }
+
+  it("el ataque del mob es telegrafiado: hace wind-up y pega si el jugador sigue en rango", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Blanco", className: "knight" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    setupMeleeMob(room, c.sessionId, p);
+    const hpBefore = p.hp;
+    await room.waitForNextSimulationTick(); // primer tick: inicia el wind-up
+    const mob = room.state.mobs.get("mob-atk")!;
+    expect(mob.windupMs).toBeGreaterThan(0); // está cargando (avisa)
+    // el jugador NO se mueve → sigue en rango; avanzar hasta que resuelva
+    for (let i = 0; i < 16; i++) await room.waitForNextSimulationTick();
+    expect(p.hp).toBeLessThan(hpBefore); // el golpe conectó
+  });
+
+  it("el jugador esquiva si sale del rango durante el wind-up", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Escurridizo", className: "rogue" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    const mob = setupMeleeMob(room, c.sessionId, p);
+    const hpBefore = p.hp;
+    await room.waitForNextSimulationTick(); // inicia el wind-up (el mob queda plantado)
+    expect(mob.windupMs).toBeGreaterThan(0);
+    // ESQUIVAR: salir del rango mientras el mob carga (el mob no se mueve)
+    p.x = p.targetX = 45; p.z = p.targetZ = 45;
+    for (let i = 0; i < 16; i++) await room.waitForNextSimulationTick();
+    expect(p.hp).toBe(hpBefore); // no le pegó: lo esquivó
   });
 
   it("el Rey Esqueleto spawnea con 600 HP", async () => {
