@@ -71,3 +71,7 @@ export const PLAYER_RESPAWN_MS = 4000;
 
 export const ATTACK_RANGE = 2.5;
 export const MOB_RESPAWN_MS = 5000;
+// Ventana de aviso (wind-up) del ataque de los mobs: durante este tiempo el mob
+// queda plantado y muestra el telegraph; al terminar, el golpe solo conecta si
+// el objetivo sigue en rango (si no, lo esquivó).
+export const ATTACK_WINDUP_MS = 700;
