@@ -49,6 +49,7 @@ import {
   respawnForTemplate,
   ATTACK_WINDUP_MS,
   computeDamage,
+  applyPvpDeathPenalty,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -85,6 +86,40 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
+  /** Resuelve un targetId a un mob vivo o a un jugador vivo (o null). */
+  private resolveTarget(id: string):
+    | { kind: "mob"; entity: MobState }
+    | { kind: "player"; entity: PlayerState; sessionId: string }
+    | null {
+    if (!id) return null;
+    const mob = this.state.mobs.get(id);
+    if (mob && !mob.dead) return { kind: "mob", entity: mob };
+    const pl = this.state.players.get(id);
+    if (pl && !pl.dead) return { kind: "player", entity: pl, sessionId: id };
+    return null;
+  }
+
+  /** true si la posición está fuera de la zona segura del pueblo (PvP habilitado). */
+  private inPvpZone(p: { x: number; z: number }): boolean {
+    return distance2D(p.x, p.z, TOWN.x, TOWN.z) > SAFE_RADIUS;
+  }
+
+  /** Centraliza la muerte de un jugador (por mob o por PvP). Aplica penalidad si es PvP. */
+  private killPlayer(victim: PlayerState, victimId: string, killerId?: string): void {
+    victim.dead = true;
+    victim.moving = false;
+    victim.respawnMs = PLAYER_RESPAWN_MS;
+    victim.targetId = "";
+    this.broadcast(MessageType.Death, { entityId: victimId });
+    if (killerId) {
+      const pen = applyPvpDeathPenalty(victim.gold, victim.exp, victim.level);
+      victim.gold = pen.gold;
+      victim.exp = pen.exp;
+      const killer = this.state.players.get(killerId);
+      if (killer && !killer.dead) killer.pvpKills += 1;
+    }
+  }
+
   onCreate() {
     this.setState(new GameState());
     this.persistence = createPersistence();
@@ -106,13 +141,11 @@ export class GameRoom extends Room<GameState> {
     this.onMessage(MessageType.SetTarget, (client, msg: SetTargetMessage) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.dead) return;
-      // objetivo válido: un mob existente y vivo, o "" para limpiar
-      if (
-        msg.targetId === "" ||
-        (this.state.mobs.has(msg.targetId) && !this.state.mobs.get(msg.targetId)!.dead)
-      ) {
-        player.targetId = msg.targetId;
-      }
+      if (msg.targetId === "") { player.targetId = ""; return; }
+      const mobOk = this.state.mobs.has(msg.targetId) && !this.state.mobs.get(msg.targetId)!.dead;
+      const other = this.state.players.get(msg.targetId);
+      const playerOk = msg.targetId !== client.sessionId && !!other && !other.dead;
+      if (mobOk || playerOk) player.targetId = msg.targetId;
     });
 
     this.onMessage(MessageType.UseSkill, (client, msg: UseSkillMessage) => {
@@ -136,20 +169,27 @@ export class GameRoom extends Room<GameState> {
 
       // Branch by skill type
       if (skill.type === "damage") {
-        // Damage skill: requires mob target in range
-        const mob = p.targetId ? this.state.mobs.get(p.targetId) : undefined;
-        if (!mob || mob.dead) return;
-        if (!canAttack(p, mob, ATTACK_RANGE)) return;
-
-        // All checks passed: spend resources
-        p.mp -= skill.mpCost;
-        p.skillCooldowns.set(skill.id, skill.cooldownMs);
-
-        const variance = 0.9 + Math.random() * 0.2;
-        const dmg = resolveAttack(p, mob, skill.factor ?? 1, variance, getClass(p.className).base.attackCooldownMs);
-        this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
-        if (mob.hp <= 0) {
-          this.killMob(mob, p.targetId, client.sessionId);
+        const t = p.targetId ? this.resolveTarget(p.targetId) : null;
+        if (!t) return;
+        if (t.kind === "mob") {
+          const mob = t.entity;
+          if (!canAttack(p, mob, ATTACK_RANGE)) return;
+          p.mp -= skill.mpCost;
+          p.skillCooldowns.set(skill.id, skill.cooldownMs);
+          const variance = 0.9 + Math.random() * 0.2;
+          const dmg = resolveAttack(p, mob, skill.factor ?? 1, variance, getClass(p.className).base.attackCooldownMs);
+          this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
+          if (mob.hp <= 0) this.killMob(mob, p.targetId, client.sessionId);
+        } else {
+          const victim = t.entity;
+          if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
+          if (!canAttack(p, victim, ATTACK_RANGE)) return;
+          p.mp -= skill.mpCost;
+          p.skillCooldowns.set(skill.id, skill.cooldownMs);
+          const variance = 0.9 + Math.random() * 0.2;
+          const dmg = resolveAttack(p, victim, skill.factor ?? 1, variance, getClass(p.className).base.attackCooldownMs);
+          this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: victim.hp });
+          if (victim.hp <= 0) this.killPlayer(victim, p.targetId, client.sessionId);
         }
       } else if (skill.type === "heal") {
         // Heal skill: no target needed
@@ -425,17 +465,25 @@ export class GameRoom extends Room<GameState> {
     // auto-attack del jugador sobre su target
     this.state.players.forEach((p, sessionId) => {
       if (p.dead || !p.targetId) return;
-      const mob = this.state.mobs.get(p.targetId);
-      if (!mob || mob.dead) {
-        p.targetId = "";
-        return;
-      }
-      if (canAttack(p, mob, ATTACK_RANGE)) {
-        const variance = 0.9 + Math.random() * 0.2;
-        const dmg = resolveAttack(p, mob, 1, variance, getClass(p.className).base.attackCooldownMs);
-        this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
-        if (mob.hp <= 0) {
-          this.killMob(mob, p.targetId, sessionId);
+      const t = this.resolveTarget(p.targetId);
+      if (!t) { p.targetId = ""; return; }
+      if (t.kind === "mob") {
+        const mob = t.entity;
+        if (canAttack(p, mob, ATTACK_RANGE)) {
+          const variance = 0.9 + Math.random() * 0.2;
+          const dmg = resolveAttack(p, mob, 1, variance, getClass(p.className).base.attackCooldownMs);
+          this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
+          if (mob.hp <= 0) this.killMob(mob, p.targetId, sessionId);
+        }
+      } else {
+        // PvP: ambos fuera del pueblo
+        const victim = t.entity;
+        if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
+        if (canAttack(p, victim, ATTACK_RANGE)) {
+          const variance = 0.9 + Math.random() * 0.2;
+          const dmg = resolveAttack(p, victim, 1, variance, getClass(p.className).base.attackCooldownMs);
+          this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: victim.hp });
+          if (victim.hp <= 0) this.killPlayer(victim, p.targetId, sessionId);
         }
       }
     });
@@ -606,6 +654,7 @@ export class GameRoom extends Room<GameState> {
     player.questId = firstQuestId();
     player.questProgress = 0;
     player.gold = 0;
+    player.pvpKills = 0;
     this.state.players.set(client.sessionId, player);
 
     // Etapa 3c: cargar el save (si existe) y aplicarlo sobre el player ya insertado en el
@@ -628,6 +677,7 @@ export class GameRoom extends Room<GameState> {
       player.gold = save.gold ?? 0;
       player.questId = save.questId ?? firstQuestId();
       player.questProgress = save.questProgress ?? 0;
+      player.pvpKills = save.pvpKills ?? 0;
       for (const [id, qty] of inventoryRecordToEntries(save.inventory)) {
         const it = new InventoryItemState();
         it.itemTemplateId = id;

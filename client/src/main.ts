@@ -16,11 +16,12 @@ import { ClassSelect } from "./render/ClassSelect.js";
 import { Minimap } from "./render/Minimap.js";
 import { StoryCard } from "./render/StoryCard.js";
 import { DialogPanel } from "./render/DialogPanel.js";
+import { ZoneIndicator } from "./render/ZoneIndicator.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss, ELDER_NAME, firstQuestId } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss, ELDER_NAME, firstQuestId, SAFE_RADIUS } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -49,6 +50,8 @@ async function main() {
   const classSelect = new ClassSelect();
   const storyCard = new StoryCard();
   const dialog = new DialogPanel();
+  const zoneIndicator = new ZoneIndicator();
+  zoneIndicator.mount(document.body);
 
   // Minimapa (esquina sup. der.) con marcadores fijos: NPCs y la arena del jefe.
   const minimap = new Minimap();
@@ -130,6 +133,10 @@ async function main() {
         }
       } else if (views.hasPlayer(entityId)) {
         views.onPlayerDeath(entityId);
+        if (entityId === currentTargetId) {
+          currentTargetId = null;
+          views.setTargetHighlight(null);
+        }
       }
     },
     onLevelUp: (level) => hud.flashLevelUp(level),
@@ -208,15 +215,20 @@ async function main() {
     shopPanel.toggle();
   }
 
+  // Targetear (mob o jugador, para PvP): misma lógica de picking en ambos
+  // casos, sólo cambia qué mesh golpeó el rayo.
+  const pickTarget = (id: string) => {
+    currentTargetId = id;
+    net.sendSetTarget(id);
+    views.setTargetHighlight(id);
+  };
+
   const input = new InputController(
     renderer,
     views,
     (msg) => net.sendMove(msg),
-    (id) => {
-      currentTargetId = id;
-      net.sendSetTarget(id);
-      views.setTargetHighlight(id);
-    },
+    pickTarget,
+    pickTarget,
     () => interactNpc(),
     npc.object,
     () => interactMerchant(),
@@ -297,7 +309,10 @@ async function main() {
     damageNumbers.update(dt);
     groundItems.update(dt);
     const self = views.selfPosition();
-    if (self) renderer.followTarget(self.x, self.z, dt);
+    if (self) {
+      renderer.followTarget(self.x, self.z, dt);
+      zoneIndicator.update(distance2D(self.x, self.z, TOWN.x, TOWN.z) > SAFE_RADIUS);
+    }
     const selfCombat = net.getSelf();
     npc.update(dt);
     merchant.update(dt);

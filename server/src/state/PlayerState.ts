@@ -19,6 +19,7 @@ export class PlayerState extends Schema {
   @type("number") maxMp = 0;
   @type("boolean") dead = false;
   @type("string") className = "knight";
+  @type("number") pvpKills = 0;
 
   // Progression — synced to clients
   @type("number") exp = 0;
