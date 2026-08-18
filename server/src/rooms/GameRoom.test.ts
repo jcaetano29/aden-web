@@ -340,4 +340,63 @@ describe("GameRoom", () => {
     for (let i = 0; i < 16; i++) await room.waitForNextSimulationTick();
     expect(mob.hp).toBeLessThan(100); // el veneno bajó su HP sin volver a atacar
   });
+
+  describe("PvP (Etapa 9a)", () => {
+    it("un jugador puede pegarle a otro fuera del pueblo y le baja la HP", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Atacante", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Victima", className: "knight" });
+      // ambos fuera del pueblo, pegados
+      const pa = room.state.players.get(a.sessionId)!;
+      const pb = room.state.players.get(b.sessionId)!;
+      pa.x = 30; pa.z = 0; pa.targetX = 30; pa.targetZ = 0; pa.moving = false;
+      pb.x = 31; pb.z = 0; pb.targetX = 31; pb.targetZ = 0; pb.moving = false;
+      const hp0 = pb.hp;
+      a.send("setTarget", { targetId: b.sessionId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(pb.hp).toBeLessThan(hp0);
+    });
+
+    it("no hay daño si la víctima está en el pueblo (zona segura)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Atk2", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Vic2", className: "knight" });
+      const pa = room.state.players.get(a.sessionId)!;
+      const pb = room.state.players.get(b.sessionId)!;
+      pa.x = 7; pa.z = 0; pa.targetX = 7; pa.targetZ = 0;   // atacante fuera del radio? no: dentro
+      pb.x = 0; pb.z = 0; pb.targetX = 0; pb.targetZ = 0;   // víctima en el centro del pueblo
+      const hp0 = pb.hp;
+      a.send("setTarget", { targetId: b.sessionId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(pb.hp).toBe(hp0);
+    });
+
+    it("al morir en PvP: víctima muere, pierde oro y el asesino suma pvpKills", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Killer", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Dead", className: "knight" });
+      const pa = room.state.players.get(a.sessionId)!;
+      const pb = room.state.players.get(b.sessionId)!;
+      pa.x = 30; pa.z = 0; pa.targetX = 30; pa.targetZ = 0;
+      pb.x = 31; pb.z = 0; pb.targetX = 31; pb.targetZ = 0;
+      pb.hp = 1; pb.gold = 100;
+      a.send("setTarget", { targetId: b.sessionId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(pb.dead).toBe(true);
+      expect(pb.gold).toBe(90);       // floor(100*0.9)
+      expect(pa.pvpKills).toBe(1);
+    });
+
+    it("no se puede targetear a uno mismo", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Solo", className: "knight" });
+      const pa = room.state.players.get(a.sessionId)!;
+      a.send("setTarget", { targetId: a.sessionId });
+      await room.waitForNextSimulationTick();
+      expect(pa.targetId).toBe("");
+    });
+  });
 });
