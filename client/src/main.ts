@@ -93,13 +93,30 @@ async function main() {
       // Feedback en el objetivo: puede ser un mob (auto-attack/Power Strike
       // del jugador) o un jugador (contraataque de un mob) — nunca ambos.
       if (views.hasMob(ev.targetId)) {
-        views.onMobDamage(ev.targetId);
+        // Si es un esquive, no llamar a onMobDamage (no hay animación de daño)
+        if (!ev.dodged) {
+          views.onMobDamage(ev.targetId);
+        }
         const pos = views.mobWorldPosition(ev.targetId);
-        if (pos) damageNumbers.spawn(pos, ev.amount);
+        if (pos) {
+          if (ev.dodged) {
+            damageNumbers.spawnText(pos, "¡Esquivado!", "#2ecc40");
+          } else {
+            damageNumbers.spawn(pos, ev.amount);
+          }
+        }
       } else if (views.hasPlayer(ev.targetId)) {
-        views.onPlayerDamage(ev.targetId);
+        if (!ev.dodged) {
+          views.onPlayerDamage(ev.targetId);
+        }
         const pos = views.playerWorldPosition(ev.targetId);
-        if (pos) damageNumbers.spawn(pos, ev.amount);
+        if (pos) {
+          if (ev.dodged) {
+            damageNumbers.spawnText(pos, "¡Esquivado!", "#2ecc40");
+          } else {
+            damageNumbers.spawn(pos, ev.amount);
+          }
+        }
       }
       // Animación de ataque en el ATACANTE (mob o jugador), vía attackerId.
       views.playAttackerAnim(ev.attackerId);

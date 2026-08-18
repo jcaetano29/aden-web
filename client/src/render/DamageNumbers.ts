@@ -32,6 +32,17 @@ export class DamageNumbers {
     this.active.push({ obj, el, bornAt: performance.now(), baseY: worldPos.y });
   }
 
+  /** Muestra un texto personalizado (ej: "¡Esquivado!") en una posición. */
+  spawnText(worldPos: THREE.Vector3, text: string, color: string) {
+    const el = document.createElement("div");
+    el.textContent = text;
+    el.style.cssText = `color:${color};font:bold 16px sans-serif;text-shadow:0 0 3px #000;pointer-events:none;white-space:nowrap;`;
+    const obj = new CSS2DObject(el);
+    obj.position.copy(worldPos);
+    this.scene.add(obj);
+    this.active.push({ obj, el, bornAt: performance.now(), baseY: worldPos.y });
+  }
+
   /** Anima la subida/desvanecido y auto-remueve los números vencidos. Llamar en el render loop. */
   update(_dt: number) {
     if (this.active.length === 0) return;

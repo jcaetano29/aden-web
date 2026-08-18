@@ -33,6 +33,7 @@ export interface MobSnapshot extends PlayerSnapshot {
   hp: number;
   maxHp: number;
   dead: boolean;
+  windupMs: number;
 }
 
 /** Campos de combate del jugador local, leídos directamente del estado sincronizado (HUD). */
@@ -104,6 +105,7 @@ export class NetworkClient {
       hp: m.hp,
       maxHp: m.maxHp,
       dead: m.dead,
+      windupMs: m.windupMs ?? 0,
     });
 
     this.room.state.mobs.onAdd((mob: any, id: string) => {
