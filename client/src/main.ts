@@ -284,6 +284,17 @@ async function main() {
     const selfCombat = net.getSelf();
     npc.update(dt);
     merchant.update(dt);
+    // Marcador de objetivo en el minimapa: la zona de spawn del enemigo de la
+    // misión activa (dónde ir a cazar). null si no hay misión o zona conocida.
+    let objective = null;
+    if (selfCombat?.questId) {
+      try {
+        const mobId = getQuest(selfCombat.questId).mobTemplateId;
+        const zone = SPAWN_ZONES.find((z) => z.templateId === mobId);
+        if (zone) objective = { x: zone.centerX, z: zone.centerZ, label: "⚔", color: "#ff184c" };
+      } catch { /* questId desconocido: sin objetivo */ }
+    }
+    minimap.setObjective(objective);
     minimap.update(net.getMinimapEntities());
     if (selfCombat) {
       hud.update(

@@ -16,6 +16,8 @@ export class Minimap {
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
   private markers: MinimapMarker[] = [];
+  private objective: MinimapMarker | null = null;
+  private pulse = 0;
 
   constructor(parent: HTMLElement = document.body) {
     this.canvas = document.createElement("canvas");
@@ -33,6 +35,14 @@ export class Minimap {
   setMarkers(markers: MinimapMarker[]): void {
     this.markers = markers;
     this.update([]); // frame inicial: muestra pueblo + marcadores aunque no haya entidades aún
+  }
+
+  /**
+   * Marcador dinámico del objetivo de la misión activa (zona del enemigo a
+   * cazar). Se actualiza cada frame desde main; `null` lo oculta.
+   */
+  setObjective(objective: MinimapMarker | null): void {
+    this.objective = objective;
   }
 
   /** Convierte coords de mundo (x,z) a píxeles del canvas. Norte (-z) arriba. */
@@ -55,6 +65,7 @@ export class Minimap {
   /** Redibuja el minimapa con las entidades actuales. Llamar cada frame. */
   update(entities: MinimapEntity[]): void {
     const ctx = this.ctx;
+    this.pulse += 0.06;
     ctx.clearRect(0, 0, SIZE, SIZE);
 
     // Pueblo: círculo tenue alrededor de TOWN.
@@ -63,6 +74,23 @@ export class Minimap {
     ctx.arc(tx, ty, 14, 0, Math.PI * 2);
     ctx.fillStyle = "rgba(120,150,90,0.25)";
     ctx.fill();
+
+    // Objetivo de la misión activa: anillo pulsante + etiqueta, para saber a
+    // dónde ir a cazar. Se dibuja bajo las entidades vivas.
+    if (this.objective) {
+      const [ox, oy] = this.toPx(this.objective.x, this.objective.z);
+      const r = 7 + Math.sin(this.pulse) * 2.5;
+      ctx.beginPath();
+      ctx.arc(ox, oy, r, 0, Math.PI * 2);
+      ctx.strokeStyle = this.objective.color;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = this.objective.color;
+      ctx.font = "bold 11px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(this.objective.label, ox, oy);
+    }
 
     // Marcadores fijos (NPCs / arena del jefe).
     for (const m of this.markers) {

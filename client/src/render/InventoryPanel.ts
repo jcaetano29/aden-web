@@ -20,7 +20,8 @@ export class InventoryPanel {
     this.onUseItem = onUseItem;
     this.root = document.createElement("div");
     this.root.style.cssText =
-      "position:fixed;right:12px;top:12px;display:none;pointer-events:none;z-index:1000;" +
+      // top:192 → debajo del minimapa (168px + margen) para no superponerse.
+      "position:fixed;right:12px;top:192px;display:none;pointer-events:none;z-index:1000;" +
       "min-width:160px;font:12px sans-serif;text-shadow:0 0 3px #000;color:#fff;" +
       "background:rgba(0,0,0,0.5);border-radius:6px;padding:8px 10px;user-select:none;";
 
