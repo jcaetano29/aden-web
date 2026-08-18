@@ -40,7 +40,7 @@ export class SkillBar {
       const keyLabel = document.createElement("div");
       keyLabel.style.cssText =
         "font-size:12px;font-weight:bold;color:#ffd54f;margin-top:2px;";
-      keyLabel.textContent = `${i === 0 ? "Space" : i}`;
+      keyLabel.textContent = i === 0 ? "1 / Spc" : String(i + 1);
       slot.appendChild(keyLabel);
 
       // Veil de cooldown: overlay que se oscurece con animación de height
