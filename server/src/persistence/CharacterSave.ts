@@ -8,6 +8,7 @@ export interface CharacterSave {
   questId: string;
   questProgress: number;
   className: string;
+  pvpKills: number;
 }
 
 export interface Persistable {
@@ -20,6 +21,7 @@ export interface Persistable {
   questId: string;
   questProgress: number;
   className: string;
+  pvpKills: number;
 }
 
 export function toCharacterSave(p: Persistable): CharacterSave {
@@ -38,6 +40,7 @@ export function toCharacterSave(p: Persistable): CharacterSave {
     questId: p.questId,
     questProgress: p.questProgress,
     className: p.className,
+    pvpKills: p.pvpKills,
   };
 }
 

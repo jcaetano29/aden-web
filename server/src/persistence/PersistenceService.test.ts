@@ -15,6 +15,7 @@ describe("InMemoryPersistence", () => {
       questId: "q1",
       questProgress: 2,
       className: "mage",
+      pvpKills: 0,
     };
 
     await persistence.save("Aiden", data);
@@ -41,6 +42,7 @@ describe("InMemoryPersistence", () => {
       questId: "q1",
       questProgress: 0,
       className: "knight",
+      pvpKills: 0,
     };
 
     await persistence.save("Mob", data);
@@ -49,6 +51,16 @@ describe("InMemoryPersistence", () => {
     loaded!.inventory.gold = 999;
 
     const reloaded = await persistence.load("Mob");
-    expect(reloaded).toEqual({ level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: { gold: 1 }, gold: 0, questId: "q1", questProgress: 0, className: "knight" });
+    expect(reloaded).toEqual({ level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: { gold: 1 }, gold: 0, questId: "q1", questProgress: 0, className: "knight", pvpKills: 0 });
+  });
+
+  it("persiste y devuelve pvpKills", async () => {
+    const svc = new InMemoryPersistence();
+    await svc.save("Boromir", {
+      level: 3, exp: 10, pos_x: 1, pos_z: 2, inventory: {}, gold: 50,
+      questId: "q1", questProgress: 0, className: "knight", pvpKills: 7,
+    });
+    const loaded = await svc.load("Boromir");
+    expect(loaded?.pvpKills).toBe(7);
   });
 });
