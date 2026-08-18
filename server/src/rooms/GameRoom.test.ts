@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
-import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem } from "@aden/shared";
+import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass } from "@aden/shared";
 import appConfig from "../testServer.js";
 
 describe("GameRoom", () => {
@@ -158,5 +158,31 @@ describe("GameRoom", () => {
     await room.waitForNextPatch();
     expect(p.hp).toBe(p.maxHp);
     expect(p.inventory.get("health_potion")?.qty).toBe(1); // no se gastó
+  });
+
+  it("aplica los stats de la clase elegida al entrar (mage vs knight)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const knightC = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+    const mageC = await colyseus.connectTo(room, { name: "Mag", className: "mage" });
+    await room.waitForNextPatch();
+    const knight = room.state.players.get(knightC.sessionId)!;
+    const mage = room.state.players.get(mageC.sessionId)!;
+    expect(knight.className).toBe("knight");
+    expect(mage.className).toBe("mage");
+    // El caballero tiene más HP; el mago más MP (stats por clase).
+    expect(knight.maxHp).toBeGreaterThan(mage.maxHp);
+    expect(mage.maxMp).toBeGreaterThan(knight.maxMp);
+    // Coinciden exactamente con statsForClass a nivel 1.
+    expect(knight.maxHp).toBe(statsForClass("knight", 1).maxHp);
+    expect(mage.maxMp).toBe(statsForClass("mage", 1).maxMp);
+  });
+
+  it("className inválido cae a knight por defecto", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Raro", className: "brujo_inexistente" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    expect(p.className).toBe("knight");
+    expect(getClass(p.className).skillId).toBe("shield_bash");
   });
 });

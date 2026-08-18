@@ -12,7 +12,7 @@ export class SupabasePersistence implements PersistenceService {
   async load(name: string): Promise<CharacterSave | null> {
     const { data, error } = await this.client
       .from("characters")
-      .select("level,exp,pos_x,pos_z,inventory,gold,questId,questProgress")
+      .select("level,exp,pos_x,pos_z,inventory,gold,questId,questProgress,className")
       .eq("name", name)
       .maybeSingle();
 
@@ -34,6 +34,7 @@ export class SupabasePersistence implements PersistenceService {
       gold: data.gold ?? 0,
       questId: data.questId ?? "",
       questProgress: data.questProgress ?? 0,
+      className: data.className ?? "knight",
     };
   }
 
@@ -49,6 +50,7 @@ export class SupabasePersistence implements PersistenceService {
         gold: data.gold,
         questId: data.questId,
         questProgress: data.questProgress,
+        className: data.className,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "name" },
