@@ -47,6 +47,8 @@ import {
   getClass,
   isValidClass,
   respawnForTemplate,
+  ATTACK_WINDUP_MS,
+  computeDamage,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -305,6 +307,8 @@ export class GameRoom extends Room<GameState> {
     mob.aiState = "wander";
     mob.aggroTargetId = "";
     mob.wanderCooldownMs = 0;
+    mob.windupMs = 0;
+    mob.windupTargetId = "";
 
     const c = getMobCombat(templateId);
     mob.hp = c.maxHp;
@@ -377,6 +381,10 @@ export class GameRoom extends Room<GameState> {
     const dtMs = dt * 1000;
     this.state.mobs.forEach((mob) => {
       if (mob.dead) return; // R-E2b1-3: un mob muerto no deambula ni persigue
+      if (mob.windupMs > 0) {
+        mob.moving = false;
+        return; // Plantado mientras carga el ataque
+      }
       stepMobAI(mob, aggroPlayers, AI_CONFIG, Math.random, dtMs);
       advanceMovable(mob, dt, MOB_MOVE_SPEED);
     });
@@ -432,22 +440,48 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
-    // ataque de mobs sobre el jugador que persiguen (R-E2b2-2: sólo objetivo vivo)
+    // ataque de mobs sobre el jugador que persiguen — dos fases: wind-up + impacto
     this.state.mobs.forEach((mob, mobId) => {
-      if (mob.dead || !mob.aggroTargetId) return;
+      if (mob.dead) return;
+
+      // Fase 2: resolver un wind-up en curso
+      if (mob.windupMs > 0) {
+        mob.windupMs = Math.max(0, mob.windupMs - dtMs);
+        if (mob.windupMs > 0) return; // sigue cargando
+        const targetId = mob.windupTargetId;
+        mob.windupTargetId = "";
+        mob.attackCooldownMs = getMobCombat(mob.templateId).attackCooldownMs; // cooldown tras el swing
+        const target = this.state.players.get(targetId);
+        if (!target || target.dead) return;
+        if (distance2D(mob.x, mob.z, target.x, target.z) > ATTACK_RANGE) {
+          // esquivado: fuera de rango al impacto
+          this.broadcast(MessageType.Damage, { attackerId: mobId, targetId, amount: 0, hp: target.hp, dodged: true });
+          return;
+        }
+        const variance = 0.9 + Math.random() * 0.2;
+        // daño con def efectiva del jugador (buff): reusar computeDamage
+        const defMult = (target.defBuffMs > 0) ? target.defBuffMult : 1;
+        const dmg = computeDamage(mob.pAtk, target.pDef * defMult, 1, variance);
+        target.hp = Math.max(0, target.hp - dmg);
+        this.broadcast(MessageType.Damage, { attackerId: mobId, targetId, amount: dmg, hp: target.hp });
+        if (target.hp <= 0) {
+          target.dead = true;
+          target.moving = false;
+          target.respawnMs = PLAYER_RESPAWN_MS;
+          target.targetId = "";
+          this.broadcast(MessageType.Death, { entityId: targetId });
+        }
+        return;
+      }
+
+      // Fase 1: iniciar wind-up
+      if (!mob.aggroTargetId) return;
       const player = this.state.players.get(mob.aggroTargetId);
       if (!player || player.dead) return;
-      if (!canAttack(mob, player, ATTACK_RANGE)) return;
-      const variance = 0.9 + Math.random() * 0.2;
-      const dmg = resolveAttack(mob, player, 1, variance, getMobCombat(mob.templateId).attackCooldownMs);
-      this.broadcast(MessageType.Damage, { attackerId: mobId, targetId: mob.aggroTargetId, amount: dmg, hp: player.hp });
-      if (player.hp <= 0) {
-        player.dead = true;
-        player.moving = false;
-        player.respawnMs = PLAYER_RESPAWN_MS;
-        player.targetId = "";
-        this.broadcast(MessageType.Death, { entityId: mob.aggroTargetId });
-      }
+      if (mob.attackCooldownMs > 0) return;
+      if (distance2D(mob.x, mob.z, player.x, player.z) > ATTACK_RANGE) return;
+      mob.windupMs = ATTACK_WINDUP_MS;
+      mob.windupTargetId = mob.aggroTargetId;
     });
 
     // DoT ticks: aplicar daño por veneno a mobs

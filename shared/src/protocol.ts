@@ -28,6 +28,8 @@ export interface DamageEvent {
   targetId: string;
   amount: number;
   hp: number;
+  /** true = el ataque fue esquivado (el objetivo salió del rango durante el wind-up); amount 0. */
+  dodged?: boolean;
 }
 
 export interface DeathEvent {

@@ -3,11 +3,14 @@ import { CharacterFactory } from "./CharacterFactory.js";
 import { CharacterView } from "./CharacterView.js";
 import { Nameplates } from "./Nameplates.js";
 import { HealthBar } from "./HealthBar.js";
-import { isBoss, scaleForTemplate, getTemplate } from "@aden/shared";
+import { isBoss, scaleForTemplate, getTemplate, ATTACK_RANGE } from "@aden/shared";
 import type { PlayerSnapshot, MobSnapshot } from "../net/NetworkClient.js";
 
 const MOB_HP_BAR_Y = 2.2; // altura aprox. de la cabeza, para posicionar los damage numbers
 const PLAYER_HP_BAR_Y = 2.2; // misma altura aprox. (modelos KayKit de escala similar)
+
+// Shared RingGeometry para los telegraphs: reutilizado entre todos los mobs
+const TELEGRAPH_RING_GEOMETRY = new THREE.RingGeometry(ATTACK_RANGE * 0.82, ATTACK_RANGE, 32);
 
 /** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
 export class EntityViews {
@@ -19,6 +22,8 @@ export class EntityViews {
   private readonly mobDead = new Map<string, boolean>();
   /** mobId -> barra de HP (CSS2D) flotando sobre el mob. */
   private readonly mobHealthBars = new Map<string, HealthBar>();
+  /** mobId -> anillo de telegraph (viento-up). */
+  private readonly mobTelegraphRings = new Map<string, THREE.Mesh>();
   /** playerId -> ¿muerto? (del snapshot sincronizado); detecta la transición dead->false (respawn) para salir de la pose de muerte. */
   private readonly playerDead = new Map<string, boolean>();
   private currentTargetId: string | null = null;
@@ -86,6 +91,22 @@ export class EntityViews {
     bar.update(snap.hp, snap.maxHp);
     bar.setVisible(!snap.dead);
     this.mobHealthBars.set(id, bar);
+
+    // Telegraph ring (wind-up visual)
+    const ring = new THREE.Mesh(
+      TELEGRAPH_RING_GEOMETRY,
+      new THREE.MeshBasicMaterial({
+        color: 0xff2a2a,
+        transparent: true,
+        opacity: 0.5,
+        side: THREE.DoubleSide,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.05;
+    ring.visible = false;
+    view.object.add(ring);
+    this.mobTelegraphRings.set(id, ring);
   }
 
   updateMob(id: string, snap: MobSnapshot) {
@@ -105,6 +126,11 @@ export class EntityViews {
       this.mobHealthBars.get(id)?.setVisible(true);
       this.mobViews.get(id)?.resetAnimation();
     }
+    // Telegraph ring: mostrar si hay wind-up activo
+    const ring = this.mobTelegraphRings.get(id);
+    if (ring) {
+      ring.visible = snap.windupMs > 0;
+    }
   }
 
   removeMob(id: string) {
@@ -118,6 +144,16 @@ export class EntityViews {
     this.nameplates.remove(id);
     this.mobHealthBars.get(id)?.remove();
     this.mobHealthBars.delete(id);
+    // Telegraph ring cleanup (dispose material only; geometry is shared)
+    const ring = this.mobTelegraphRings.get(id);
+    if (ring) {
+      const material = ring.material;
+      if (material instanceof THREE.Material) {
+        material.dispose();
+      }
+      ring.removeFromParent();
+      this.mobTelegraphRings.delete(id);
+    }
     this.mobDead.delete(id);
     if (this.currentTargetId === id) this.currentTargetId = null;
   }

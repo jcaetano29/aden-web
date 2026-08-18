@@ -15,12 +15,14 @@ export class MobState extends Schema {
   @type("number") pAtk = 0;
   @type("number") pDef = 0;
   @type("boolean") dead = false;
+  @type("number") windupMs = 0;
 
   // Estado interno server-only (NO sincronizado — sin @type)
   homeX = 0;
   homeZ = 0;
   wanderCooldownMs = 0;
   aggroTargetId = "";
+  windupTargetId = "";
 
   // Combat cooldowns — server-only
   attackCooldownMs = 0;
