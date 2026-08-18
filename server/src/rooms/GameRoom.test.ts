@@ -238,6 +238,47 @@ describe("GameRoom", () => {
     expect(hpAfterFirst).toBeGreaterThan(10); // la primera sí curó
   });
 
+  it("el Rey Esqueleto spawnea con 600 HP", async () => {
+    const room = await colyseus.createRoom("game", {});
+    await room.waitForNextPatch();
+    let boss: any;
+    room.state.mobs.forEach((m: any) => {
+      if (m.templateId === "skeleton_king") boss = m;
+    });
+    expect(boss).toBeDefined();
+    expect(boss.hp).toBe(600);
+  });
+
+  it("matar al Rey Esqueleto dropea la corona, da exp y completa la q4", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Heroe", className: "barbarian" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    let bossId = ""; let boss: any;
+    room.state.mobs.forEach((m: any, id: string) => {
+      if (m.templateId === "skeleton_king") { bossId = id; boss = m; }
+    });
+    // Preparar: jugador con la q4 activa, pegado al jefe, jefe casi muerto.
+    p.questId = "q4"; p.questProgress = 0;
+    p.x = boss.x; p.z = boss.z;
+    boss.hp = 1;
+    p.targetId = bossId;
+    c.send(MessageType.SetTarget, { targetId: bossId });
+    // Avanzar la simulación para que el auto-attack lo remate.
+    for (let i = 0; i < 6; i++) await room.waitForNextSimulationTick();
+    expect(boss.dead).toBe(true);
+    // La corona quedó en el suelo.
+    let hasCrown = false;
+    room.state.droppedItems.forEach((d: any) => {
+      if (d.itemTemplateId === "skull_crown") hasCrown = true;
+    });
+    expect(hasCrown).toBe(true);
+    // 300 exp mata seguro sube al menos un nivel desde nv1.
+    expect(p.level).toBeGreaterThan(1);
+    // q4 (amount 1) queda completa.
+    expect(p.questProgress).toBe(1);
+  });
+
   it("veneno (poison) hace daño por tiempo al mob objetivo", async () => {
     const room = await colyseus.createRoom("game", {});
     const c = await colyseus.connectTo(room, { name: "Pica", className: "rogue" });
