@@ -7,6 +7,7 @@ import { CharacterFactory } from "./render/CharacterFactory.js";
 import { Nameplates } from "./render/Nameplates.js";
 import { DamageNumbers } from "./render/DamageNumbers.js";
 import { Hud } from "./render/Hud.js";
+import { SkillBar } from "./render/SkillBar.js";
 import { InventoryPanel } from "./render/InventoryPanel.js";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
@@ -16,7 +17,7 @@ import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -31,6 +32,7 @@ async function main() {
   const damageNumbers = new DamageNumbers(renderer.scene);
   const groundItems = new GroundItems(renderer.scene);
   const hud = new Hud();
+  const skillBar = new SkillBar();
   const npc = new Npc(renderer.scene, renderer.css2d);
   const merchant = new Merchant(renderer.scene, renderer.css2d);
   const shopPanel = new ShopPanel((itemId) => {
@@ -158,8 +160,41 @@ async function main() {
   );
   input.attach(document.body);
 
-  const skillInput = new SkillInput(getClass(className).skillId, (id) => net.sendUseSkill(id));
+  // Configurar el kit de skills de la clase
+  const kit = getClassSkills(className);
+  let skillInputCreated = false;
+
+  // Función auxiliar para usar una skill: envía al server, activa cooldown local y feedback
+  const useSkill = (skillId: string) => {
+    net.sendUseSkill(skillId);
+
+    try {
+      const skill = getSkill(skillId);
+
+      // Encontrar el índice del slot en el kit
+      const slotIndex = kit.indexOf(skillId);
+      if (slotIndex >= 0) {
+        skillBar.triggerCooldown(slotIndex, skill.cooldownMs);
+      }
+
+      // Feedback por tipo de skill
+      if (skill.type === "heal") {
+        hud.toast("Te curaste", "#2ecc40");
+      } else if (skill.type === "buff") {
+        hud.toast(`¡${skill.name}!`, "#ffe066");
+      } else if (skill.type === "dot") {
+        hud.toast(`${skill.name} aplicado`, "#a0e");
+      }
+      // Para damage, no mostrar toast (o mensaje muy breve)
+    } catch {
+      // Skill desconocida, ignorar
+    }
+  };
+
+  const skillInput = new SkillInput(useSkill);
+  skillInput.setSkills(kit);
   skillInput.attach(document.body);
+  skillBar.setSkills(kit);
 
   // Tecla "i" → alterna el panel de inventario. No conflictúa con "1"/Space
   // (Power Strike) ni con el resto de InputController (movimiento/click).

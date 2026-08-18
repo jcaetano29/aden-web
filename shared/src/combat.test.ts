@@ -63,4 +63,68 @@ describe("skills y config defensiva", () => {
     expect(getSkill("backstab").mpCost).toBe(8);
     expect(getSkill("backstab").factor).toBe(2.8);
   });
+
+  it("todas las skills tienen name y type definidos", () => {
+    const skills = ["power_strike", "shield_bash", "fireball", "brutal_strike", "backstab", "guard", "second_wind", "ice_lance", "arcane_mend", "rage", "cleave", "poison", "evasion"];
+    skills.forEach((skillId) => {
+      const skill = getSkill(skillId);
+      expect(skill).toHaveProperty("name");
+      expect(skill).toHaveProperty("type");
+      expect(typeof skill.name).toBe("string");
+      expect(skill.type).toMatch(/^(damage|heal|buff|dot)$/);
+    });
+  });
+
+  it("los skills de damage tienen factor", () => {
+    const damageSkills = ["power_strike", "shield_bash", "fireball", "brutal_strike", "backstab", "ice_lance", "cleave"];
+    damageSkills.forEach((skillId) => {
+      const skill = getSkill(skillId);
+      expect(skill.type).toBe("damage");
+      expect(skill.factor).toBeDefined();
+      expect(typeof skill.factor).toBe("number");
+      expect(skill.factor).toBeGreaterThan(1);
+    });
+  });
+
+  it("los skills de heal tienen healPct", () => {
+    const healSkills = ["second_wind", "arcane_mend"];
+    healSkills.forEach((skillId) => {
+      const skill = getSkill(skillId);
+      expect(skill.type).toBe("heal");
+      expect(skill.healPct).toBeDefined();
+      expect(typeof skill.healPct).toBe("number");
+      expect(skill.healPct).toBeGreaterThan(0);
+      expect(skill.healPct).toBeLessThanOrEqual(1);
+    });
+  });
+
+  it("los skills de buff tienen buffStat, buffMult y buffMs", () => {
+    const buffSkills = ["guard", "rage", "evasion"];
+    buffSkills.forEach((skillId) => {
+      const skill = getSkill(skillId);
+      expect(skill.type).toBe("buff");
+      expect(skill.buffStat).toBeDefined();
+      expect(["pAtk", "pDef"]).toContain(skill.buffStat);
+      expect(skill.buffMult).toBeDefined();
+      expect(typeof skill.buffMult).toBe("number");
+      expect(skill.buffMult).toBeGreaterThan(1);
+      expect(skill.buffMs).toBeDefined();
+      expect(typeof skill.buffMs).toBe("number");
+      expect(skill.buffMs).toBeGreaterThan(0);
+    });
+  });
+
+  it("los skills de dot tienen dotDps y dotMs", () => {
+    const dotSkills = ["poison"];
+    dotSkills.forEach((skillId) => {
+      const skill = getSkill(skillId);
+      expect(skill.type).toBe("dot");
+      expect(skill.dotDps).toBeDefined();
+      expect(typeof skill.dotDps).toBe("number");
+      expect(skill.dotDps).toBeGreaterThan(0);
+      expect(skill.dotMs).toBeDefined();
+      expect(typeof skill.dotMs).toBe("number");
+      expect(skill.dotMs).toBeGreaterThan(0);
+    });
+  });
 });

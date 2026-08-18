@@ -26,19 +26,36 @@ export function getMobCombat(templateId: string): CombatStats {
 
 export interface SkillConfig {
   id: string;
+  name: string;
   mpCost: number;
   cooldownMs: number;
-  factor: number;
+  type: "damage" | "heal" | "buff" | "dot";
+  factor?: number;
+  healPct?: number;
+  buffStat?: "pAtk" | "pDef";
+  buffMult?: number;
+  buffMs?: number;
+  dotDps?: number;
+  dotMs?: number;
+  range?: number;
 }
 
-export const POWER_STRIKE: SkillConfig = { id: "power_strike", mpCost: 10, cooldownMs: 4000, factor: 2.5 };
+export const POWER_STRIKE: SkillConfig = { id: "power_strike", name: "Golpe Poderoso", mpCost: 10, cooldownMs: 4000, type: "damage", factor: 2.5 };
 
 export const SKILLS: Record<string, SkillConfig> = {
   power_strike: POWER_STRIKE,
-  shield_bash: { id: "shield_bash", mpCost: 8, cooldownMs: 5000, factor: 2.0 },
-  fireball: { id: "fireball", mpCost: 22, cooldownMs: 4500, factor: 3.6 },
-  brutal_strike: { id: "brutal_strike", mpCost: 12, cooldownMs: 4000, factor: 3.0 },
-  backstab: { id: "backstab", mpCost: 8, cooldownMs: 2500, factor: 2.8 },
+  shield_bash: { id: "shield_bash", name: "Golpe de Escudo", mpCost: 8, cooldownMs: 5000, type: "damage", factor: 2.0 },
+  fireball: { id: "fireball", name: "Bola de Fuego", mpCost: 22, cooldownMs: 4500, type: "damage", factor: 3.6 },
+  brutal_strike: { id: "brutal_strike", name: "Golpe Brutal", mpCost: 12, cooldownMs: 4000, type: "damage", factor: 3.0 },
+  backstab: { id: "backstab", name: "Puñalada", mpCost: 8, cooldownMs: 2500, type: "damage", factor: 2.8 },
+  guard: { id: "guard", name: "Guardia", mpCost: 10, cooldownMs: 12000, type: "buff", buffStat: "pDef", buffMult: 1.6, buffMs: 6000 },
+  second_wind: { id: "second_wind", name: "Segundo Aire", mpCost: 15, cooldownMs: 15000, type: "heal", healPct: 0.4 },
+  ice_lance: { id: "ice_lance", name: "Lanza de Hielo", mpCost: 12, cooldownMs: 2500, type: "damage", factor: 2.2 },
+  arcane_mend: { id: "arcane_mend", name: "Cura Arcana", mpCost: 18, cooldownMs: 12000, type: "heal", healPct: 0.3 },
+  rage: { id: "rage", name: "Furia", mpCost: 12, cooldownMs: 12000, type: "buff", buffStat: "pAtk", buffMult: 1.5, buffMs: 6000 },
+  cleave: { id: "cleave", name: "Tajo", mpCost: 10, cooldownMs: 3000, type: "damage", factor: 2.4 },
+  poison: { id: "poison", name: "Veneno", mpCost: 10, cooldownMs: 6000, type: "dot", dotDps: 12, dotMs: 5000 },
+  evasion: { id: "evasion", name: "Evasión", mpCost: 8, cooldownMs: 10000, type: "buff", buffStat: "pDef", buffMult: 1.8, buffMs: 4000 },
 };
 
 export function getSkill(id: string): SkillConfig {

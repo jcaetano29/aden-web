@@ -25,4 +25,10 @@ export class MobState extends Schema {
   // Combat cooldowns — server-only
   attackCooldownMs = 0;
   respawnMs = 0;
+
+  // DoT (Damage over Time) — server-only (NO @type)
+  dotMs = 0;
+  dotDps = 0;
+  dotAttackerId = "";
+  dotAccumMs = 0;
 }
