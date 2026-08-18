@@ -11,6 +11,7 @@ export interface ClassDef {
     pAtk: number;
     pDef: number;
   };
+  skills: string[];
   skillId: string;
 }
 
@@ -21,6 +22,7 @@ export const CLASSES: Record<string, ClassDef> = {
     model: "Knight",
     base: { maxHp: 140, maxMp: 30, pAtk: 13, pDef: 16, attackCooldownMs: 1600 },
     growth: { hp: 26, mp: 3, pAtk: 3, pDef: 3 },
+    skills: ["shield_bash", "guard", "second_wind"],
     skillId: "shield_bash",
   },
   mage: {
@@ -29,6 +31,7 @@ export const CLASSES: Record<string, ClassDef> = {
     model: "Mage",
     base: { maxHp: 80, maxMp: 90, pAtk: 18, pDef: 7, attackCooldownMs: 1500 },
     growth: { hp: 14, mp: 10, pAtk: 4, pDef: 1 },
+    skills: ["fireball", "ice_lance", "arcane_mend"],
     skillId: "fireball",
   },
   barbarian: {
@@ -37,6 +40,7 @@ export const CLASSES: Record<string, ClassDef> = {
     model: "Barbarian",
     base: { maxHp: 120, maxMp: 30, pAtk: 18, pDef: 10, attackCooldownMs: 1500 },
     growth: { hp: 22, mp: 3, pAtk: 4, pDef: 2 },
+    skills: ["brutal_strike", "rage", "cleave"],
     skillId: "brutal_strike",
   },
   rogue: {
@@ -45,6 +49,7 @@ export const CLASSES: Record<string, ClassDef> = {
     model: "Rogue",
     base: { maxHp: 95, maxMp: 45, pAtk: 16, pDef: 9, attackCooldownMs: 1100 },
     growth: { hp: 18, mp: 5, pAtk: 4, pDef: 2 },
+    skills: ["backstab", "poison", "evasion"],
     skillId: "backstab",
   },
 };
@@ -60,4 +65,8 @@ export function getClass(id: string): ClassDef {
 export function isValidClass(id: string | undefined): boolean {
   if (id === undefined) return false;
   return id in CLASSES;
+}
+
+export function getClassSkills(className: string): string[] {
+  return getClass(className).skills;
 }
