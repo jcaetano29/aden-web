@@ -1,11 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { getQuest, firstQuestId, nextQuestId, QUEST_ORDER } from "./quests.js";
+import { getQuest, firstQuestId, nextQuestId, QUEST_ORDER, QUESTS } from "./quests.js";
+import { LORE, ELDER_NAME } from "./story.js";
 
 describe("getQuest", () => {
   it("retorna la quest q1 con valores correctos", () => {
     const q = getQuest("q1");
     expect(q.id).toBe("q1");
-    expect(q.title).toBe("Limpieza de esqueletos");
+    expect(q.title).toBe("Los primeros huesos");
     expect(q.mobTemplateId).toBe("skeleton_minion");
     expect(q.amount).toBe(5);
     expect(q.rewardExp).toBe(50);
@@ -15,7 +16,7 @@ describe("getQuest", () => {
   it("retorna la quest q2 con valores correctos", () => {
     const q = getQuest("q2");
     expect(q.id).toBe("q2");
-    expect(q.title).toBe("Purga de las ruinas");
+    expect(q.title).toBe("La marea crece");
     expect(q.mobTemplateId).toBe("skeleton_minion");
     expect(q.amount).toBe(8);
     expect(q.rewardExp).toBe(80);
@@ -25,7 +26,7 @@ describe("getQuest", () => {
   it("retorna la quest q3 con valores correctos", () => {
     const q = getQuest("q3");
     expect(q.id).toBe("q3");
-    expect(q.title).toBe("Cazador de guerreros");
+    expect(q.title).toBe("Los guerreros caídos");
     expect(q.mobTemplateId).toBe("skeleton_warrior");
     expect(q.amount).toBe(5);
     expect(q.rewardExp).toBe(150);
@@ -75,10 +76,45 @@ describe("getQuest q4", () => {
   it("retorna la quest q4 con valores correctos (Rey Esqueleto)", () => {
     const q = getQuest("q4");
     expect(q.id).toBe("q4");
-    expect(q.title).toBe("Derrota al Rey Esqueleto");
+    expect(q.title).toBe("El Rey Esqueleto");
     expect(q.mobTemplateId).toBe("skeleton_king");
     expect(q.amount).toBe(1);
     expect(q.rewardExp).toBe(400);
     expect(q.rewardGold).toBe(200);
+  });
+});
+
+describe("Quest narrative fields", () => {
+  it("todas las quests tienen intro y done no vacíos", () => {
+    QUEST_ORDER.forEach((questId) => {
+      const q = getQuest(questId);
+      expect(q.intro).toBeDefined();
+      expect(q.intro.length).toBeGreaterThan(0);
+      expect(q.done).toBeDefined();
+      expect(q.done.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("getQuest('q1').title es 'Los primeros huesos'", () => {
+    expect(getQuest("q1").title).toBe("Los primeros huesos");
+  });
+
+  it("getQuest('q4').title es 'El Rey Esqueleto'", () => {
+    expect(getQuest("q4").title).toBe("El Rey Esqueleto");
+  });
+});
+
+describe("Story (LORE and ELDER_NAME)", () => {
+  it("LORE.title es 'El Asedio de Aden'", () => {
+    expect(LORE.title).toBe("El Asedio de Aden");
+  });
+
+  it("LORE.body no está vacío", () => {
+    expect(LORE.body).toBeDefined();
+    expect(LORE.body.length).toBeGreaterThan(0);
+  });
+
+  it("ELDER_NAME es 'Anciano Rowan'", () => {
+    expect(ELDER_NAME).toBe("Anciano Rowan");
   });
 });
