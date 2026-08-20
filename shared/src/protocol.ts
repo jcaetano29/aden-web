@@ -11,6 +11,7 @@ export const MessageType = {
   CreateGuild: "createGuild",
   JoinGuild: "joinGuild",
   LeaveGuild: "leaveGuild",
+  BossKilled: "bossKilled",
 } as const;
 
 export interface MoveToMessage {
@@ -63,4 +64,10 @@ export interface CreateGuildMessage {
 
 export interface JoinGuildMessage {
   guildId: string;
+}
+
+export interface BossKilledEvent {
+  bossName: string;
+  guildTag: string;
+  guildName: string;
 }

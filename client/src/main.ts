@@ -147,6 +147,8 @@ async function main() {
       }
     },
     onLevelUp: (level) => hud.flashLevelUp(level),
+    onBossKilled: (ev) =>
+      hud.toast(`⚔ ¡La guild [${ev.guildTag}] abatió al ${ev.bossName}!`, "#ff5252"),
     onItemAdd: (id, itemTemplateId, x, z) => groundItems.add(id, itemTemplateId, x, z),
     onItemRemove: (id) => groundItems.remove(id),
   });
