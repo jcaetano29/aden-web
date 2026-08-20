@@ -16,6 +16,9 @@ describe("InMemoryPersistence", () => {
       questProgress: 2,
       className: "mage",
       pvpKills: 0,
+      guildId: "",
+      guildName: "",
+      guildTag: "",
     };
 
     await persistence.save("Aiden", data);
@@ -43,6 +46,9 @@ describe("InMemoryPersistence", () => {
       questProgress: 0,
       className: "knight",
       pvpKills: 0,
+      guildId: "",
+      guildName: "",
+      guildTag: "",
     };
 
     await persistence.save("Mob", data);
@@ -51,7 +57,7 @@ describe("InMemoryPersistence", () => {
     loaded!.inventory.gold = 999;
 
     const reloaded = await persistence.load("Mob");
-    expect(reloaded).toEqual({ level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: { gold: 1 }, gold: 0, questId: "q1", questProgress: 0, className: "knight", pvpKills: 0 });
+    expect(reloaded).toEqual({ level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: { gold: 1 }, gold: 0, questId: "q1", questProgress: 0, className: "knight", pvpKills: 0, guildId: "", guildName: "", guildTag: "" });
   });
 
   it("persiste y devuelve pvpKills", async () => {
@@ -59,8 +65,34 @@ describe("InMemoryPersistence", () => {
     await svc.save("Boromir", {
       level: 3, exp: 10, pos_x: 1, pos_z: 2, inventory: {}, gold: 50,
       questId: "q1", questProgress: 0, className: "knight", pvpKills: 7,
+      guildId: "", guildName: "", guildTag: "",
     });
     const loaded = await svc.load("Boromir");
     expect(loaded?.pvpKills).toBe(7);
+  });
+
+  it("persiste y devuelve la identidad de guild del personaje", async () => {
+    const svc = new InMemoryPersistence();
+    await svc.save("Aragorn", {
+      level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: {}, gold: 0,
+      questId: "q1", questProgress: 0, className: "knight", pvpKills: 0,
+      guildId: "wolf-abc123", guildName: "Los Lobos", guildTag: "WOLF",
+    });
+    const loaded = await svc.load("Aragorn");
+    expect(loaded?.guildId).toBe("wolf-abc123");
+    expect(loaded?.guildName).toBe("Los Lobos");
+    expect(loaded?.guildTag).toBe("WOLF");
+  });
+
+  it("guarda y carga una guild (round-trip)", async () => {
+    const svc = new InMemoryPersistence();
+    await svc.saveGuild({ id: "wolf-abc123", name: "Los Lobos", tag: "WOLF", leaderName: "Aragorn", bossKills: 3 });
+    const g = await svc.loadGuild("wolf-abc123");
+    expect(g).toEqual({ id: "wolf-abc123", name: "Los Lobos", tag: "WOLF", leaderName: "Aragorn", bossKills: 3 });
+  });
+
+  it("loadGuild devuelve null si no existe", async () => {
+    const svc = new InMemoryPersistence();
+    expect(await svc.loadGuild("nope")).toBeNull();
   });
 });

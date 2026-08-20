@@ -9,6 +9,9 @@ export interface CharacterSave {
   questProgress: number;
   className: string;
   pvpKills: number;
+  guildId: string;
+  guildName: string;
+  guildTag: string;
 }
 
 export interface Persistable {
@@ -22,6 +25,9 @@ export interface Persistable {
   questProgress: number;
   className: string;
   pvpKills: number;
+  guildId: string;
+  guildName: string;
+  guildTag: string;
 }
 
 export function toCharacterSave(p: Persistable): CharacterSave {
@@ -41,6 +47,9 @@ export function toCharacterSave(p: Persistable): CharacterSave {
     questProgress: p.questProgress,
     className: p.className,
     pvpKills: p.pvpKills,
+    guildId: p.guildId,
+    guildName: p.guildName,
+    guildTag: p.guildTag,
   };
 }
 

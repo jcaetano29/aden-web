@@ -655,6 +655,9 @@ export class GameRoom extends Room<GameState> {
     player.questProgress = 0;
     player.gold = 0;
     player.pvpKills = 0;
+    player.guildId = "";
+    player.guildTag = "";
+    player.guildName = "";
     this.state.players.set(client.sessionId, player);
 
     // Etapa 3c: cargar el save (si existe) y aplicarlo sobre el player ya insertado en el
@@ -678,6 +681,9 @@ export class GameRoom extends Room<GameState> {
       player.questId = save.questId ?? firstQuestId();
       player.questProgress = save.questProgress ?? 0;
       player.pvpKills = save.pvpKills ?? 0;
+      player.guildId = save.guildId ?? "";
+      player.guildName = save.guildName ?? "";
+      player.guildTag = save.guildTag ?? "";
       for (const [id, qty] of inventoryRecordToEntries(save.inventory)) {
         const it = new InventoryItemState();
         it.itemTemplateId = id;
