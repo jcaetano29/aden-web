@@ -513,4 +513,32 @@ describe("GameRoom", () => {
       expect(boss.dead).toBe(true); // no crash, muere normal
     });
   });
+
+  describe("Leaderboard (Etapa 9d)", () => {
+    it("incluye guilds vivas y jugadores online con sus stats actuales", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Campeon", className: "knight" });
+      a.send("createGuild", { name: "Los Reyes", tag: "KING" });
+      await room.waitForNextSimulationTick();
+      const pa = room.state.players.get(a.sessionId)!;
+      pa.level = 9;
+      room.state.guilds.get(pa.guildId)!.bossKills = 5;
+      await (room as any).refreshLeaderboard();
+      const guilds = [...room.state.leaderboard.guilds];
+      const players = [...room.state.leaderboard.players];
+      expect(guilds.some((g: any) => g.tag === "KING" && g.bossKills === 5)).toBe(true);
+      expect(players.some((p: any) => p.name === "Campeon" && p.level === 9)).toBe(true);
+    });
+
+    it("ordena jugadores por nivel desc y guilds por bossKills desc", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Nivel3", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Nivel8", className: "mage" });
+      room.state.players.get(a.sessionId)!.level = 3;
+      room.state.players.get(b.sessionId)!.level = 8;
+      await (room as any).refreshLeaderboard();
+      const players = [...room.state.leaderboard.players].map((p: any) => p.name);
+      expect(players.indexOf("Nivel8")).toBeLessThan(players.indexOf("Nivel3"));
+    });
+  });
 });

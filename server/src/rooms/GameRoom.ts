@@ -63,12 +63,13 @@ import { MobState } from "../state/MobState.js";
 import { DroppedItemState } from "../state/DroppedItemState.js";
 import { GuildState } from "../state/GuildState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
+import { LeaderboardState, LeaderPlayerEntry, LeaderGuildEntry } from "../state/LeaderboardState.js";
 import { advanceMovable } from "../systems/MovementSystem.js";
 import { createSpawns } from "../systems/SpawnSystem.js";
 import { stepMobAI, eligiblePlayersForAggro } from "../systems/MobAISystem.js";
 import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
 import { createPersistence } from "../persistence/createPersistence.js";
-import type { PersistenceService } from "../persistence/PersistenceService.js";
+import type { PersistenceService, CharacterRank, GuildRank } from "../persistence/PersistenceService.js";
 import { toCharacterSave, inventoryRecordToEntries } from "../persistence/CharacterSave.js";
 
 /** Intervalo de guardado periódico de personajes (Etapa 3c). */
@@ -134,10 +135,53 @@ export class GameRoom extends Room<GameState> {
     if (!anyOnline) this.state.guilds.delete(guildId);
   }
 
+  /** Recalcula el snapshot del leaderboard: persistencia (incluye offline) mezclada con el estado vivo (online), ordenada, top 10. */
+  private async refreshLeaderboard(): Promise<void> {
+    const [chars, guilds] = await Promise.all([
+      this.persistence.topCharacters(20),
+      this.persistence.topGuilds(20),
+    ]);
+
+    // Jugadores: mezcla por nombre, el estado vivo pisa al persistido (stats más frescas).
+    const pByName = new Map<string, CharacterRank>();
+    for (const c of chars) pByName.set(c.name, c);
+    this.state.players.forEach((pl) => {
+      pByName.set(pl.name, { name: pl.name, level: pl.level, pvpKills: pl.pvpKills, className: pl.className });
+    });
+    const players = [...pByName.values()]
+      .sort((a, b) => b.level - a.level || b.pvpKills - a.pvpKills)
+      .slice(0, 10);
+
+    // Guilds: mezcla por tag, las guilds vivas pisan a las persistidas.
+    const gByTag = new Map<string, GuildRank>();
+    for (const g of guilds) gByTag.set(g.tag, g);
+    this.state.guilds.forEach((g) => {
+      gByTag.set(g.tag, { name: g.name, tag: g.tag, bossKills: g.bossKills });
+    });
+    const gl = [...gByTag.values()]
+      .sort((a, b) => b.bossKills - a.bossKills)
+      .slice(0, 10);
+
+    this.state.leaderboard.players.splice(0);
+    for (const p of players) {
+      const e = new LeaderPlayerEntry();
+      e.name = p.name; e.level = p.level; e.pvpKills = p.pvpKills; e.className = p.className;
+      this.state.leaderboard.players.push(e);
+    }
+    this.state.leaderboard.guilds.splice(0);
+    for (const g of gl) {
+      const e = new LeaderGuildEntry();
+      e.name = g.name; e.tag = g.tag; e.bossKills = g.bossKills;
+      this.state.leaderboard.guilds.push(e);
+    }
+  }
+
   onCreate() {
     this.setState(new GameState());
     this.persistence = createPersistence();
     this.clock.setInterval(() => this.saveAll(), SAVE_INTERVAL_MS);
+    this.clock.setInterval(() => { void this.refreshLeaderboard(); }, 15000);
+    void this.refreshLeaderboard();
 
     for (const s of createSpawns(SPAWN_ZONES, Math.random)) {
       this.spawnMob(s.id, s.templateId, s.x, s.z);
