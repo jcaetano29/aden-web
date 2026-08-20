@@ -1,7 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { CharacterSave } from "./CharacterSave.js";
 import type { GuildSave } from "./GuildSave.js";
-import type { PersistenceService } from "./PersistenceService.js";
+import type { CharacterRank, GuildRank, PersistenceService } from "./PersistenceService.js";
 
 export class SupabasePersistence implements PersistenceService {
   private readonly client: SupabaseClient;
@@ -87,5 +87,26 @@ export class SupabasePersistence implements PersistenceService {
       { onConflict: "id" },
     );
     if (error) console.error("[aden] SupabasePersistence.saveGuild error:", error.message);
+  }
+
+  async topCharacters(limit: number): Promise<CharacterRank[]> {
+    const { data, error } = await this.client
+      .from("characters")
+      .select("name,level,pvpKills,className")
+      .order("level", { ascending: false })
+      .order("pvpKills", { ascending: false })
+      .limit(limit);
+    if (error) { console.error("[aden] SupabasePersistence.topCharacters error:", error.message); return []; }
+    return (data ?? []).map((r) => ({ name: r.name, level: r.level, pvpKills: (r.pvpKills as number) ?? 0, className: r.className ?? "knight" }));
+  }
+
+  async topGuilds(limit: number): Promise<GuildRank[]> {
+    const { data, error } = await this.client
+      .from("guilds")
+      .select("name,tag,bossKills")
+      .order("bossKills", { ascending: false })
+      .limit(limit);
+    if (error) { console.error("[aden] SupabasePersistence.topGuilds error:", error.message); return []; }
+    return (data ?? []).map((r) => ({ name: r.name, tag: r.tag, bossKills: (r.bossKills as number) ?? 0 }));
   }
 }

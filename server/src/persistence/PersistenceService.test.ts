@@ -95,4 +95,25 @@ describe("InMemoryPersistence", () => {
     const svc = new InMemoryPersistence();
     expect(await svc.loadGuild("nope")).toBeNull();
   });
+
+  it("topCharacters ordena por nivel desc, desempata por pvpKills desc y respeta el límite", async () => {
+    const svc = new InMemoryPersistence();
+    const base = { exp: 0, pos_x: 0, pos_z: 0, inventory: {}, gold: 0, questId: "q1", questProgress: 0, className: "knight", guildId: "", guildName: "", guildTag: "" };
+    await svc.save("Bajo",  { ...base, level: 2, pvpKills: 0 });
+    await svc.save("AltoA", { ...base, level: 9, pvpKills: 1 });
+    await svc.save("AltoB", { ...base, level: 9, pvpKills: 7 });
+    const top = await svc.topCharacters(2);
+    expect(top.map((c) => c.name)).toEqual(["AltoB", "AltoA"]); // mismo nivel, más pvpKills primero; "Bajo" queda fuera por el límite
+    expect(top[0]).toEqual({ name: "AltoB", level: 9, pvpKills: 7, className: "knight" });
+  });
+
+  it("topGuilds ordena por bossKills desc y respeta el límite", async () => {
+    const svc = new InMemoryPersistence();
+    await svc.saveGuild({ id: "a", name: "A", tag: "AAA", leaderName: "x", bossKills: 1 });
+    await svc.saveGuild({ id: "b", name: "B", tag: "BBB", leaderName: "y", bossKills: 5 });
+    await svc.saveGuild({ id: "c", name: "C", tag: "CCC", leaderName: "z", bossKills: 3 });
+    const top = await svc.topGuilds(2);
+    expect(top.map((g) => g.tag)).toEqual(["BBB", "CCC"]);
+    expect(top[0]).toEqual({ name: "B", tag: "BBB", bossKills: 5 });
+  });
 });
