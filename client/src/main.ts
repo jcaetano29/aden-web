@@ -9,6 +9,7 @@ import { DamageNumbers } from "./render/DamageNumbers.js";
 import { Hud } from "./render/Hud.js";
 import { SkillBar } from "./render/SkillBar.js";
 import { InventoryPanel } from "./render/InventoryPanel.js";
+import { GuildPanel } from "./render/GuildPanel.js";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ShopPanel } from "./render/ShopPanel.js";
@@ -47,6 +48,12 @@ async function main() {
     document.body,
     (itemId) => net.sendUseItem(itemId),
   );
+  const guildPanel = new GuildPanel({
+    onCreate: (name_, tag) => net.sendCreateGuild(name_, tag),
+    onJoin: (guildId) => net.sendJoinGuild(guildId),
+    onLeave: () => net.sendLeaveGuild(),
+  });
+  guildPanel.mount(document.body);
   const classSelect = new ClassSelect();
   const storyCard = new StoryCard();
   const dialog = new DialogPanel();
@@ -275,9 +282,15 @@ async function main() {
   // Tecla "i" → alterna el panel de inventario. No conflictúa con "1"/Space
   // (Power Strike) ni con el resto de InputController (movimiento/click).
   // Tecla "q" → usa una Poción de Vida (si la tienes y HP < maxHp).
+  let guildPanelVisible = false;
   document.body.addEventListener("keydown", (e) => {
     if (e.key === "i" || e.key === "I" || e.code === "KeyI") {
       inventoryPanel.toggle();
+    }
+    if (e.key === "g" || e.key === "G" || e.code === "KeyG") {
+      guildPanelVisible = !guildPanelVisible;
+      if (guildPanelVisible) guildPanel.update(net.getGuildPanelData());
+      guildPanel.setVisible(guildPanelVisible);
     }
     if (e.key === "q" || e.key === "Q" || e.code === "KeyQ") {
       const self = net.getSelf();
@@ -362,6 +375,9 @@ async function main() {
     inventoryPanel.update(
       net.getInventory().map((it) => ({ ...it, name: getItem(it.itemTemplateId).name })),
     );
+    if (guildPanelVisible) {
+      guildPanel.update(net.getGuildPanelData());
+    }
     renderer.render();
     renderer.css2d.render(renderer.scene, renderer.camera);
     requestAnimationFrame(loop);

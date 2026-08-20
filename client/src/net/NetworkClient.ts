@@ -10,6 +10,8 @@ import {
   type InteractNpcMessage,
   type BuyItemMessage,
   type UseItemMessage,
+  type CreateGuildMessage,
+  type JoinGuildMessage,
   isBoss,
 } from "@aden/shared";
 
@@ -26,6 +28,8 @@ export interface PlayerSnapshot {
   dead: boolean;
   /** Clase del jugador (knight/mage/barbarian/rogue); se sincroniza desde el server. Solo para jugadores. */
   className?: string;
+  /** Tag de guild ("" si no pertenece a ninguna); se sincroniza desde el server. Solo para jugadores. */
+  guildTag?: string;
 }
 
 /** Snapshot de mob: incluye combate (hp/maxHp/dead) para highlight/HUD. */
@@ -87,6 +91,7 @@ export class NetworkClient {
       moving: p.moving,
       dead: p.dead,
       className: p.className,
+      guildTag: p.guildTag ?? "",
     });
 
     this.room.state.players.onAdd((player: any, id: string) => {
@@ -157,6 +162,23 @@ export class NetworkClient {
     this.room.send(MessageType.UseItem, msg);
   }
 
+  /** Envía la intención de crear una guild nueva (el jugador local pasa a ser el líder). */
+  sendCreateGuild(name: string, tag: string) {
+    const msg: CreateGuildMessage = { name, tag };
+    this.room.send(MessageType.CreateGuild, msg);
+  }
+
+  /** Envía la intención de unirse a una guild existente. */
+  sendJoinGuild(guildId: string) {
+    const msg: JoinGuildMessage = { guildId };
+    this.room.send(MessageType.JoinGuild, msg);
+  }
+
+  /** Envía la intención de abandonar la guild actual. */
+  sendLeaveGuild() {
+    this.room.send(MessageType.LeaveGuild, {});
+  }
+
   get sessionId(): string {
     return this.room.sessionId;
   }
@@ -217,5 +239,34 @@ export class NetworkClient {
       out.push({ x: m.x, z: m.z, kind: isBoss(m.templateId) ? "boss" : "mob" });
     });
     return out;
+  }
+
+  /**
+   * Datos para el panel de guild: la guild del jugador local (id vacío si
+   * ninguna), todas las guilds vivas (`state.guilds`) y el roster (nombres)
+   * de los jugadores que comparten `guildId` con el jugador local. Sólo
+   * lectura del estado sincronizado.
+   */
+  getGuildPanelData(): {
+    myGuildId: string;
+    guilds: { id: string; name: string; tag: string; leaderName: string; bossKills: number }[];
+    roster: string[];
+  } {
+    const self: any = this.room.state.players.get(this.room.sessionId);
+    const myGuildId: string = self?.guildId ?? "";
+
+    const guilds: { id: string; name: string; tag: string; leaderName: string; bossKills: number }[] = [];
+    this.room.state.guilds.forEach((g: any) => {
+      guilds.push({ id: g.id, name: g.name, tag: g.tag, leaderName: g.leaderName, bossKills: g.bossKills });
+    });
+
+    const roster: string[] = [];
+    if (myGuildId) {
+      this.room.state.players.forEach((p: any) => {
+        if (p.guildId === myGuildId) roster.push(p.name);
+      });
+    }
+
+    return { myGuildId, guilds, roster };
   }
 }
