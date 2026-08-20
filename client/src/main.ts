@@ -284,6 +284,11 @@ async function main() {
   // Tecla "q" → usa una Poción de Vida (si la tienes y HP < maxHp).
   let guildPanelVisible = false;
   document.body.addEventListener("keydown", (e) => {
+    // No disparar hotkeys de gameplay mientras se está tipeando en un input
+    // (p.ej. el form de crear guild): sin esta guarda, escribir "Guerreros"
+    // o el tag "GG" cierra el panel o dispara otras acciones por accidente.
+    const ae = document.activeElement;
+    if (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement) return;
     if (e.key === "i" || e.key === "I" || e.code === "KeyI") {
       inventoryPanel.toggle();
     }

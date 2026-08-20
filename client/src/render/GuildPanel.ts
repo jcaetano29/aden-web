@@ -28,6 +28,8 @@ export interface GuildPanelHandlers {
 export class GuildPanel {
   readonly el: HTMLDivElement;
   private lastData: GuildPanelData = { myGuildId: "", guilds: [], roster: [] };
+  /** Firma de la última data renderizada; null antes del primer render (fuerza el primer `update()` a dibujar). */
+  private lastSignature: string | null = null;
 
   constructor(private readonly handlers: GuildPanelHandlers) {
     this.el = document.createElement("div");
@@ -49,6 +51,13 @@ export class GuildPanel {
   }
 
   update(data: GuildPanelData): void {
+    // Evita redibujar (y por lo tanto destruir/recrear los <input>) cuando la
+    // data no cambió: se llama una vez por frame mientras el panel está
+    // abierto, y recrear el DOM en cada llamada tira el foco/valor de los
+    // inputs del form de crear guild mientras el usuario está tipeando.
+    const signature = JSON.stringify(data);
+    if (signature === this.lastSignature) return;
+    this.lastSignature = signature;
     this.lastData = data;
     this.render();
   }
