@@ -16,6 +16,10 @@ import {
   type UseSkillMessage,
   type BuyItemMessage,
   type UseItemMessage,
+  type CreateGuildMessage,
+  type JoinGuildMessage,
+  isValidGuildTag,
+  isValidGuildName,
   MAP_BOUNDS,
   TICK_RATE,
   clampToBounds,
@@ -55,6 +59,7 @@ import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
 import { MobState } from "../state/MobState.js";
 import { DroppedItemState } from "../state/DroppedItemState.js";
+import { GuildState } from "../state/GuildState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
 import { advanceMovable } from "../systems/MovementSystem.js";
 import { createSpawns } from "../systems/SpawnSystem.js";
@@ -120,6 +125,13 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
+  /** Borra la GuildState viva si ya no hay ningún jugador online con ese guildId. La fila persistida queda. */
+  private pruneGuildIfEmpty(guildId: string): void {
+    let anyOnline = false;
+    this.state.players.forEach((pl) => { if (pl.guildId === guildId) anyOnline = true; });
+    if (!anyOnline) this.state.guilds.delete(guildId);
+  }
+
   onCreate() {
     this.setState(new GameState());
     this.persistence = createPersistence();
@@ -182,6 +194,7 @@ export class GameRoom extends Room<GameState> {
           if (mob.hp <= 0) this.killMob(mob, p.targetId, client.sessionId);
         } else {
           const victim = t.entity;
+          if (p.guildId !== "" && p.guildId === victim.guildId) return; // aliados no se pegan
           if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
           if (!canAttack(p, victim, ATTACK_RANGE)) return;
           p.mp -= skill.mpCost;
@@ -319,6 +332,41 @@ export class GameRoom extends Room<GameState> {
       if (invEntry.qty <= 0) {
         p.inventory.delete(msg.itemTemplateId);
       }
+    });
+
+    // Etapa 9b: handlers de guild (crear/unirse/salir)
+    this.onMessage(MessageType.CreateGuild, (client, msg: CreateGuildMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.guildId !== "") return;
+      const name = (msg?.name ?? "").trim();
+      const tag = (msg?.tag ?? "").trim().toUpperCase();
+      if (!isValidGuildName(name) || !isValidGuildTag(tag)) return;
+      let taken = false;
+      this.state.guilds.forEach((g) => { if (g.tag === tag) taken = true; });
+      if (taken) return;
+      const id = `${tag.toLowerCase()}-${Math.random().toString(36).slice(2, 8)}`;
+      const g = new GuildState();
+      g.id = id; g.name = name; g.tag = tag; g.leaderName = p.name; g.bossKills = 0;
+      this.state.guilds.set(id, g);
+      p.guildId = id; p.guildName = name; p.guildTag = tag;
+      this.persistence.saveGuild({ id, name, tag, leaderName: p.name, bossKills: 0 })
+        .catch((e) => console.error("[aden] saveGuild fail", id, e));
+    });
+
+    this.onMessage(MessageType.JoinGuild, (client, msg: JoinGuildMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.guildId !== "") return;
+      const g = this.state.guilds.get(msg?.guildId ?? "");
+      if (!g) return;
+      p.guildId = g.id; p.guildName = g.name; p.guildTag = g.tag;
+    });
+
+    this.onMessage(MessageType.LeaveGuild, (client) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.guildId === "") return;
+      const gid = p.guildId;
+      p.guildId = ""; p.guildName = ""; p.guildTag = "";
+      this.pruneGuildIfEmpty(gid);
     });
 
     const dt = 1 / TICK_RATE;
@@ -478,6 +526,7 @@ export class GameRoom extends Room<GameState> {
       } else {
         // PvP: ambos fuera del pueblo
         const victim = t.entity;
+        if (p.guildId !== "" && p.guildId === victim.guildId) return; // aliados no se pegan
         if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
         if (canAttack(p, victim, ATTACK_RANGE)) {
           const variance = 0.9 + Math.random() * 0.2;
@@ -655,6 +704,9 @@ export class GameRoom extends Room<GameState> {
     player.questProgress = 0;
     player.gold = 0;
     player.pvpKills = 0;
+    player.guildId = "";
+    player.guildTag = "";
+    player.guildName = "";
     this.state.players.set(client.sessionId, player);
 
     // Etapa 3c: cargar el save (si existe) y aplicarlo sobre el player ya insertado en el
@@ -678,6 +730,9 @@ export class GameRoom extends Room<GameState> {
       player.questId = save.questId ?? firstQuestId();
       player.questProgress = save.questProgress ?? 0;
       player.pvpKills = save.pvpKills ?? 0;
+      player.guildId = save.guildId ?? "";
+      player.guildName = save.guildName ?? "";
+      player.guildTag = save.guildTag ?? "";
       for (const [id, qty] of inventoryRecordToEntries(save.inventory)) {
         const it = new InventoryItemState();
         it.itemTemplateId = id;
@@ -691,6 +746,19 @@ export class GameRoom extends Room<GameState> {
     // saveAll()/onLeave() deben ignorarlo para no pisar el registro real con defaults
     // de nivel 1 (ver guardas en saveAll y onLeave).
     player.loaded = true;
+
+    // Etapa 9b: si el jugador tiene guild pero no hay ninguna instancia online (todos los
+    // demás miembros están desconectados), reconstruir la GuildState viva desde el save.
+    if (player.guildId !== "" && !this.state.guilds.has(player.guildId)) {
+      const row = await this.persistence.loadGuild(player.guildId);
+      const g = new GuildState();
+      g.id = player.guildId;
+      g.name = row?.name ?? player.guildName;
+      g.tag = row?.tag ?? player.guildTag;
+      g.leaderName = row?.leaderName ?? player.name;
+      g.bossKills = row?.bossKills ?? 0;
+      this.state.guilds.set(player.guildId, g);
+    }
   }
 
   /** Guarda el estado de todos los jugadores conectados (fire-and-forget, periódico). */
@@ -716,6 +784,8 @@ export class GameRoom extends Room<GameState> {
         }
       }
     }
+    const gid = player?.guildId ?? "";
     this.state.players.delete(client.sessionId);
+    if (gid !== "") this.pruneGuildIfEmpty(gid);
   }
 }

@@ -9,3 +9,4 @@ export * from "./quests.js";
 export * from "./classes.js";
 export * from "./pvp.js";
 export * from "./story.js";
+export * from "./guilds.js";

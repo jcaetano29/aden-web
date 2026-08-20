@@ -20,6 +20,8 @@ export class PlayerState extends Schema {
   @type("boolean") dead = false;
   @type("string") className = "knight";
   @type("number") pvpKills = 0;
+  @type("string") guildId = "";
+  @type("string") guildTag = "";
 
   // Progression — synced to clients
   @type("number") exp = 0;
@@ -46,6 +48,9 @@ export class PlayerState extends Schema {
   // nivel 1) pise el registro real si el jugador se desconecta o si el saveAll
   // periódico corre antes de que el load() resuelva.
   loaded = false;
+
+  // Guild identity — server-only (NO @type)
+  guildName = "";
 
   // Inventory — synced to client
   @type({ map: InventoryItemState }) inventory = new MapSchema<InventoryItemState>();

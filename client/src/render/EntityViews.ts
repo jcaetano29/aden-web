@@ -12,6 +12,11 @@ const PLAYER_HP_BAR_Y = 2.2; // misma altura aprox. (modelos KayKit de escala si
 // Shared RingGeometry para los telegraphs: reutilizado entre todos los mobs
 const TELEGRAPH_RING_GEOMETRY = new THREE.RingGeometry(ATTACK_RANGE * 0.82, ATTACK_RANGE, 32);
 
+/** Texto del nameplate de un jugador: "[TAG] Nombre" si tiene guildTag, si no sólo "Nombre". */
+function nameplateText(name: string, guildTag?: string): string {
+  return guildTag ? `[${guildTag}] ${name}` : name;
+}
+
 /** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
 export class EntityViews {
   private readonly views = new Map<string, CharacterView>();
@@ -28,6 +33,8 @@ export class EntityViews {
   private readonly mobTelegraphRings = new Map<string, THREE.Mesh>();
   /** playerId -> ¿muerto? (del snapshot sincronizado); detecta la transición dead->false (respawn) para salir de la pose de muerte. */
   private readonly playerDead = new Map<string, boolean>();
+  /** playerId -> guildTag actual (del snapshot sincronizado); detecta cambios para refrescar el texto del nameplate. */
+  private readonly playerGuildTag = new Map<string, string>();
   private currentTargetId: string | null = null;
   private selfId: string | null = null;
 
@@ -44,8 +51,9 @@ export class EntityViews {
     this.scene.add(view.object);
     this.views.set(id, view);
     this.playerRootToId.set(view.object, id);
-    this.nameplates.add(id, snap.name, view.object);
+    this.nameplates.add(id, nameplateText(snap.name, snap.guildTag), view.object);
     this.playerDead.set(id, snap.dead);
+    this.playerGuildTag.set(id, snap.guildTag ?? "");
     if (isSelf) {
       this.selfId = id;
       view.addSelfRing();
@@ -61,6 +69,13 @@ export class EntityViews {
     if (wasDead && !state.dead) {
       this.views.get(id)?.resetAnimation();
     }
+    // Refrescar el texto del nameplate si cambió el guildTag (crear/unirse/salir de guild).
+    const prevTag = this.playerGuildTag.get(id) ?? "";
+    const newTag = state.guildTag ?? "";
+    if (prevTag !== newTag) {
+      this.playerGuildTag.set(id, newTag);
+      this.nameplates.setText(id, nameplateText(state.name, newTag));
+    }
   }
 
   remove(id: string) {
@@ -73,6 +88,7 @@ export class EntityViews {
       this.views.delete(id);
     }
     this.playerDead.delete(id);
+    this.playerGuildTag.delete(id);
     if (this.currentTargetId === id) this.currentTargetId = null;
   }
 

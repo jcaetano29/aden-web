@@ -17,6 +17,14 @@ export class Nameplates {
     this.labels.set(id, label);
   }
 
+  /** Actualiza el texto de una etiqueta ya agregada (p.ej. cuando cambia el guildTag). */
+  setText(id: string, text: string) {
+    const label = this.labels.get(id);
+    if (label) {
+      (label.element as HTMLElement).textContent = text;
+    }
+  }
+
   remove(id: string) {
     const label = this.labels.get(id);
     if (label) {
