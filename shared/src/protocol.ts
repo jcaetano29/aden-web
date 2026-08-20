@@ -8,6 +8,9 @@ export const MessageType = {
   InteractNpc: "interactNpc",
   UseItem: "useItem",
   BuyItem: "buyItem",
+  CreateGuild: "createGuild",
+  JoinGuild: "joinGuild",
+  LeaveGuild: "leaveGuild",
 } as const;
 
 export interface MoveToMessage {
@@ -51,4 +54,13 @@ export interface UseItemMessage {
 export interface BuyItemMessage {
   itemTemplateId: string;
   qty?: number;
+}
+
+export interface CreateGuildMessage {
+  name: string;
+  tag: string;
+}
+
+export interface JoinGuildMessage {
+  guildId: string;
 }

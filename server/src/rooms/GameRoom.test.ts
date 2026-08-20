@@ -399,4 +399,78 @@ describe("GameRoom", () => {
       expect(pa.targetId).toBe("");
     });
   });
+
+  describe("Guilds (Etapa 9b)", () => {
+    it("crear guild setea id/tag/name en el jugador y la registra viva", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Lider", className: "knight" });
+      a.send("createGuild", { name: "Los Lobos", tag: "WOLF" });
+      await room.waitForNextSimulationTick();
+      const pa = room.state.players.get(a.sessionId)!;
+      expect(pa.guildTag).toBe("WOLF");
+      expect(pa.guildId).not.toBe("");
+      const g = room.state.guilds.get(pa.guildId)!;
+      expect(g.name).toBe("Los Lobos");
+      expect(g.leaderName).toBe("Lider");
+    });
+
+    it("rechaza tag inválido y tag duplicado", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "L1", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "L2", className: "knight" });
+      a.send("createGuild", { name: "AAA", tag: "toolong" }); // inválido
+      await room.waitForNextSimulationTick();
+      expect(room.state.players.get(a.sessionId)!.guildId).toBe("");
+      a.send("createGuild", { name: "Uno", tag: "WOLF" });
+      await room.waitForNextSimulationTick();
+      b.send("createGuild", { name: "Dos", tag: "WOLF" }); // duplicado
+      await room.waitForNextSimulationTick();
+      expect(room.state.players.get(b.sessionId)!.guildId).toBe("");
+    });
+
+    it("unirse copia la identidad de la guild", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Jefe", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Miembro", className: "knight" });
+      a.send("createGuild", { name: "Halcones", tag: "HAWK" });
+      await room.waitForNextSimulationTick();
+      const gid = room.state.players.get(a.sessionId)!.guildId;
+      b.send("joinGuild", { guildId: gid });
+      await room.waitForNextSimulationTick();
+      expect(room.state.players.get(b.sessionId)!.guildId).toBe(gid);
+      expect(room.state.players.get(b.sessionId)!.guildTag).toBe("HAWK");
+    });
+
+    it("miembros de la misma guild NO se hacen daño (fuego amigo)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Aliado1", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Aliado2", className: "knight" });
+      const pa = room.state.players.get(a.sessionId)!;
+      const pb = room.state.players.get(b.sessionId)!;
+      pa.x = 30; pa.z = 0; pa.targetX = 30; pa.targetZ = 0;
+      pb.x = 31; pb.z = 0; pb.targetX = 31; pb.targetZ = 0;
+      a.send("createGuild", { name: "Pactados", tag: "PAX" });
+      await room.waitForNextSimulationTick();
+      b.send("joinGuild", { guildId: pa.guildId });
+      await room.waitForNextSimulationTick();
+      const hp0 = pb.hp;
+      a.send("setTarget", { targetId: b.sessionId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(pb.hp).toBe(hp0); // sin daño entre aliados
+    });
+
+    it("salir limpia la identidad y poda la guild vacía", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Solo", className: "knight" });
+      a.send("createGuild", { name: "Efímera", tag: "TMP" });
+      await room.waitForNextSimulationTick();
+      const gid = room.state.players.get(a.sessionId)!.guildId;
+      expect(room.state.guilds.has(gid)).toBe(true);
+      a.send("leaveGuild", {});
+      await room.waitForNextSimulationTick();
+      expect(room.state.players.get(a.sessionId)!.guildId).toBe("");
+      expect(room.state.guilds.has(gid)).toBe(false); // podada (sin miembros online)
+    });
+  });
 });
