@@ -473,4 +473,44 @@ describe("GameRoom", () => {
       expect(room.state.guilds.has(gid)).toBe(false); // podada (sin miembros online)
     });
   });
+
+  describe("Boss contestado (Etapa 9c)", () => {
+    function findBoss(room: any): string {
+      let id = "";
+      room.state.mobs.forEach((m: any, k: string) => { if (m.templateId === "skeleton_king") id = k; });
+      return id;
+    }
+
+    it("el golpe final al jefe acredita bossKills a la guild del que remata", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Campeon", className: "knight" });
+      a.send("createGuild", { name: "Los Reyes", tag: "KING" });
+      await room.waitForNextSimulationTick();
+      const pa = room.state.players.get(a.sessionId)!;
+      const gid = pa.guildId;
+      const bossId = findBoss(room);
+      const boss = room.state.mobs.get(bossId)!;
+      boss.hp = 1;
+      pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
+      a.send("setTarget", { targetId: bossId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(boss.dead).toBe(true);
+      expect(room.state.guilds.get(gid)!.bossKills).toBe(1);
+    });
+
+    it("si el que remata no tiene guild, no incrementa nada ni crashea", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Solitario", className: "knight" });
+      const pa = room.state.players.get(a.sessionId)!;
+      const bossId = findBoss(room);
+      const boss = room.state.mobs.get(bossId)!;
+      boss.hp = 1;
+      pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
+      a.send("setTarget", { targetId: bossId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(boss.dead).toBe(true); // no crash, muere normal
+    });
+  });
 });

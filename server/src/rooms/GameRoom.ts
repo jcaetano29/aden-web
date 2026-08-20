@@ -54,6 +54,8 @@ import {
   ATTACK_WINDUP_MS,
   computeDamage,
   applyPvpDeathPenalty,
+  isBoss,
+  getTemplate,
 } from "@aden/shared";
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
@@ -437,6 +439,22 @@ export class GameRoom extends Room<GameState> {
           }
         } catch {
           // Quest no encontrada, ignorar
+        }
+      }
+
+      // Etapa 9c: crédito de guild por matar al jefe (last-hit)
+      if (isBoss(mob.templateId) && killer.guildId !== "") {
+        const g = this.state.guilds.get(killer.guildId);
+        if (g) {
+          g.bossKills += 1;
+          this.persistence
+            .saveGuild({ id: g.id, name: g.name, tag: g.tag, leaderName: g.leaderName, bossKills: g.bossKills })
+            .catch((e) => console.error("[aden] saveGuild fail", g.id, e));
+          this.broadcast(MessageType.BossKilled, {
+            bossName: getTemplate(mob.templateId).name,
+            guildTag: g.tag,
+            guildName: g.name,
+          });
         }
       }
     }
