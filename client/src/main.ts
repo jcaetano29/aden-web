@@ -10,6 +10,7 @@ import { Hud } from "./render/Hud.js";
 import { SkillBar } from "./render/SkillBar.js";
 import { InventoryPanel } from "./render/InventoryPanel.js";
 import { GuildPanel } from "./render/GuildPanel.js";
+import { LeaderboardPanel } from "./render/LeaderboardPanel.js";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ShopPanel } from "./render/ShopPanel.js";
@@ -54,6 +55,8 @@ async function main() {
     onLeave: () => net.sendLeaveGuild(),
   });
   guildPanel.mount(document.body);
+  const leaderboardPanel = new LeaderboardPanel();
+  leaderboardPanel.mount(document.body);
   const classSelect = new ClassSelect();
   const storyCard = new StoryCard();
   const dialog = new DialogPanel();
@@ -285,6 +288,7 @@ async function main() {
   // (Power Strike) ni con el resto de InputController (movimiento/click).
   // Tecla "q" → usa una Poción de Vida (si la tienes y HP < maxHp).
   let guildPanelVisible = false;
+  let leaderboardPanelVisible = false;
   document.body.addEventListener("keydown", (e) => {
     // No disparar hotkeys de gameplay mientras se está tipeando en un input
     // (p.ej. el form de crear guild): sin esta guarda, escribir "Guerreros"
@@ -298,6 +302,11 @@ async function main() {
       guildPanelVisible = !guildPanelVisible;
       if (guildPanelVisible) guildPanel.update(net.getGuildPanelData());
       guildPanel.setVisible(guildPanelVisible);
+    }
+    if (e.key === "l" || e.key === "L" || e.code === "KeyL") {
+      leaderboardPanelVisible = !leaderboardPanelVisible;
+      if (leaderboardPanelVisible) leaderboardPanel.update(net.getLeaderboardData());
+      leaderboardPanel.setVisible(leaderboardPanelVisible);
     }
     if (e.key === "q" || e.key === "Q" || e.code === "KeyQ") {
       const self = net.getSelf();
@@ -384,6 +393,9 @@ async function main() {
     );
     if (guildPanelVisible) {
       guildPanel.update(net.getGuildPanelData());
+    }
+    if (leaderboardPanelVisible) {
+      leaderboardPanel.update(net.getLeaderboardData());
     }
     renderer.render();
     renderer.css2d.render(renderer.scene, renderer.camera);

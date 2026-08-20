@@ -273,4 +273,32 @@ export class NetworkClient {
 
     return { myGuildId, guilds, roster };
   }
+
+  /**
+   * Datos para el panel de leaderboard: top jugadores y top guilds tal como
+   * los sincroniza el servidor en `state.leaderboard` (refrescado cada ~15s).
+   * Sólo lectura del estado sincronizado; `leaderboard` puede no existir
+   * todavía antes del primer sync.
+   */
+  getLeaderboardData(): {
+    players: { name: string; level: number; pvpKills: number; className: string }[];
+    guilds: { name: string; tag: string; bossKills: number }[];
+  } {
+    const leaderboard: any = this.room.state.leaderboard;
+    if (!leaderboard) return { players: [], guilds: [] };
+
+    const players = [...leaderboard.players].map((e: any) => ({
+      name: e.name,
+      level: e.level,
+      pvpKills: e.pvpKills,
+      className: e.className,
+    }));
+    const guilds = [...leaderboard.guilds].map((e: any) => ({
+      name: e.name,
+      tag: e.tag,
+      bossKills: e.bossKills,
+    }));
+
+    return { players, guilds };
+  }
 }
