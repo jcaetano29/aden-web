@@ -7,6 +7,7 @@ import {
   type DamageEvent,
   type DeathEvent,
   type LevelUpEvent,
+  type BossKilledEvent,
   type InteractNpcMessage,
   type BuyItemMessage,
   type UseItemMessage,
@@ -72,6 +73,8 @@ export interface RoomCallbacks {
   onDeath: (entityId: string) => void;
   /** Disparado cuando el server sube de nivel al jugador local (mensaje dirigido `levelUp`). */
   onLevelUp: (level: number) => void;
+  /** Disparado server-wide cuando una guild abate al jefe (broadcast `bossKilled`). */
+  onBossKilled: (ev: BossKilledEvent) => void;
 }
 
 export class NetworkClient {
@@ -127,6 +130,7 @@ export class NetworkClient {
     this.room.onMessage(MessageType.Damage, (data: DamageEvent) => cb.onDamage(data));
     this.room.onMessage(MessageType.Death, (data: DeathEvent) => cb.onDeath(data.entityId));
     this.room.onMessage(MessageType.LevelUp, (data: LevelUpEvent) => cb.onLevelUp(data.level));
+    this.room.onMessage(MessageType.BossKilled, (data: BossKilledEvent) => cb.onBossKilled(data));
   }
 
   sendMove(msg: MoveToMessage) {
