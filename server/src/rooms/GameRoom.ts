@@ -63,7 +63,7 @@ import { MobState } from "../state/MobState.js";
 import { DroppedItemState } from "../state/DroppedItemState.js";
 import { GuildState } from "../state/GuildState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
-import { LeaderboardState, LeaderPlayerEntry, LeaderGuildEntry } from "../state/LeaderboardState.js";
+import { LeaderPlayerEntry, LeaderGuildEntry } from "../state/LeaderboardState.js";
 import { advanceMovable } from "../systems/MovementSystem.js";
 import { createSpawns } from "../systems/SpawnSystem.js";
 import { stepMobAI, eligiblePlayersForAggro } from "../systems/MobAISystem.js";
@@ -146,6 +146,7 @@ export class GameRoom extends Room<GameState> {
     const pByName = new Map<string, CharacterRank>();
     for (const c of chars) pByName.set(c.name, c);
     this.state.players.forEach((pl) => {
+      if (!pl.loaded) return;
       pByName.set(pl.name, { name: pl.name, level: pl.level, pvpKills: pl.pvpKills, className: pl.className });
     });
     const players = [...pByName.values()]
