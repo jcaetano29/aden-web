@@ -13,10 +13,21 @@ export interface CombatStats {
 
 export const PLAYER_COMBAT: CombatStats = { maxHp: 100, maxMp: 50, pAtk: 15, pDef: 10, attackCooldownMs: 1500 };
 
+// Etapa 11: las stats escalan con la profundidad de la zona (ver world.ts). El salto
+// de dificultad entre zonas es lo que gatea la progresión sin muros.
 export const MOB_COMBAT: Record<string, CombatStats> = {
+  // Bosque de Umbra (Lv 1-3)
   skeleton_minion: { maxHp: 30, pAtk: 8, pDef: 5, attackCooldownMs: 2000 },
   skeleton_warrior: { maxHp: 60, pAtk: 14, pDef: 12, attackCooldownMs: 1800 },
-  skeleton_king: { maxHp: 600, pAtk: 24, pDef: 18, attackCooldownMs: 2200 },
+  // Ruinas de Nihil (Lv 3-6)
+  crypt_minion: { maxHp: 80, pAtk: 17, pDef: 13, attackCooldownMs: 1900 },
+  crypt_warrior: { maxHp: 140, pAtk: 23, pDef: 20, attackCooldownMs: 1800 },
+  crypt_sentinel: { maxHp: 340, pAtk: 30, pDef: 26, attackCooldownMs: 2000 }, // mini-jefe
+  // Yermo Ceniciento (Lv 6-9) — élites
+  ash_minion: { maxHp: 170, pAtk: 27, pDef: 22, attackCooldownMs: 1700 },
+  ash_warrior: { maxHp: 280, pAtk: 35, pDef: 30, attackCooldownMs: 1600 },
+  // Trono del Rey Nihil — jefe final
+  skeleton_king: { maxHp: 1000, pAtk: 38, pDef: 32, attackCooldownMs: 2100 },
 };
 
 export function getMobCombat(templateId: string): CombatStats {
@@ -65,8 +76,10 @@ export function getSkill(id: string): SkillConfig {
   return s;
 }
 
-export const TOWN = { x: 0, z: 0 } as const;
-export const SAFE_RADIUS = 8;
+// Etapa 11: el pueblo de Aden se ubica al sur del mundo (ver world.ts, zona "pueblo").
+// TOWN es el centro de spawn/respawn y el ancla de la zona segura (PvP off).
+export const TOWN = { x: 0, z: 30 } as const;
+export const SAFE_RADIUS = 12;
 export const PLAYER_RESPAWN_MS = 4000;
 
 export const ATTACK_RANGE = 2.5;

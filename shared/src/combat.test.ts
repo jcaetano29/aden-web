@@ -28,12 +28,17 @@ describe("config", () => {
     expect(ATTACK_RANGE).toBe(2.5);
   });
 
-  it("skeleton_king (jefe) tiene stats potentes", () => {
+  it("skeleton_king (jefe final) tiene stats potentes", () => {
     const boss = getMobCombat("skeleton_king");
-    expect(boss.maxHp).toBe(600);
-    expect(boss.pAtk).toBe(24);
-    expect(boss.pDef).toBe(18);
-    expect(boss.attackCooldownMs).toBe(2200);
+    expect(boss.maxHp).toBe(1000);
+    expect(boss.pAtk).toBe(38);
+    expect(boss.pDef).toBe(32);
+    expect(boss.attackCooldownMs).toBe(2100);
+  });
+
+  it("las stats escalan con la profundidad de la zona (bosque < ruinas < yermo)", () => {
+    expect(getMobCombat("crypt_warrior").maxHp).toBeGreaterThan(getMobCombat("skeleton_warrior").maxHp);
+    expect(getMobCombat("ash_warrior").maxHp).toBeGreaterThan(getMobCombat("crypt_warrior").maxHp);
   });
 
   it("getMobCombat lanza para template desconocido", () => {
@@ -53,7 +58,7 @@ describe("skills y config defensiva", () => {
   });
   it("jugador tiene MP; pueblo y respawn definidos", () => {
     expect(PLAYER_COMBAT.maxMp).toBe(50);
-    expect(TOWN).toEqual({ x: 0, z: 0 });
+    expect(TOWN).toEqual({ x: 0, z: 30 });
     expect(SAFE_RADIUS).toBeGreaterThan(0);
     expect(PLAYER_RESPAWN_MS).toBeGreaterThan(0);
   });
