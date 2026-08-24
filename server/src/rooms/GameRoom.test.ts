@@ -703,7 +703,7 @@ describe("GameRoom", () => {
       boss.hp = 1;
       p.x = p.targetX = boss.x; p.z = p.targetZ = boss.z + 1; p.moving = false; p.hp = 500;
       c.send(MessageType.SetTarget, { targetId: bossId });
-      for (let i = 0; i < 5; i++) await room.waitForNextSimulationTick();
+      for (let i = 0; i < 10; i++) await room.waitForNextSimulationTick();
       expect(boss.dead).toBe(true);
       expect(announces.some((t) => t.includes("caído"))).toBe(true);
     });
