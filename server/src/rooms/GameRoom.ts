@@ -18,6 +18,10 @@ import {
   type UseItemMessage,
   type CreateGuildMessage,
   type JoinGuildMessage,
+  type EquipItemMessage,
+  type UnequipItemMessage,
+  type EquipSlot,
+  equipmentBonuses,
   isValidGuildTag,
   isValidGuildName,
   MAP_BOUNDS,
@@ -92,6 +96,24 @@ export class GameRoom extends Room<GameState> {
       inv.qty = qty;
       player.inventory.set(itemTemplateId, inv);
     }
+  }
+
+  /**
+   * Etapa 12: recalcula los stats efectivos del jugador = base(clase,nivel) +
+   * bonuses del equipo. Se llama tras equipar/desequipar y tras subir de nivel
+   * (gainExp resetea los stats a la base, sin gear). Clampea hp/mp a los nuevos máximos.
+   */
+  private recomputeStats(p: PlayerState): void {
+    const base = statsForClass(p.className, p.level);
+    const equipped: Partial<Record<EquipSlot, string>> = {};
+    p.equipment.forEach((id, slot) => { equipped[slot as EquipSlot] = id; });
+    const bonus = equipmentBonuses(equipped);
+    p.maxHp = base.maxHp + bonus.maxHp;
+    p.maxMp = base.maxMp + bonus.maxMp;
+    p.pAtk = base.pAtk + bonus.pAtk;
+    p.pDef = base.pDef + bonus.pDef;
+    if (p.hp > p.maxHp) p.hp = p.maxHp;
+    if (p.mp > p.maxMp) p.mp = p.maxMp;
   }
 
   /** Resuelve un targetId a un mob vivo o a un jugador vivo (o null). */
@@ -416,6 +438,40 @@ export class GameRoom extends Room<GameState> {
       this.pruneGuildIfEmpty(gid);
     });
 
+    // Etapa 12: equipar un ítem del inventario en su slot (arma/armadura/accesorio).
+    this.onMessage(MessageType.EquipItem, (client, msg: EquipItemMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.dead) return;
+      const id = msg?.itemTemplateId;
+      if (!id) return;
+      let item;
+      try { item = getItem(id); } catch { return; }
+      if (item.type !== "equipment" || !item.slot) return;
+      const inv = p.inventory.get(id);
+      if (!inv || inv.qty < 1) return;
+      // Sacar uno del inventario.
+      inv.qty -= 1;
+      if (inv.qty <= 0) p.inventory.delete(id);
+      // Si el slot ya tenía algo, vuelve al inventario (swap).
+      const prev = p.equipment.get(item.slot);
+      if (prev) this.addToInventory(p, prev, 1);
+      p.equipment.set(item.slot, id);
+      this.recomputeStats(p);
+    });
+
+    // Etapa 12: desequipar el slot dado → el ítem vuelve al inventario.
+    this.onMessage(MessageType.UnequipItem, (client, msg: UnequipItemMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p) return;
+      const slot = msg?.slot;
+      if (!slot) return;
+      const cur = p.equipment.get(slot);
+      if (!cur) return;
+      p.equipment.delete(slot);
+      this.addToInventory(p, cur, 1);
+      this.recomputeStats(p);
+    });
+
     const dt = 1 / TICK_RATE;
     this.setSimulationInterval(() => this.tick(dt), 1000 / TICK_RATE);
   }
@@ -424,6 +480,8 @@ export class GameRoom extends Room<GameState> {
   private grantExp(player: PlayerState, client: Client, amount: number) {
     const lvls = gainExp(player, amount, player.className);
     if (lvls > 0) {
+      // gainExp resetea los stats a la base de clase/nivel; re-aplicar el equipo.
+      this.recomputeStats(player);
       client.send(MessageType.LevelUp, { level: player.level });
     }
   }
@@ -802,6 +860,13 @@ export class GameRoom extends Room<GameState> {
         it.qty = qty;
         player.inventory.set(id, it);
       }
+      // Etapa 12: restaurar el equipo y recalcular los stats con sus bonuses.
+      for (const [slot, itemId] of Object.entries(save.equipment ?? {})) {
+        if (itemId) player.equipment.set(slot, itemId);
+      }
+      this.recomputeStats(player);
+      player.hp = player.maxHp;
+      player.mp = player.maxMp;
     }
 
     // Etapa 3c (fix race save-before-load): recién ahora, con el save (si existía) ya

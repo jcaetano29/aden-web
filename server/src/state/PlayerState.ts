@@ -54,4 +54,8 @@ export class PlayerState extends Schema {
 
   // Inventory — synced to client
   @type({ map: InventoryItemState }) inventory = new MapSchema<InventoryItemState>();
+
+  // Etapa 12: equipo — mapa slot ("weapon"|"armor"|"accessory") → itemTemplateId.
+  // Sincronizado al cliente (paperdoll). Los bonuses se aplican a los stats en el server.
+  @type({ map: "string" }) equipment = new MapSchema<string>();
 }

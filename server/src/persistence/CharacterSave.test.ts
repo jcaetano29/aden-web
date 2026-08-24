@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import { toCharacterSave, inventoryRecordToEntries } from "./CharacterSave.js";
 
 describe("toCharacterSave", () => {
-  it("serializa nivel/exp/pos e inventario a Record", () => {
+  it("serializa nivel/exp/pos, inventario y equipo a Record", () => {
     const inv = new Map([["gold", { qty: 5 }], ["bone", { qty: 2 }]]);
-    const save = toCharacterSave({ level: 3, exp: 40, x: 12, z: -7, inventory: inv, gold: 100, questId: "q1", questProgress: 2, className: "mage", pvpKills: 0, guildId: "", guildName: "", guildTag: "" });
-    expect(save).toEqual({ level: 3, exp: 40, pos_x: 12, pos_z: -7, inventory: { gold: 5, bone: 2 }, gold: 100, questId: "q1", questProgress: 2, className: "mage", pvpKills: 0, guildId: "", guildName: "", guildTag: "" });
+    const equip = new Map([["weapon", "iron_sword"], ["armor", ""]]); // "" se ignora
+    const save = toCharacterSave({ level: 3, exp: 40, x: 12, z: -7, inventory: inv, gold: 100, questId: "q1", questProgress: 2, className: "mage", pvpKills: 0, guildId: "", guildName: "", guildTag: "", equipment: equip });
+    expect(save).toEqual({ level: 3, exp: 40, pos_x: 12, pos_z: -7, inventory: { gold: 5, bone: 2 }, gold: 100, questId: "q1", questProgress: 2, className: "mage", pvpKills: 0, guildId: "", guildName: "", guildTag: "", equipment: { weapon: "iron_sword" } });
   });
 });
 
