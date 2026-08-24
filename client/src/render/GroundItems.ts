@@ -1,5 +1,5 @@
 import * as THREE from "three";
-import { getItem } from "@aden/shared";
+import { getItem, RARITY_COLORS } from "@aden/shared";
 
 const ITEM_Y = 0.7;
 const ROTATE_SPEED = 1.4; // rad/s
@@ -35,7 +35,12 @@ export class GroundItems {
     if (this.items.has(id)) return;
     let color = DEFAULT_COLOR;
     try {
-      color = COLOR_BY_TYPE[getItem(itemTemplateId).type] ?? DEFAULT_COLOR;
+      const item = getItem(itemTemplateId);
+      // Etapa 12: el equipo brilla con el color de su rareza (un legendario "canta"
+      // desde el piso) — refuerza la emoción del loot; el resto usa color por tipo.
+      color = item.type === "equipment"
+        ? parseInt(RARITY_COLORS[item.rarity ?? "common"].slice(1), 16)
+        : COLOR_BY_TYPE[item.type] ?? DEFAULT_COLOR;
     } catch {
       // itemTemplateId desconocido (no debería pasar si server/shared están en sync):
       // usar color default en vez de romper el render.

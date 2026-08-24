@@ -55,10 +55,14 @@ async function main() {
     net.sendBuyItem(itemId);
     hud.toast(`¡Compraste ${getItem(itemId).name}!`, "#2ecc40");
   });
-  const inventoryPanel = new InventoryPanel(
-    document.body,
-    (itemId) => net.sendUseItem(itemId),
-  );
+  const inventoryPanel = new InventoryPanel(document.body, {
+    onUseItem: (itemId) => net.sendUseItem(itemId),
+    onEquip: (itemId) => {
+      net.sendEquipItem(itemId);
+      hud.toast(`Equipaste ${getItem(itemId).name}`, "#4da6ff");
+    },
+    onUnequip: (slot) => net.sendUnequipItem(slot),
+  });
   const guildPanel = new GuildPanel({
     onCreate: (name_, tag) => net.sendCreateGuild(name_, tag),
     onJoin: (guildId) => net.sendJoinGuild(guildId),
@@ -428,9 +432,11 @@ async function main() {
         shopPanel.updateGold(selfCombat.gold);
       }
     }
-    inventoryPanel.update(
-      net.getInventory().map((it) => ({ ...it, name: getItem(it.itemTemplateId).name })),
-    );
+    inventoryPanel.update({
+      entries: net.getInventory().map((it) => ({ ...it, name: getItem(it.itemTemplateId).name })),
+      equipment: net.getEquipment(),
+      stats: { pAtk: selfCombat?.pAtk ?? 0, pDef: selfCombat?.pDef ?? 0 },
+    });
     if (guildPanelVisible) {
       guildPanel.update(net.getGuildPanelData());
     }

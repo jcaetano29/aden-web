@@ -13,6 +13,8 @@ import {
   type UseItemMessage,
   type CreateGuildMessage,
   type JoinGuildMessage,
+  type EquipItemMessage,
+  type UnequipItemMessage,
   isBoss,
 } from "@aden/shared";
 
@@ -57,6 +59,9 @@ export interface SelfCombatSnapshot {
   questProgress: number;
   /** Clase del jugador local. */
   className: string;
+  /** Stats de combate efectivos (base + equipo), para mostrar el impacto del gear. */
+  pAtk: number;
+  pDef: number;
 }
 
 export interface RoomCallbacks {
@@ -183,6 +188,18 @@ export class NetworkClient {
     this.room.send(MessageType.LeaveGuild, {});
   }
 
+  /** Envía la intención de equipar un ítem del inventario (el server valida slot/posesión). */
+  sendEquipItem(itemTemplateId: string) {
+    const msg: EquipItemMessage = { itemTemplateId };
+    this.room.send(MessageType.EquipItem, msg);
+  }
+
+  /** Envía la intención de desequipar el slot dado; el ítem vuelve al inventario. */
+  sendUnequipItem(slot: string) {
+    const msg: UnequipItemMessage = { slot };
+    this.room.send(MessageType.UnequipItem, msg);
+  }
+
   get sessionId(): string {
     return this.room.sessionId;
   }
@@ -208,7 +225,20 @@ export class NetworkClient {
       questId: p.questId ?? "",
       questProgress: p.questProgress ?? 0,
       className: p.className ?? "knight",
+      pAtk: p.pAtk ?? 0,
+      pDef: p.pDef ?? 0,
     };
+  }
+
+  /** Equipo del jugador local: slot → itemTemplateId (sólo lectura del estado sincronizado). */
+  getEquipment(): Record<string, string> {
+    const p: any = this.room.state.players.get(this.room.sessionId);
+    const out: Record<string, string> = {};
+    if (!p?.equipment) return out;
+    p.equipment.forEach((itemId: string, slot: string) => {
+      if (itemId) out[slot] = itemId;
+    });
+    return out;
   }
 
   /**
