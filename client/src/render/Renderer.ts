@@ -46,6 +46,11 @@ export class Renderer {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly ground: THREE.Mesh;
   private readonly css2dRenderer: CSS2DRenderer;
+  // Base de la cámara (sin shake) que `followTarget` suaviza; el shake se suma
+  // encima al final de cada frame para no acumularse sobre sí mismo (drift).
+  private camBaseX = 0;
+  private camBaseY = 30;
+  private camBaseZ = 30;
 
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -120,12 +125,18 @@ export class Renderer {
    * Cámara en tercera persona que sigue al self con offset fijo, suavizada:
    * en vez de teletransportarse cada frame, converge hacia (target+offset) con
    * `smoothTowards` (independiente del framerate) → seguimiento fluido.
+   *
+   * El suavizado se aplica sobre una base interna (`camBase*`), no directamente
+   * sobre `camera.position`: el shake (screen shake) se suma encima al final,
+   * así el offset de shake nunca "contamina" la base que se está suavizando
+   * (evita drift acumulado frame a frame).
    */
-  followTarget(x: number, z: number, dt: number): void {
+  followTarget(x: number, z: number, dt: number, shakeX = 0, shakeY = 0): void {
     const K = 6; // rapidez de convergencia
-    this.camera.position.x = smoothTowards(this.camera.position.x, x, K, dt);
-    this.camera.position.y = smoothTowards(this.camera.position.y, 22, K, dt);
-    this.camera.position.z = smoothTowards(this.camera.position.z, z + 22, K, dt);
+    this.camBaseX = smoothTowards(this.camBaseX, x, K, dt);
+    this.camBaseY = smoothTowards(this.camBaseY, 22, K, dt);
+    this.camBaseZ = smoothTowards(this.camBaseZ, z + 22, K, dt);
+    this.camera.position.set(this.camBaseX + shakeX, this.camBaseY + shakeY, this.camBaseZ);
     this.camera.lookAt(x, 1, z);
   }
 
