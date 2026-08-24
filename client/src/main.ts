@@ -22,6 +22,8 @@ import { ZoneIndicator } from "./render/ZoneIndicator.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
+import { AudioEngine } from "./audio/AudioEngine.js";
+import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
 import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss, ELDER_NAME, firstQuestId, SAFE_RADIUS } from "@aden/shared";
 
@@ -37,6 +39,13 @@ async function main() {
   const views = new EntityViews(renderer.scene, factory, nameplates);
   const damageNumbers = new DamageNumbers(renderer.scene);
   const groundItems = new GroundItems(renderer.scene);
+  const audio = new AudioEngine();
+  const screenShake = new ScreenShake();
+  // Autoplay policy: el AudioContext sólo puede arrancar/reanudarse tras un
+  // gesto del usuario. Se engancha una vez a pointerdown y a keydown (lo que
+  // llegue primero) y se desregistra sola gracias a { once: true }.
+  window.addEventListener("pointerdown", () => audio.resume(), { once: true });
+  window.addEventListener("keydown", () => audio.resume(), { once: true });
   const hud = new Hud();
   const skillBar = new SkillBar();
   const npc = new Npc(renderer.scene, renderer.css2d);
@@ -133,6 +142,17 @@ async function main() {
       }
       // Animación de ataque en el ATACANTE (mob o jugador), vía attackerId.
       views.playAttackerAnim(ev.attackerId);
+      // Audio + screen shake: esquive silba, te pegan duele más (shake grande),
+      // pegar/ver pegar a otro es un impacto chico.
+      if (ev.dodged) {
+        audio.play("dodge");
+      } else if (ev.targetId === net.sessionId) {
+        audio.play("hurt");
+        screenShake.addTrauma(0.5);
+      } else {
+        audio.play("hit");
+        screenShake.addTrauma(0.18);
+      }
     },
     onDeath: (entityId) => {
       if (views.hasMob(entityId)) {
@@ -141,6 +161,7 @@ async function main() {
           currentTargetId = null;
           views.setTargetHighlight(null);
         }
+        audio.play("die");
       } else if (views.hasPlayer(entityId)) {
         views.onPlayerDeath(entityId);
         if (entityId === currentTargetId) {
@@ -149,9 +170,16 @@ async function main() {
         }
       }
     },
-    onLevelUp: (level) => hud.flashLevelUp(level),
-    onBossKilled: (ev) =>
-      hud.toast(`⚔ ¡La guild [${ev.guildTag}] abatió al ${ev.bossName}!`, "#ff5252"),
+    onLevelUp: (level) => {
+      hud.flashLevelUp(level);
+      audio.play("levelup");
+      screenShake.addTrauma(0.5);
+    },
+    onBossKilled: (ev) => {
+      hud.toast(`⚔ ¡La guild [${ev.guildTag}] abatió al ${ev.bossName}!`, "#ff5252");
+      audio.play("boss");
+      screenShake.addTrauma(0.7);
+    },
     onItemAdd: (id, itemTemplateId, x, z) => groundItems.add(id, itemTemplateId, x, z),
     onItemRemove: (id) => groundItems.remove(id),
   });
@@ -308,6 +336,11 @@ async function main() {
       if (leaderboardPanelVisible) leaderboardPanel.update(net.getLeaderboardData());
       leaderboardPanel.setVisible(leaderboardPanelVisible);
     }
+    if (e.key === "m" || e.key === "M") {
+      const muted = audio.toggleMuted();
+      hud.toast(muted ? "🔇 Sonido apagado" : "🔊 Sonido encendido", "#ffd23f");
+      return;
+    }
     if (e.key === "q" || e.key === "Q" || e.code === "KeyQ") {
       const self = net.getSelf();
       const inv = net.getInventory();
@@ -338,8 +371,9 @@ async function main() {
     damageNumbers.update(dt);
     groundItems.update(dt);
     const self = views.selfPosition();
+    const shake = screenShake.update(dt);
     if (self) {
-      renderer.followTarget(self.x, self.z, dt);
+      renderer.followTarget(self.x, self.z, dt, shake.x, shake.y);
       zoneIndicator.update(distance2D(self.x, self.z, TOWN.x, TOWN.z) > SAFE_RADIUS);
     }
     const selfCombat = net.getSelf();

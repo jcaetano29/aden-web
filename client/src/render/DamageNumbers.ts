@@ -3,6 +3,7 @@ import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 
 const LIFETIME_MS = 800;
 const RISE_HEIGHT = 1.2; // unidades de mundo que sube durante toda su vida
+const POP_MS = 140; // duración del pop de escala al nacer
 
 interface ActiveNumber {
   obj: CSS2DObject;
@@ -24,8 +25,10 @@ export class DamageNumbers {
   spawn(worldPos: THREE.Vector3, amount: number) {
     const el = document.createElement("div");
     el.textContent = String(Math.round(amount));
-    el.style.cssText =
-      "color:#ffd23f;font:bold 16px sans-serif;text-shadow:0 0 3px #000;pointer-events:none;white-space:nowrap;";
+    // Tamaño de fuente escala con el golpe: los críticos/golpes grandes se
+    // sienten más satisfactorios cuando "pesan" más visualmente (14..29px).
+    const size = 14 + Math.min(30, Math.round(amount)) * 0.5;
+    el.style.cssText = `color:#ffd23f;font:bold ${size}px sans-serif;text-shadow:0 0 3px #000;pointer-events:none;white-space:nowrap;transform-origin:center;`;
     const obj = new CSS2DObject(el);
     obj.position.copy(worldPos);
     this.scene.add(obj);
@@ -57,6 +60,11 @@ export class DamageNumbers {
       }
       n.obj.position.y = n.baseY + RISE_HEIGHT * t;
       n.el.style.opacity = String(1 - t);
+      // Pop de escala: nace grande (1.5x) y se asienta a tamaño normal (1x)
+      // en los primeros POP_MS de vida, para que el golpe se sienta con "punch".
+      const age = now - n.bornAt;
+      const scale = age < POP_MS ? 1.5 - 0.5 * (age / POP_MS) : 1;
+      n.el.style.transform = `scale(${scale})`;
     }
   }
 }
