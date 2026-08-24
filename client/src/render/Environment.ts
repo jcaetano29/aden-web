@@ -1,7 +1,7 @@
 import * as THREE from "three";
-import { TOWN, SAFE_RADIUS, MAP_BOUNDS, SPAWN_ZONES } from "@aden/shared";
+import { ZONES, getZone, zoneAt, TOWN, SAFE_RADIUS, type Zone } from "@aden/shared";
 
-/** RNG determinístico (mulberry32) con seed fija → todos los clientes ven el mismo bosque. */
+/** RNG determinístico (mulberry32) con seed fija → todos los clientes ven el mismo mundo. */
 function mulberry32(seed: number): () => number {
   return function () {
     seed |= 0;
@@ -13,30 +13,67 @@ function mulberry32(seed: number): () => number {
 }
 
 const SKY_TOP = 0x4a90d9;
-const SKY_HORIZON = 0xbcd9f0;
+
+/** Intensidad del sol por zona (más oscuro cuanto más profundo/peligroso). */
+const SUN_INTENSITY: Record<string, number> = {
+  pueblo: 1.0,
+  bosque: 0.8,
+  ruinas: 0.55,
+  yermo: 0.7,
+  trono: 0.38,
+};
 
 /**
- * Entorno procedural (sin assets externos), estilo low-poly "vieja escuela":
- * domo de cielo con gradiente, niebla, iluminación cálida (hemisférica + sol),
- * y árboles/rocas/pasto esparcidos determinísticamente fuera del pueblo y de las
- * spawn zones. Puramente visual; el cliente no decide nada de gameplay acá.
+ * Entorno procedural del Mundo de Aden (Etapa 11). En lugar de un único bioma,
+ * pinta CADA zona (ver shared/world.ts) con su propia identidad: suelo de color,
+ * props temáticos (bosque denso → columnas rotas → árboles muertos y brasas →
+ * pilares de hueso y trono), caminos que las conectan, y una niebla + luz que
+ * cambian suavemente al viajar de una zona a otra (updateMood). Puramente visual.
  */
 export class Environment {
+  private readonly hemi: THREE.HemisphereLight;
+  private readonly sun: THREE.DirectionalLight;
+  private readonly fog: THREE.Fog;
+  private readonly bgColor: THREE.Color;
+  private embers: THREE.Points | null = null;
+  private emberBaseY: Float32Array | null = null;
+  private moodTime = 0;
+  // Objetivos de mood (se interpolan suavemente frame a frame).
+  private curFogNear: number;
+  private curFogFar: number;
+  private curSun: number;
+
   constructor(private readonly scene: THREE.Scene) {
+    const pueblo = getZone("pueblo").biome;
     this.addSky();
-    this.addLights();
-    this.scene.fog = new THREE.Fog(SKY_HORIZON, 45, 150);
-    this.addProps();
+    this.hemi = new THREE.HemisphereLight(0x9fc4e8, 0x4a5a3a, 0.9);
+    this.scene.add(this.hemi);
+    this.sun = new THREE.DirectionalLight(0xfff2d9, SUN_INTENSITY.pueblo);
+    this.sun.position.set(30, 60, 20);
+    this.scene.add(this.sun);
+    this.scene.add(new THREE.AmbientLight(0xffffff, 0.22));
+
+    this.fog = new THREE.Fog(pueblo.fog, pueblo.fogNear, pueblo.fogFar);
+    this.scene.fog = this.fog;
+    this.bgColor = new THREE.Color(pueblo.fog);
+    this.scene.background = this.bgColor;
+    this.curFogNear = pueblo.fogNear;
+    this.curFogFar = pueblo.fogFar;
+    this.curSun = SUN_INTENSITY.pueblo;
+
+    this.paintBiomes();
+    this.addPaths();
+    this.populate();
   }
 
   private addSky() {
-    const geo = new THREE.SphereGeometry(240, 32, 16);
+    const geo = new THREE.SphereGeometry(400, 32, 16);
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
       uniforms: {
         top: { value: new THREE.Color(SKY_TOP) },
-        bottom: { value: new THREE.Color(SKY_HORIZON) },
+        bottom: { value: new THREE.Color(0xbcd9f0) },
         exponent: { value: 0.6 },
       },
       vertexShader: `
@@ -56,84 +93,351 @@ export class Environment {
         }`,
     });
     this.scene.add(new THREE.Mesh(geo, mat));
-    this.scene.background = new THREE.Color(SKY_HORIZON);
   }
 
-  private addLights() {
-    const hemi = new THREE.HemisphereLight(0x9fc4e8, 0x4a5a3a, 0.9);
-    this.scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xfff2d9, 0.95);
-    sun.position.set(30, 50, 20);
-    this.scene.add(sun);
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.25));
+  /** Disco de suelo coloreado por cada zona, encima del suelo base (Renderer). */
+  private paintBiomes() {
+    ZONES.forEach((z, i) => {
+      const geo = new THREE.CircleGeometry(z.radius * 1.25, 40);
+      const mat = new THREE.MeshStandardMaterial({ color: z.biome.ground, flatShading: true });
+      const disc = new THREE.Mesh(geo, mat);
+      disc.rotation.x = -Math.PI / 2;
+      // y creciente por profundidad para que los bordes se solapen sin z-fighting.
+      disc.position.set(z.center.x, 0.01 + i * 0.004, z.center.z);
+      this.scene.add(disc);
+    });
   }
 
-  private addProps() {
-    const rng = mulberry32(1337);
-    // geometrías/materiales compartidos por tipo (perf)
-    const trunkGeo = new THREE.CylinderGeometry(0.3, 0.42, 2, 6);
-    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b });
-    const leafGeo1 = new THREE.ConeGeometry(1.7, 2.4, 7);
-    const leafGeo2 = new THREE.ConeGeometry(1.15, 1.9, 7);
-    const leafMat = new THREE.MeshStandardMaterial({ color: 0x2f6b34, flatShading: true });
-    const rockGeo = new THREE.IcosahedronGeometry(1, 0);
-    const rockMat = new THREE.MeshStandardMaterial({ color: 0x7a7d80, flatShading: true });
-    const grassGeo = new THREE.ConeGeometry(0.18, 0.6, 4);
-    const grassMat = new THREE.MeshStandardMaterial({ color: 0x3f7d41, flatShading: true });
+  /** Caminos de tierra que encadenan las zonas (guían la exploración al norte). */
+  private addPaths() {
+    const links: Array<[string, string]> = [
+      ["pueblo", "bosque"],
+      ["bosque", "ruinas"],
+      ["bosque", "yermo"],
+      ["ruinas", "trono"],
+      ["yermo", "trono"],
+    ];
+    const mat = new THREE.MeshStandardMaterial({ color: 0x6b5a3c });
+    for (const [a, b] of links) {
+      const za = getZone(a).center;
+      const zb = getZone(b).center;
+      const dx = zb.x - za.x;
+      const dz = zb.z - za.z;
+      const len = Math.hypot(dx, dz);
+      const path = new THREE.Mesh(new THREE.PlaneGeometry(4.5, len), mat);
+      path.rotation.x = -Math.PI / 2;
+      path.rotation.z = -Math.atan2(dx, dz);
+      path.position.set((za.x + zb.x) / 2, 0.03, (za.z + zb.z) / 2);
+      this.scene.add(path);
+    }
+  }
 
-    const okSpot = (x: number, z: number): boolean => {
-      // fuera del pueblo
-      if (Math.hypot(x - TOWN.x, z - TOWN.z) < SAFE_RADIUS + 4) return false;
-      // fuera de las spawn zones (para no tapar el spawn de mobs)
-      for (const zn of SPAWN_ZONES) {
-        if (Math.hypot(x - zn.centerX, z - zn.centerZ) < zn.radius + 3) return false;
+  /** Puebla cada zona con props temáticos (determinístico por zona). */
+  private populate() {
+    const rng = mulberry32(20260824);
+    for (const z of ZONES) {
+      switch (z.id) {
+        case "pueblo": this.populatePueblo(z, rng); break;
+        case "bosque": this.populateBosque(z, rng); break;
+        case "ruinas": this.populateRuinas(z, rng); break;
+        case "yermo": this.populateYermo(z, rng); break;
+        case "trono": this.populateTrono(z, rng); break;
       }
-      return true;
-    };
-    const randPos = (): [number, number] => {
-      const m = 3;
-      return [
-        MAP_BOUNDS.minX + m + rng() * (MAP_BOUNDS.maxX - MAP_BOUNDS.minX - 2 * m),
-        MAP_BOUNDS.minZ + m + rng() * (MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ - 2 * m),
-      ];
-    };
+    }
+  }
 
-    // árboles
-    for (let i = 0; i < 38; i++) {
-      let x = 0, z = 0, tries = 0;
-      do { [x, z] = randPos(); tries++; } while (!okSpot(x, z) && tries < 12);
-      if (!okSpot(x, z)) continue;
-      const tree = new THREE.Group();
-      const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.position.y = 1;
-      const c1 = new THREE.Mesh(leafGeo1, leafMat); c1.position.y = 2.9;
-      const c2 = new THREE.Mesh(leafGeo2, leafMat); c2.position.y = 4.1;
-      tree.add(trunk, c1, c2);
-      const s = 0.8 + rng() * 0.7;
-      tree.scale.setScalar(s);
-      tree.position.set(x, 0, z);
-      tree.rotation.y = rng() * Math.PI * 2;
-      this.scene.add(tree);
+  /** Punto aleatorio dentro de la zona (anillo interno..radio), evitando el centro exacto. */
+  private spot(z: Zone, rng: () => number, innerFrac = 0.15): [number, number] {
+    const ang = rng() * Math.PI * 2;
+    const r = z.radius * (innerFrac + rng() * (1 - innerFrac));
+    return [z.center.x + Math.cos(ang) * r, z.center.z + Math.sin(ang) * r];
+  }
+
+  private rock(x: number, z: number, rng: () => number, color = 0x7a7d80): void {
+    const rock = new THREE.Mesh(
+      new THREE.IcosahedronGeometry(1, 0),
+      new THREE.MeshStandardMaterial({ color, flatShading: true }),
+    );
+    const s = 0.5 + rng() * 1.2;
+    rock.scale.set(s, s * (0.6 + rng() * 0.5), s);
+    rock.position.set(x, s * 0.3, z);
+    rock.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
+    this.scene.add(rock);
+  }
+
+  // ── Pueblo: prado luminoso con vallas, cajas y una fogata central ──────────
+  private populatePueblo(z: Zone, rng: () => number): void {
+    // Empedrado de la plaza (disco de piedra clara sobre el prado).
+    const plaza = new THREE.Mesh(
+      new THREE.CircleGeometry(SAFE_RADIUS * 0.85, 32),
+      new THREE.MeshStandardMaterial({ color: 0x9a8f6b, flatShading: true }),
+    );
+    plaza.rotation.x = -Math.PI / 2;
+    plaza.position.set(TOWN.x, 0.04, TOWN.z);
+    this.scene.add(plaza);
+
+    // Fogata (acento cálido) al costado de la plaza.
+    this.addGlow(TOWN.x - 5, TOWN.z + 4, 0xff9a3c, 0.5);
+
+    // Postes de valla en anillo alrededor del pueblo.
+    const postGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.1, 6);
+    const postMat = new THREE.MeshStandardMaterial({ color: 0x7a5a34 });
+    for (let i = 0; i < 20; i++) {
+      const ang = (i / 20) * Math.PI * 2;
+      const r = z.radius * 0.82;
+      const post = new THREE.Mesh(postGeo, postMat);
+      post.position.set(TOWN.x + Math.cos(ang) * r, 0.55, TOWN.z + Math.sin(ang) * r);
+      this.scene.add(post);
     }
-    // rocas
-    for (let i = 0; i < 18; i++) {
-      let x = 0, z = 0, tries = 0;
-      do { [x, z] = randPos(); tries++; } while (!okSpot(x, z) && tries < 12);
-      if (!okSpot(x, z)) continue;
-      const rock = new THREE.Mesh(rockGeo, rockMat);
-      const s = 0.5 + rng() * 1.1;
-      rock.scale.set(s, s * (0.6 + rng() * 0.5), s);
-      rock.position.set(x, s * 0.3, z);
-      rock.rotation.set(rng() * Math.PI, rng() * Math.PI, rng() * Math.PI);
-      this.scene.add(rock);
+    // Cajas y barriles dispersos.
+    const crateMat = new THREE.MeshStandardMaterial({ color: 0x8a6a3c, flatShading: true });
+    for (let i = 0; i < 6; i++) {
+      const [x, zz] = this.spot(z, rng, 0.3);
+      const s = 0.5 + rng() * 0.4;
+      const crate = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), crateMat);
+      crate.position.set(x, s / 2, zz);
+      crate.rotation.y = rng() * Math.PI;
+      this.scene.add(crate);
     }
-    // matas de pasto
-    for (let i = 0; i < 60; i++) {
-      const [x, z] = randPos();
-      if (!okSpot(x, z)) continue;
+    // Algunos árboles frondosos en el borde del prado.
+    for (let i = 0; i < 8; i++) {
+      const [x, zz] = this.spot(z, rng, 0.6);
+      this.conifer(x, zz, rng, 0x3f8a44, 0x6b4a2b);
+    }
+  }
+
+  // ── Bosque de Umbra: coníferas densas, rocas musgosas, pasto ───────────────
+  private populateBosque(z: Zone, rng: () => number): void {
+    for (let i = 0; i < 46; i++) {
+      const [x, zz] = this.spot(z, rng);
+      this.conifer(x, zz, rng, 0x2f6b34, 0x5a3f24);
+    }
+    for (let i = 0; i < 14; i++) {
+      const [x, zz] = this.spot(z, rng);
+      this.rock(x, zz, rng, 0x5d6b54);
+    }
+    // Matas de pasto.
+    const grassGeo = new THREE.ConeGeometry(0.18, 0.6, 4);
+    const grassMat = new THREE.MeshStandardMaterial({ color: 0x4f8d41, flatShading: true });
+    for (let i = 0; i < 40; i++) {
+      const [x, zz] = this.spot(z, rng);
       const g = new THREE.Mesh(grassGeo, grassMat);
-      g.position.set(x, 0.3, z);
+      g.position.set(x, 0.3, zz);
       g.rotation.y = rng() * Math.PI;
       this.scene.add(g);
+    }
+  }
+
+  // ── Ruinas de Nihil: columnas rotas, bloques caídos, cristales violeta ─────
+  private populateRuinas(z: Zone, rng: () => number): void {
+    const stone = new THREE.MeshStandardMaterial({ color: 0x8a8497, flatShading: true });
+    for (let i = 0; i < 18; i++) {
+      const [x, zz] = this.spot(z, rng);
+      const h = 1.5 + rng() * 4;
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, h, 8), stone);
+      col.position.set(x, h / 2, zz);
+      col.rotation.z = (rng() - 0.5) * 0.25; // ligeramente inclinadas
+      this.scene.add(col);
+    }
+    // Bloques/escombros.
+    for (let i = 0; i < 20; i++) {
+      const [x, zz] = this.spot(z, rng);
+      const s = 0.7 + rng() * 1.3;
+      const block = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.7, s), stone);
+      block.position.set(x, s * 0.35, zz);
+      block.rotation.y = rng() * Math.PI;
+      this.scene.add(block);
+    }
+    // Cristales violeta (acento) que brillan tenue.
+    const crystalMat = new THREE.MeshStandardMaterial({
+      color: 0x9b7fd4, emissive: 0x6a4fb0, emissiveIntensity: 0.6, flatShading: true,
+    });
+    for (let i = 0; i < 10; i++) {
+      const [x, zz] = this.spot(z, rng);
+      const cr = new THREE.Mesh(new THREE.OctahedronGeometry(0.6, 0), crystalMat);
+      cr.position.set(x, 0.6, zz);
+      cr.rotation.y = rng() * Math.PI;
+      this.scene.add(cr);
+    }
+    for (let i = 0; i < 8; i++) {
+      const [x, zz] = this.spot(z, rng);
+      this.rock(x, zz, rng, 0x6b6577);
+    }
+  }
+
+  // ── Yermo Ceniciento: árboles muertos, rocas agrietadas, brasas ────────────
+  private populateYermo(z: Zone, rng: () => number): void {
+    const deadMat = new THREE.MeshStandardMaterial({ color: 0x3b322c, flatShading: true });
+    for (let i = 0; i < 24; i++) {
+      const [x, zz] = this.spot(z, rng);
+      const tree = new THREE.Group();
+      const h = 2.5 + rng() * 2;
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.34, h, 6), deadMat);
+      trunk.position.y = h / 2;
+      tree.add(trunk);
+      // Un par de ramas peladas.
+      for (let b = 0; b < 3; b++) {
+        const branch = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.12, 1.2, 5), deadMat);
+        branch.position.y = h * (0.6 + rng() * 0.3);
+        branch.rotation.z = (rng() - 0.5) * 1.6;
+        branch.rotation.y = rng() * Math.PI;
+        tree.add(branch);
+      }
+      tree.position.set(x, 0, zz);
+      this.scene.add(tree);
+    }
+    for (let i = 0; i < 16; i++) {
+      const [x, zz] = this.spot(z, rng);
+      this.rock(x, zz, rng, 0x4a3d38);
+    }
+    // Rocas de brasa que brillan (acento cálido).
+    const emberRock = new THREE.MeshStandardMaterial({
+      color: 0xff7a3c, emissive: 0xff4a10, emissiveIntensity: 0.7, flatShading: true,
+    });
+    for (let i = 0; i < 8; i++) {
+      const [x, zz] = this.spot(z, rng);
+      const r = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5 + rng() * 0.4, 0), emberRock);
+      r.position.set(x, 0.4, zz);
+      this.scene.add(r);
+    }
+    this.addEmbers(z);
+  }
+
+  // ── Trono del Rey Nihil: pilares de hueso, trono, braseros — un LUGAR ──────
+  private populateTrono(z: Zone, rng: () => number): void {
+    const bone = new THREE.MeshStandardMaterial({ color: 0xd9cfb0, flatShading: true });
+    const obsidian = new THREE.MeshStandardMaterial({ color: 0x1e1b26, flatShading: true });
+
+    // Pilares de hueso en dos hileras que flanquean el acceso (desde el sur).
+    for (let i = 0; i < 5; i++) {
+      const zz = z.center.z + 12 - i * 6;
+      for (const sx of [-7, 7]) {
+        const h = 6 + rng() * 1.5;
+        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, h, 7), bone);
+        pillar.position.set(z.center.x + sx, h / 2, zz);
+        this.scene.add(pillar);
+        const skull = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 0), bone);
+        skull.position.set(z.center.x + sx, h + 0.5, zz);
+        this.scene.add(skull);
+      }
+    }
+
+    // Braseros encendidos a la entrada de la arena (acento + "preparación").
+    this.addGlow(z.center.x - 7, z.center.z + 14, 0xff3b3b, 0.7);
+    this.addGlow(z.center.x + 7, z.center.z + 14, 0xff3b3b, 0.7);
+
+    // El Trono: plataforma de obsidiana escalonada + respaldo, DETRÁS del jefe.
+    const throne = new THREE.Group();
+    const base = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 10), obsidian);
+    base.position.y = 0.5;
+    throne.add(base);
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(4, 1.4, 3), obsidian);
+    seat.position.set(0, 1.7, -1);
+    throne.add(seat);
+    const back = new THREE.Mesh(new THREE.BoxGeometry(4, 6, 1), obsidian);
+    back.position.set(0, 4, -2.5);
+    throne.add(back);
+    // Cresta de hueso coronando el respaldo.
+    for (const sx of [-1.4, 0, 1.4]) {
+      const spike = new THREE.Mesh(new THREE.ConeGeometry(0.4, 2, 6), bone);
+      spike.position.set(sx, 7.4, -2.5);
+      throne.add(spike);
+    }
+    throne.position.set(z.center.x, 0, z.center.z - 10);
+    this.scene.add(throne);
+  }
+
+  /** Cono/pino low-poly reutilizable (trunk + 2 copas). */
+  private conifer(x: number, z: number, rng: () => number, leaf: number, trunkColor: number): void {
+    const tree = new THREE.Group();
+    const trunk = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.3, 0.42, 2, 6),
+      new THREE.MeshStandardMaterial({ color: trunkColor }),
+    );
+    trunk.position.y = 1;
+    const leafMat = new THREE.MeshStandardMaterial({ color: leaf, flatShading: true });
+    const c1 = new THREE.Mesh(new THREE.ConeGeometry(1.7, 2.4, 7), leafMat);
+    c1.position.y = 2.9;
+    const c2 = new THREE.Mesh(new THREE.ConeGeometry(1.15, 1.9, 7), leafMat);
+    c2.position.y = 4.1;
+    tree.add(trunk, c1, c2);
+    tree.scale.setScalar(0.8 + rng() * 0.7);
+    tree.position.set(x, 0, z);
+    tree.rotation.y = rng() * Math.PI * 2;
+    this.scene.add(tree);
+  }
+
+  /** Esfera emissiva + point light para fogatas/braseros/cristales de acento. */
+  private addGlow(x: number, z: number, color: number, intensity: number): void {
+    const orb = new THREE.Mesh(
+      new THREE.SphereGeometry(0.4, 10, 10),
+      new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 1 }),
+    );
+    orb.position.set(x, 0.8, z);
+    this.scene.add(orb);
+    const light = new THREE.PointLight(color, intensity, 18, 2);
+    light.position.set(x, 1.6, z);
+    this.scene.add(light);
+  }
+
+  /** Sistema de partículas de brasas ascendentes para el Yermo. */
+  private addEmbers(z: Zone): void {
+    const N = 140;
+    const positions = new Float32Array(N * 3);
+    const baseY = new Float32Array(N);
+    const rng = mulberry32(777);
+    for (let i = 0; i < N; i++) {
+      const ang = rng() * Math.PI * 2;
+      const r = rng() * z.radius;
+      positions[i * 3] = z.center.x + Math.cos(ang) * r;
+      positions[i * 3 + 1] = rng() * 6;
+      positions[i * 3 + 2] = z.center.z + Math.sin(ang) * r;
+      baseY[i] = positions[i * 3 + 1];
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({
+      color: 0xff7a3c, size: 0.35, transparent: true, opacity: 0.85,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    this.embers = new THREE.Points(geo, mat);
+    this.emberBaseY = baseY;
+    this.scene.add(this.embers);
+  }
+
+  /**
+   * Interpola suavemente la niebla, el fondo y las luces hacia el bioma de la zona
+   * donde está el jugador — así CRUZAR a una zona nueva se siente distinto. Llamar
+   * cada frame con la posición del self. También anima las brasas del Yermo.
+   */
+  updateMood(x: number, z: number, dt: number): void {
+    const zone = zoneAt(x, z);
+    const b = zone.biome;
+    const k = Math.min(1, dt * 1.5); // rapidez de transición
+
+    this.fog.color.lerp(new THREE.Color(b.fog), k);
+    this.bgColor.copy(this.fog.color);
+    this.curFogNear += (b.fogNear - this.curFogNear) * k;
+    this.curFogFar += (b.fogFar - this.curFogFar) * k;
+    this.fog.near = this.curFogNear;
+    this.fog.far = this.curFogFar;
+
+    const targetSun = SUN_INTENSITY[zone.id] ?? 0.8;
+    this.curSun += (targetSun - this.curSun) * k;
+    this.sun.intensity = this.curSun;
+    // La luz hemisférica también toma el tinte del bioma (cielo).
+    this.hemi.color.lerp(new THREE.Color(b.fog), k * 0.6);
+
+    // Brasas: ascienden y se reciclan.
+    if (this.embers && this.emberBaseY) {
+      this.moodTime += dt;
+      const pos = this.embers.geometry.getAttribute("position") as THREE.BufferAttribute;
+      for (let i = 0; i < this.emberBaseY.length; i++) {
+        let y = pos.getY(i) + dt * 0.6;
+        if (y > 7) y = 0;
+        pos.setY(i, y);
+      }
+      pos.needsUpdate = true;
     }
   }
 }

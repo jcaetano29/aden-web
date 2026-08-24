@@ -19,18 +19,19 @@ import { Minimap } from "./render/Minimap.js";
 import { StoryCard } from "./render/StoryCard.js";
 import { DialogPanel } from "./render/DialogPanel.js";
 import { ZoneIndicator } from "./render/ZoneIndicator.js";
+import { ZoneBanner } from "./render/ZoneBanner.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
 import { AudioEngine } from "./audio/AudioEngine.js";
 import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss, ELDER_NAME, firstQuestId, SAFE_RADIUS } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss, ELDER_NAME, firstQuestId, SAFE_RADIUS, zoneAt } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
   const renderer = new Renderer(app);
-  new Environment(renderer.scene); // cielo, niebla, luces y props procedurales
+  const environment = new Environment(renderer.scene); // biomas por zona, niebla dinámica, props
 
   const factory = new CharacterFactory();
   await factory.preload([...MODEL_NAMES, ...MOB_MODEL_NAMES]);
@@ -71,6 +72,8 @@ async function main() {
   const dialog = new DialogPanel();
   const zoneIndicator = new ZoneIndicator();
   zoneIndicator.mount(document.body);
+  const zoneBanner = new ZoneBanner();
+  zoneBanner.mount(document.body);
 
   // Minimapa (esquina sup. der.) con marcadores fijos: NPCs y la arena del jefe.
   const minimap = new Minimap();
@@ -375,6 +378,9 @@ async function main() {
     if (self) {
       renderer.followTarget(self.x, self.z, dt, shake.x, shake.y);
       zoneIndicator.update(distance2D(self.x, self.z, TOWN.x, TOWN.z) > SAFE_RADIUS);
+      // Bioma/niebla/luz de la zona actual + cartel al cruzar a una zona nueva.
+      environment.updateMood(self.x, self.z, dt);
+      zoneBanner.setZone(zoneAt(self.x, self.z).id);
     }
     const selfCombat = net.getSelf();
     npc.update(dt);

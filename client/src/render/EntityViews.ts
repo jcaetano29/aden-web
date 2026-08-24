@@ -3,7 +3,7 @@ import { CharacterFactory } from "./CharacterFactory.js";
 import { CharacterView } from "./CharacterView.js";
 import { Nameplates } from "./Nameplates.js";
 import { HealthBar } from "./HealthBar.js";
-import { isBoss, scaleForTemplate, getTemplate, ATTACK_RANGE } from "@aden/shared";
+import { isBoss, isMiniBoss, scaleForTemplate, getTemplate, tintForTemplate, ATTACK_RANGE } from "@aden/shared";
 import type { PlayerSnapshot, MobSnapshot } from "../net/NetworkClient.js";
 
 const MOB_HP_BAR_Y = 2.2; // altura aprox. de la cabeza, para posicionar los damage numbers
@@ -15,6 +15,29 @@ const TELEGRAPH_RING_GEOMETRY = new THREE.RingGeometry(ATTACK_RANGE * 0.82, ATTA
 /** Texto del nameplate de un jugador: "[TAG] Nombre" si tiene guildTag, si no sólo "Nombre". */
 function nameplateText(name: string, guildTag?: string): string {
   return guildTag ? `[${guildTag}] ${name}` : name;
+}
+
+/**
+ * Aplica un tinte (multiply, hex) a TODOS los materiales de un modelo, dándole
+ * identidad de variante de zona sin modelos nuevos (Etapa 11). Los materiales se
+ * CLONAN por instancia antes de mutar: `cloneSkeleton` comparte materiales entre
+ * clones, así que mutar el original repintaría a todas las demás instancias (y al
+ * modelo base). Cada canal de color se multiplica por el tinte.
+ */
+function applyTint(root: THREE.Object3D, tint: number): void {
+  const c = new THREE.Color(tint);
+  const tintOne = (m: THREE.Material): THREE.Material => {
+    const cloned = m.clone() as THREE.MeshStandardMaterial;
+    if (cloned.color) cloned.color.multiply(c);
+    return cloned;
+  };
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh;
+    if (!mesh.isMesh || !mesh.material) return;
+    mesh.material = Array.isArray(mesh.material)
+      ? mesh.material.map(tintOne)
+      : tintOne(mesh.material);
+  });
 }
 
 /** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
@@ -97,14 +120,19 @@ export class EntityViews {
     view.snapTo(snap.x, snap.z);
     view.setServerState(snap);
     view.object.scale.setScalar(scaleForTemplate(templateId));
+    // Etapa 11: tinte por variante de zona (musgoso/cripta/ceniza) sobre el modelo base.
+    const tint = tintForTemplate(templateId);
+    if (tint !== undefined) applyTint(view.object, tint);
     this.scene.add(view.object);
     this.mobViews.set(id, view);
     this.mobRootToId.set(view.object, id);
     this.mobDead.set(id, snap.dead);
 
-    // Boss nameplate en rojo
+    // Nameplate: jefe final en rojo, mini-jefe de zona en violeta — ambos con nombre.
     if (isBoss(templateId)) {
       this.nameplates.add(id, getTemplate(templateId).name, view.object, "#ff5252");
+    } else if (isMiniBoss(templateId)) {
+      this.nameplates.add(id, getTemplate(templateId).name, view.object, "#b98bff");
     }
 
     const bar = new HealthBar();
