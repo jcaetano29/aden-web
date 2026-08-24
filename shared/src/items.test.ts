@@ -7,10 +7,10 @@ describe("items", () => {
     expect(() => getItem("excalibur")).toThrow();
   });
 
-  it("skull_crown es un trofeo material no-stackable del Rey Esqueleto", () => {
+  it("skull_crown es un trofeo material no-stackable del Rey Nihil", () => {
     const skull = getItem("skull_crown");
     expect(skull.id).toBe("skull_crown");
-    expect(skull.name).toBe("Corona del Rey Esqueleto");
+    expect(skull.name).toBe("Corona del Rey Nihil");
     expect(skull.type).toBe("material");
     expect(skull.stackable).toBe(false);
   });
@@ -32,17 +32,23 @@ describe("rollDrops", () => {
     expect(rollDrops("dragon", () => 0)).toEqual([]);
   });
 
-  it("skeleton_king con rng=0 dropea todo (gold, health_potion, skull_crown, bone)", () => {
+  it("skeleton_king con rng=0 dropea el botín de jefe (gold, greater_potion, skull_crown, trofeos)", () => {
     const drops = rollDrops("skeleton_king", () => 0);
     const ids = drops.map((d) => d.itemTemplateId);
     expect(ids).toContain("gold");
-    expect(ids).toContain("health_potion");
+    expect(ids).toContain("greater_potion");
     expect(ids).toContain("skull_crown");
-    expect(ids).toContain("bone");
-    expect(drops.find((d) => d.itemTemplateId === "gold")?.qty).toBeGreaterThanOrEqual(50);
-    expect(drops.find((d) => d.itemTemplateId === "health_potion")?.qty).toBeGreaterThanOrEqual(2);
+    expect(ids).toContain("ancient_relic");
+    expect(ids).toContain("ember_core");
+    expect(drops.find((d) => d.itemTemplateId === "gold")?.qty).toBeGreaterThanOrEqual(120);
+    expect(drops.find((d) => d.itemTemplateId === "greater_potion")?.qty).toBeGreaterThanOrEqual(3);
     expect(drops.find((d) => d.itemTemplateId === "skull_crown")?.qty).toBe(1);
-    expect(drops.find((d) => d.itemTemplateId === "bone")?.qty).toBeGreaterThanOrEqual(3);
+  });
+
+  it("el loot escala: el mini-jefe dropea más oro que un guerrero del bosque", () => {
+    const sentinel = rollDrops("crypt_sentinel", () => 0).find((d) => d.itemTemplateId === "gold")?.qty ?? 0;
+    const warrior = rollDrops("skeleton_warrior", () => 0).find((d) => d.itemTemplateId === "gold")?.qty ?? 0;
+    expect(sentinel).toBeGreaterThan(warrior);
   });
 });
 

@@ -1,4 +1,5 @@
 export * from "./constants.js";
+export * from "./world.js";
 export * from "./protocol.js";
 export * from "./math.js";
 export * from "./mobs.js";

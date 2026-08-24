@@ -10,10 +10,21 @@ export function expToNextLevel(level: number): number {
 
 export const LEVEL_GROWTH = { hp: 20, mp: 5, pAtk: 3, pDef: 2 } as const;
 
+// Etapa 11: la EXP escala con la profundidad de la zona, de modo que el jugador
+// llega al Trono rondando el nivel recomendado (~9-10) cazando su camino al norte.
 export const MOB_EXP: Record<string, number> = {
+  // Bosque de Umbra
   skeleton_minion: 15,
   skeleton_warrior: 40,
-  skeleton_king: 300,
+  // Ruinas de Nihil
+  crypt_minion: 75,
+  crypt_warrior: 140,
+  crypt_sentinel: 500, // mini-jefe
+  // Yermo Ceniciento
+  ash_minion: 190,
+  ash_warrior: 310,
+  // Trono del Rey Nihil
+  skeleton_king: 900,
 };
 export function getMobExp(templateId: string): number {
   return MOB_EXP[templateId] ?? 0;

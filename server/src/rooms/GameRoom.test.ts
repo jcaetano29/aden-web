@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
-import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat } from "@aden/shared";
+import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN } from "@aden/shared";
 import appConfig from "../testServer.js";
 import { MobState } from "../state/MobState.js";
 
@@ -59,7 +59,7 @@ describe("GameRoom", () => {
     const client = await colyseus.connectTo(room, { name: "Quester" });
     await room.waitForNextPatch();
     const p = room.state.players.get(client.sessionId)!;
-    p.x = p.z = 0; // en el pueblo (radio de entrega)
+    p.x = TOWN.x; p.z = TOWN.z; // en el pueblo (radio de entrega)
     p.questProgress = 0; // incompleta
     client.send(MessageType.InteractNpc, {});
     await room.waitForNextPatch();
@@ -72,7 +72,7 @@ describe("GameRoom", () => {
     const client = await colyseus.connectTo(room, { name: "Quester" });
     await room.waitForNextPatch();
     const p = room.state.players.get(client.sessionId)!;
-    p.x = p.z = 0; // en el pueblo, dentro del radio de entrega
+    p.x = TOWN.x; p.z = TOWN.z; // en el pueblo, dentro del radio de entrega
     const q = getQuest(p.questId);
     const expBefore = p.exp;
     p.questProgress = q.amount; // simula haber matado los mobs requeridos
@@ -105,7 +105,7 @@ describe("GameRoom", () => {
     const client = await colyseus.connectTo(room, { name: "Comprador" });
     await room.waitForNextPatch();
     const p = room.state.players.get(client.sessionId)!;
-    p.x = p.z = 0; // en el pueblo
+    p.x = TOWN.x; p.z = TOWN.z; // en el pueblo
     p.gold = 20;
     const price = getShopPrice("health_potion"); // 15
     client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
@@ -119,7 +119,7 @@ describe("GameRoom", () => {
     const client = await colyseus.connectTo(room, { name: "Comprador" });
     await room.waitForNextPatch();
     const p = room.state.players.get(client.sessionId)!;
-    p.x = p.z = 0;
+    p.x = TOWN.x; p.z = TOWN.z;
     p.gold = 5; // < 15
     client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
     await room.waitForNextPatch();
@@ -132,7 +132,7 @@ describe("GameRoom", () => {
     const client = await colyseus.connectTo(room, { name: "Herido" });
     await room.waitForNextPatch();
     const p = room.state.players.get(client.sessionId)!;
-    p.x = p.z = 0;
+    p.x = TOWN.x; p.z = TOWN.z;
     p.gold = 20;
     client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
     await room.waitForNextPatch();
@@ -150,7 +150,7 @@ describe("GameRoom", () => {
     const client = await colyseus.connectTo(room, { name: "Sano" });
     await room.waitForNextPatch();
     const p = room.state.players.get(client.sessionId)!;
-    p.x = p.z = 0;
+    p.x = TOWN.x; p.z = TOWN.z;
     p.gold = 20;
     client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
     await room.waitForNextPatch();
@@ -281,7 +281,7 @@ describe("GameRoom", () => {
     expect(p.hp).toBe(hpBefore); // no le pegó: lo esquivó
   });
 
-  it("el Rey Esqueleto spawnea con 600 HP", async () => {
+  it("el Rey Nihil spawnea con 1000 HP", async () => {
     const room = await colyseus.createRoom("game", {});
     await room.waitForNextPatch();
     let boss: any;
@@ -289,10 +289,10 @@ describe("GameRoom", () => {
       if (m.templateId === "skeleton_king") boss = m;
     });
     expect(boss).toBeDefined();
-    expect(boss.hp).toBe(600);
+    expect(boss.hp).toBe(1000);
   });
 
-  it("matar al Rey Esqueleto dropea la corona, da exp y completa la q4", async () => {
+  it("matar al Rey Nihil dropea la corona, da exp y completa la q6 (final)", async () => {
     const room = await colyseus.createRoom("game", {});
     const c = await colyseus.connectTo(room, { name: "Heroe", className: "barbarian" });
     await room.waitForNextPatch();
@@ -301,8 +301,8 @@ describe("GameRoom", () => {
     room.state.mobs.forEach((m: any, id: string) => {
       if (m.templateId === "skeleton_king") { bossId = id; boss = m; }
     });
-    // Preparar: jugador con la q4 activa, pegado al jefe, jefe casi muerto.
-    p.questId = "q4"; p.questProgress = 0;
+    // Preparar: jugador con la q6 (final) activa, pegado al jefe, jefe casi muerto.
+    p.questId = "q6"; p.questProgress = 0;
     p.x = boss.x; p.z = boss.z;
     boss.hp = 1;
     p.targetId = bossId;
@@ -316,9 +316,9 @@ describe("GameRoom", () => {
       if (d.itemTemplateId === "skull_crown") hasCrown = true;
     });
     expect(hasCrown).toBe(true);
-    // 300 exp mata seguro sube al menos un nivel desde nv1.
+    // 900 exp mata seguro sube al menos un nivel desde nv1.
     expect(p.level).toBeGreaterThan(1);
-    // q4 (amount 1) queda completa.
+    // q6 (amount 1) queda completa.
     expect(p.questProgress).toBe(1);
   });
 
@@ -364,8 +364,10 @@ describe("GameRoom", () => {
       const b = await colyseus.connectTo(room, { name: "Vic2", className: "knight" });
       const pa = room.state.players.get(a.sessionId)!;
       const pb = room.state.players.get(b.sessionId)!;
-      pa.x = 7; pa.z = 0; pa.targetX = 7; pa.targetZ = 0;   // atacante fuera del radio? no: dentro
-      pb.x = 0; pb.z = 0; pb.targetX = 0; pb.targetZ = 0;   // víctima en el centro del pueblo
+      // Ambos DENTRO de la zona segura del pueblo y en rango de ataque:
+      // el PvP debe quedar desactivado por estar la víctima en el pueblo.
+      pa.x = TOWN.x + 1; pa.z = TOWN.z; pa.targetX = TOWN.x + 1; pa.targetZ = TOWN.z;
+      pb.x = TOWN.x; pb.z = TOWN.z; pb.targetX = TOWN.x; pb.targetZ = TOWN.z;   // víctima en el centro del pueblo
       const hp0 = pb.hp;
       a.send("setTarget", { targetId: b.sessionId });
       await room.waitForNextSimulationTick();

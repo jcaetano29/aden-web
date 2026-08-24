@@ -1,7 +1,13 @@
-import { MAP_BOUNDS, TOWN } from "@aden/shared";
+import { MAP_BOUNDS, TOWN, ZONES } from "@aden/shared";
 
 export type MinimapEntity = { x: number; z: number; kind: "self" | "player" | "mob" | "boss" };
 export type MinimapMarker = { x: number; z: number; label: string; color: string };
+
+/** "0xRRGGBB" → "#rrggbb" para dibujar en canvas 2D con los colores de bioma. */
+function hexColor(n: number, alpha = 1): string {
+  const r = (n >> 16) & 0xff, g = (n >> 8) & 0xff, b = n & 0xff;
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
 const SIZE = 168; // px del canvas
 const PAD = 6; // margen interno para que los puntos del borde no se corten
@@ -45,13 +51,30 @@ export class Minimap {
     this.objective = objective;
   }
 
-  /** Convierte coords de mundo (x,z) a píxeles del canvas. Norte (-z) arriba. */
+  /**
+   * Convierte coords de mundo (x,z) a píxeles del canvas, preservando el aspecto
+   * del mundo (ahora rectangular, más alto que ancho): se usa una escala única
+   * (la del eje mayor) y se centra el eje menor. Norte (-z) arriba.
+   */
   private toPx(x: number, z: number): [number, number] {
     const { minX, maxX, minZ, maxZ } = MAP_BOUNDS;
     const usable = SIZE - PAD * 2;
-    const px = PAD + ((x - minX) / (maxX - minX)) * usable;
-    const py = PAD + ((z - minZ) / (maxZ - minZ)) * usable;
+    const worldW = maxX - minX;
+    const worldD = maxZ - minZ;
+    const scale = usable / Math.max(worldW, worldD);
+    const offX = (usable - worldW * scale) / 2;
+    const offZ = (usable - worldD * scale) / 2;
+    const px = PAD + offX + (x - minX) * scale;
+    const py = PAD + offZ + (z - minZ) * scale;
     return [px, py];
+  }
+
+  /** Radio en píxeles de una distancia en unidades de mundo (para dibujar zonas). */
+  private toPxRadius(worldR: number): number {
+    const { minX, maxX, minZ, maxZ } = MAP_BOUNDS;
+    const usable = SIZE - PAD * 2;
+    const scale = usable / Math.max(maxX - minX, maxZ - minZ);
+    return worldR * scale;
   }
 
   private dot(x: number, z: number, r: number, color: string): void {
@@ -68,12 +91,24 @@ export class Minimap {
     this.pulse += 0.06;
     ctx.clearRect(0, 0, SIZE, SIZE);
 
-    // Pueblo: círculo tenue alrededor de TOWN.
+    // Zonas del mundo: disco tenue con el color del bioma → el jugador ve de un
+    // vistazo el mapa de zonas (pueblo verde al sur, ruinas violeta, yermo rojo,
+    // trono oscuro al norte) y hacia dónde avanzar.
+    for (const z of ZONES) {
+      const [zx, zy] = this.toPx(z.center.x, z.center.z);
+      ctx.beginPath();
+      ctx.arc(zx, zy, this.toPxRadius(z.radius), 0, Math.PI * 2);
+      ctx.fillStyle = hexColor(z.biome.ground, z.safe ? 0.35 : 0.5);
+      ctx.fill();
+    }
+
+    // Pueblo: anillo destacado alrededor de TOWN (punto de partida/refugio).
     const [tx, ty] = this.toPx(TOWN.x, TOWN.z);
     ctx.beginPath();
-    ctx.arc(tx, ty, 14, 0, Math.PI * 2);
-    ctx.fillStyle = "rgba(120,150,90,0.25)";
-    ctx.fill();
+    ctx.arc(tx, ty, this.toPxRadius(6), 0, Math.PI * 2);
+    ctx.strokeStyle = "rgba(255,213,79,0.7)";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
     // Objetivo de la misión activa: anillo pulsante + etiqueta, para saber a
     // dónde ir a cazar. Se dibuja bajo las entidades vivas.

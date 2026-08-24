@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
+import { MAP_BOUNDS } from "@aden/shared";
 import { smoothTowards } from "./motion.js";
 
 /**
@@ -73,12 +74,24 @@ export class Renderer {
     this.camera.position.set(0, 30, 30);
     this.camera.lookAt(0, 0, 0);
 
+    // Suelo base que cubre TODO el mundo (MAP_BOUNDS): es el único objetivo del
+    // raycast de click-to-move, así que debe abarcar toda el área caminable. Los
+    // biomas por zona (Environment) se pintan como discos ENCIMA de este plano;
+    // no interfieren con el picking porque `pickGround` sólo raycastea `this.ground`.
     const grass = makeGrassTexture();
+    const worldW = MAP_BOUNDS.maxX - MAP_BOUNDS.minX;
+    const worldD = MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ;
+    grass.repeat.set(worldW / 4, worldD / 4);
     this.ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(100, 100),
+      new THREE.PlaneGeometry(worldW, worldD),
       new THREE.MeshStandardMaterial({ map: grass, color: 0xffffff }),
     );
     this.ground.rotation.x = -Math.PI / 2;
+    this.ground.position.set(
+      (MAP_BOUNDS.minX + MAP_BOUNDS.maxX) / 2,
+      0,
+      (MAP_BOUNDS.minZ + MAP_BOUNDS.maxZ) / 2,
+    );
     this.scene.add(this.ground);
 
     window.addEventListener("resize", () => this.onResize());

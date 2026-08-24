@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MOB_TEMPLATES, getTemplate, SPAWN_ZONES, AI_CONFIG, MOB_MOVE_SPEED, isBoss, scaleForTemplate, respawnForTemplate } from "./mobs.js";
+import { MOB_TEMPLATES, getTemplate, SPAWN_ZONES, AI_CONFIG, MOB_MOVE_SPEED, isBoss, isMiniBoss, scaleForTemplate, respawnForTemplate, tintForTemplate } from "./mobs.js";
 import { MAP_BOUNDS } from "./constants.js";
 
 describe("MOB_TEMPLATES / getTemplate", () => {
@@ -8,13 +8,25 @@ describe("MOB_TEMPLATES / getTemplate", () => {
     expect(getTemplate("skeleton_warrior").model).toBe("Skeleton_Warrior");
   });
 
-  it("incluye skeleton_king con boss=true, scale=1.9, respawnMs=45000", () => {
+  it("incluye skeleton_king (Rey Nihil) con boss=true, scale=2.0, respawnMs=60000", () => {
     const t = getTemplate("skeleton_king");
-    expect(t.name).toBe("Rey Esqueleto");
+    expect(t.name).toBe("Rey Nihil");
     expect(t.model).toBe("Skeleton_Warrior");
     expect(t.boss).toBe(true);
-    expect(t.scale).toBe(1.9);
-    expect(t.respawnMs).toBe(45000);
+    expect(t.scale).toBe(2.0);
+    expect(t.respawnMs).toBe(60000);
+  });
+
+  it("incluye las variantes de zona (cripta violeta, ceniza roja) con tinte", () => {
+    expect(getTemplate("crypt_warrior").model).toBe("Skeleton_Warrior");
+    expect(getTemplate("crypt_warrior").tint).toBe(0xb9a7e8);
+    expect(getTemplate("ash_warrior").tint).toBe(0xff6a3c);
+    expect(getTemplate("skeleton_minion").tint).toBe(0x9fc48f); // bosque musgoso
+  });
+
+  it("crypt_sentinel es mini-jefe (miniBoss) pero NO jefe final (boss)", () => {
+    expect(getTemplate("crypt_sentinel").miniBoss).toBe(true);
+    expect(getTemplate("crypt_sentinel").boss).toBeUndefined();
   });
 
   it("lanza para un template desconocido", () => {
@@ -22,20 +34,25 @@ describe("MOB_TEMPLATES / getTemplate", () => {
   });
 });
 
-describe("isBoss", () => {
-  it("retorna true para skeleton_king", () => {
+describe("isBoss / isMiniBoss", () => {
+  it("isBoss retorna true sólo para skeleton_king", () => {
     expect(isBoss("skeleton_king")).toBe(true);
-  });
-
-  it("retorna false para skeleton_minion y skeleton_warrior", () => {
+    expect(isBoss("crypt_sentinel")).toBe(false);
     expect(isBoss("skeleton_minion")).toBe(false);
     expect(isBoss("skeleton_warrior")).toBe(false);
+  });
+
+  it("isMiniBoss retorna true sólo para crypt_sentinel", () => {
+    expect(isMiniBoss("crypt_sentinel")).toBe(true);
+    expect(isMiniBoss("skeleton_king")).toBe(false);
+    expect(isMiniBoss("skeleton_minion")).toBe(false);
   });
 });
 
 describe("scaleForTemplate", () => {
-  it("retorna 1.9 para skeleton_king", () => {
-    expect(scaleForTemplate("skeleton_king")).toBe(1.9);
+  it("retorna 2.0 para skeleton_king y 1.5 para el mini-jefe", () => {
+    expect(scaleForTemplate("skeleton_king")).toBe(2.0);
+    expect(scaleForTemplate("crypt_sentinel")).toBe(1.5);
   });
 
   it("retorna 1 (default) para skeleton_minion y skeleton_warrior", () => {
@@ -45,13 +62,20 @@ describe("scaleForTemplate", () => {
 });
 
 describe("respawnForTemplate", () => {
-  it("retorna 45000 para skeleton_king", () => {
-    expect(respawnForTemplate("skeleton_king")).toBe(45000);
+  it("retorna 60000 para skeleton_king", () => {
+    expect(respawnForTemplate("skeleton_king")).toBe(60000);
   });
 
   it("retorna undefined para skeleton_minion y skeleton_warrior", () => {
     expect(respawnForTemplate("skeleton_minion")).toBeUndefined();
     expect(respawnForTemplate("skeleton_warrior")).toBeUndefined();
+  });
+});
+
+describe("tintForTemplate", () => {
+  it("retorna el tinte del template", () => {
+    expect(tintForTemplate("ash_warrior")).toBe(0xff6a3c);
+    expect(tintForTemplate("crypt_minion")).toBe(0xb9a7e8);
   });
 });
 

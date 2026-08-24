@@ -1,36 +1,32 @@
 import { describe, it, expect } from "vitest";
 import { getQuest, firstQuestId, nextQuestId, QUEST_ORDER, QUESTS } from "./quests.js";
+import { MOB_TEMPLATES } from "./mobs.js";
 import { LORE, ELDER_NAME } from "./story.js";
 
 describe("getQuest", () => {
-  it("retorna la quest q1 con valores correctos", () => {
+  it("retorna la quest q1 con valores correctos (Bosque)", () => {
     const q = getQuest("q1");
     expect(q.id).toBe("q1");
     expect(q.title).toBe("Los primeros huesos");
     expect(q.mobTemplateId).toBe("skeleton_minion");
-    expect(q.amount).toBe(5);
-    expect(q.rewardExp).toBe(50);
-    expect(q.rewardGold).toBe(20);
+    expect(q.amount).toBe(6);
+    expect(q.rewardExp).toBe(60);
+    expect(q.rewardGold).toBe(25);
   });
 
-  it("retorna la quest q2 con valores correctos", () => {
-    const q = getQuest("q2");
-    expect(q.id).toBe("q2");
-    expect(q.title).toBe("La marea crece");
-    expect(q.mobTemplateId).toBe("skeleton_minion");
-    expect(q.amount).toBe(8);
-    expect(q.rewardExp).toBe(80);
-    expect(q.rewardGold).toBe(40);
-  });
-
-  it("retorna la quest q3 con valores correctos", () => {
+  it("retorna la quest q3 con valores correctos (Ruinas)", () => {
     const q = getQuest("q3");
     expect(q.id).toBe("q3");
-    expect(q.title).toBe("Los guerreros caídos");
-    expect(q.mobTemplateId).toBe("skeleton_warrior");
-    expect(q.amount).toBe(5);
-    expect(q.rewardExp).toBe(150);
-    expect(q.rewardGold).toBe(80);
+    expect(q.title).toBe("Bajo las Ruinas");
+    expect(q.mobTemplateId).toBe("crypt_warrior");
+    expect(q.amount).toBe(6);
+  });
+
+  it("retorna la quest q4 apuntando al mini-jefe (Centinela)", () => {
+    const q = getQuest("q4");
+    expect(q.title).toBe("El Centinela de Nihil");
+    expect(q.mobTemplateId).toBe("crypt_sentinel");
+    expect(q.amount).toBe(1);
   });
 
   it("lanza si la quest no existe", () => {
@@ -45,20 +41,16 @@ describe("firstQuestId", () => {
 });
 
 describe("nextQuestId", () => {
-  it("retorna q2 cuando la quest actual es q1", () => {
+  it("avanza en cadena q1→q2→...→q6", () => {
     expect(nextQuestId("q1")).toBe("q2");
-  });
-
-  it("retorna q3 cuando la quest actual es q2", () => {
     expect(nextQuestId("q2")).toBe("q3");
-  });
-
-  it("retorna q4 cuando la quest actual es q3", () => {
     expect(nextQuestId("q3")).toBe("q4");
+    expect(nextQuestId("q4")).toBe("q5");
+    expect(nextQuestId("q5")).toBe("q6");
   });
 
-  it("retorna q1 cuando la quest actual es q4 (loop)", () => {
-    expect(nextQuestId("q4")).toBe("q1");
+  it("retorna q1 cuando la quest actual es q6 (loop)", () => {
+    expect(nextQuestId("q6")).toBe("q1");
   });
 
   it("retorna q1 cuando la quest actual no existe (fallback)", () => {
@@ -67,20 +59,20 @@ describe("nextQuestId", () => {
 });
 
 describe("QUEST_ORDER", () => {
-  it("contiene las quests en orden correcto", () => {
-    expect(QUEST_ORDER).toEqual(["q1", "q2", "q3", "q4"]);
+  it("contiene las 6 quests en orden correcto", () => {
+    expect(QUEST_ORDER).toEqual(["q1", "q2", "q3", "q4", "q5", "q6"]);
   });
 });
 
-describe("getQuest q4", () => {
-  it("retorna la quest q4 con valores correctos (Rey Esqueleto)", () => {
-    const q = getQuest("q4");
-    expect(q.id).toBe("q4");
-    expect(q.title).toBe("El Rey Esqueleto");
+describe("getQuest q6", () => {
+  it("retorna la quest final con valores correctos (Rey Nihil)", () => {
+    const q = getQuest("q6");
+    expect(q.id).toBe("q6");
+    expect(q.title).toBe("El Rey Nihil");
     expect(q.mobTemplateId).toBe("skeleton_king");
     expect(q.amount).toBe(1);
-    expect(q.rewardExp).toBe(400);
-    expect(q.rewardGold).toBe(200);
+    expect(q.rewardExp).toBe(1500);
+    expect(q.rewardGold).toBe(800);
   });
 });
 
@@ -95,12 +87,19 @@ describe("Quest narrative fields", () => {
     });
   });
 
-  it("getQuest('q1').title es 'Los primeros huesos'", () => {
-    expect(getQuest("q1").title).toBe("Los primeros huesos");
+  it("cada quest apunta a un template de mob válido", () => {
+    QUEST_ORDER.forEach((questId) => {
+      expect(MOB_TEMPLATES[getQuest(questId).mobTemplateId]).toBeDefined();
+    });
   });
 
-  it("getQuest('q4').title es 'El Rey Esqueleto'", () => {
-    expect(getQuest("q4").title).toBe("El Rey Esqueleto");
+  it("las recompensas crecen con el avance de la cadena", () => {
+    for (let i = 1; i < QUEST_ORDER.length; i++) {
+      const prev = QUESTS[QUEST_ORDER[i - 1]];
+      const cur = QUESTS[QUEST_ORDER[i]];
+      expect(cur.rewardExp).toBeGreaterThan(prev.rewardExp);
+      expect(cur.rewardGold).toBeGreaterThan(prev.rewardGold);
+    }
   });
 });
 

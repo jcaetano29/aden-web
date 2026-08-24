@@ -54,8 +54,13 @@ describe("getMobExp", () => {
     expect(getMobExp("dragon")).toBe(0);
   });
 
-  it("skeleton_king (jefe) da 300 EXP", () => {
-    expect(getMobExp("skeleton_king")).toBe(300);
+  it("skeleton_king (jefe final) da 900 EXP", () => {
+    expect(getMobExp("skeleton_king")).toBe(900);
+  });
+
+  it("la EXP escala con la profundidad de la zona", () => {
+    expect(getMobExp("crypt_warrior")).toBeGreaterThan(getMobExp("skeleton_warrior"));
+    expect(getMobExp("ash_warrior")).toBeGreaterThan(getMobExp("crypt_warrior"));
   });
 });
 
