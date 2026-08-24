@@ -687,4 +687,25 @@ describe("GameRoom", () => {
       expect(p.title).toBe("Novato");
     });
   });
+
+  describe("Eventos de mundo (Etapa 14)", () => {
+    it("abatir al jefe emite un anuncio de mundo server-wide", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Anunciante", className: "barbarian" });
+      await room.waitForNextPatch();
+      const announces: string[] = [];
+      c.onMessage(MessageType.WorldAnnounce, (ev: any) => announces.push(ev.text));
+      const p = room.state.players.get(c.sessionId)!;
+      let bossId = ""; let boss: any;
+      room.state.mobs.forEach((m: any, id: string) => {
+        if (m.templateId === "skeleton_king") { bossId = id; boss = m; }
+      });
+      boss.hp = 1;
+      p.x = p.targetX = boss.x; p.z = p.targetZ = boss.z + 1; p.moving = false; p.hp = 500;
+      c.send(MessageType.SetTarget, { targetId: bossId });
+      for (let i = 0; i < 5; i++) await room.waitForNextSimulationTick();
+      expect(boss.dead).toBe(true);
+      expect(announces.some((t) => t.includes("caído"))).toBe(true);
+    });
+  });
 });

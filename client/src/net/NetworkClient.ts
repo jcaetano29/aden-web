@@ -19,7 +19,9 @@ import {
   type JoinGuildMessage,
   type EquipItemMessage,
   type UnequipItemMessage,
+  type WorldAnnounceEvent,
   isBoss,
+  getTemplate,
 } from "@aden/shared";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
@@ -92,6 +94,8 @@ export interface RoomCallbacks {
   onDailyComplete: (ev: DailyCompleteEvent) => void;
   /** Etapa 13: logro desbloqueado. */
   onAchievement: (ev: AchievementEvent) => void;
+  /** Etapa 14: anuncio de evento de mundo (jefe despierta/cae). */
+  onWorldAnnounce: (ev: WorldAnnounceEvent) => void;
 }
 
 export class NetworkClient {
@@ -152,6 +156,7 @@ export class NetworkClient {
     this.room.onMessage(MessageType.DailyReset, (data: DailyResetEvent) => cb.onDailyReset(data));
     this.room.onMessage(MessageType.DailyComplete, (data: DailyCompleteEvent) => cb.onDailyComplete(data));
     this.room.onMessage(MessageType.Achievement, (data: AchievementEvent) => cb.onAchievement(data));
+    this.room.onMessage(MessageType.WorldAnnounce, (data: WorldAnnounceEvent) => cb.onWorldAnnounce(data));
   }
 
   sendMove(msg: MoveToMessage) {
@@ -249,6 +254,21 @@ export class NetworkClient {
 
   get sessionId(): string {
     return this.room.sessionId;
+  }
+
+  /**
+   * Estado del jefe del mundo (Etapa 14) para la barra en pantalla: nombre, HP y
+   * si está muerto. Escanea los mobs por `isBoss`; null si no hay jefe en el estado.
+   */
+  getBossState(): { name: string; hp: number; maxHp: number; dead: boolean } | null {
+    let out: { name: string; hp: number; maxHp: number; dead: boolean } | null = null;
+    this.room.state.mobs.forEach((m: any) => {
+      if (out) return;
+      if (isBoss(m.templateId)) {
+        out = { name: getTemplate(m.templateId).name, hp: m.hp, maxHp: m.maxHp, dead: m.dead };
+      }
+    });
+    return out;
   }
 
   /**

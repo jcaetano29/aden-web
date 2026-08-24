@@ -29,6 +29,8 @@ export class Hud {
   private readonly goldLabel: HTMLDivElement;
   private readonly toastBanner: HTMLDivElement;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
+  private readonly announceBanner: HTMLDivElement;
+  private announceTimer: ReturnType<typeof setTimeout> | null = null;
 
   constructor(parent: HTMLElement = document.body) {
     this.root = document.createElement("div");
@@ -100,10 +102,30 @@ export class Hud {
       "font:bold 18px sans-serif;color:#fff;text-shadow:0 0 6px #000,0 0 12px #000;" +
       "background:rgba(0,0,0,0.55);padding:8px 18px;border-radius:6px;max-width:70vw;";
 
+    // Banner de anuncio de evento de mundo (Etapa 14): más prominente que el toast,
+    // ubicado más arriba, para eventos server-wide (el jefe despierta/cae).
+    this.announceBanner = document.createElement("div");
+    this.announceBanner.style.cssText =
+      "position:fixed;left:50%;top:9%;transform:translate(-50%,-50%);" +
+      "pointer-events:none;z-index:1100;display:none;text-align:center;" +
+      "font:bold 22px 'Georgia',serif;color:#ffd54f;text-shadow:0 0 8px #000,0 0 16px #000;" +
+      "background:rgba(20,8,8,0.7);padding:10px 24px;border-radius:8px;border:1px solid #6b2b2b;max-width:80vw;";
+
     parent.appendChild(this.root);
     parent.appendChild(this.deathBanner);
     parent.appendChild(this.levelUpBanner);
     parent.appendChild(this.toastBanner);
+    parent.appendChild(this.announceBanner);
+  }
+
+  /** Anuncio de evento de mundo (más prominente/duradero que un toast). */
+  announce(msg: string, ms = 4500): void {
+    this.announceBanner.textContent = msg;
+    this.announceBanner.style.display = "";
+    if (this.announceTimer) clearTimeout(this.announceTimer);
+    this.announceTimer = setTimeout(() => {
+      this.announceBanner.style.display = "none";
+    }, ms);
   }
 
   /**
@@ -207,6 +229,8 @@ export class Hud {
     this.root.remove();
     this.deathBanner.remove();
     this.levelUpBanner.remove();
+    this.toastBanner.remove();
+    this.announceBanner.remove();
   }
 }
 
