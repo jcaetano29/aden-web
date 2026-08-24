@@ -36,8 +36,6 @@ export class Environment {
   private readonly fog: THREE.Fog;
   private readonly bgColor: THREE.Color;
   private embers: THREE.Points | null = null;
-  private emberBaseY: Float32Array | null = null;
-  private moodTime = 0;
   // Objetivos de mood (se interpolan suavemente frame a frame).
   private curFogNear: number;
   private curFogFar: number;
@@ -384,7 +382,6 @@ export class Environment {
   private addEmbers(z: Zone): void {
     const N = 140;
     const positions = new Float32Array(N * 3);
-    const baseY = new Float32Array(N);
     const rng = mulberry32(777);
     for (let i = 0; i < N; i++) {
       const ang = rng() * Math.PI * 2;
@@ -392,7 +389,6 @@ export class Environment {
       positions[i * 3] = z.center.x + Math.cos(ang) * r;
       positions[i * 3 + 1] = rng() * 6;
       positions[i * 3 + 2] = z.center.z + Math.sin(ang) * r;
-      baseY[i] = positions[i * 3 + 1];
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
@@ -401,7 +397,6 @@ export class Environment {
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     this.embers = new THREE.Points(geo, mat);
-    this.emberBaseY = baseY;
     this.scene.add(this.embers);
   }
 
@@ -428,11 +423,10 @@ export class Environment {
     // La luz hemisférica también toma el tinte del bioma (cielo).
     this.hemi.color.lerp(new THREE.Color(b.fog), k * 0.6);
 
-    // Brasas: ascienden y se reciclan.
-    if (this.embers && this.emberBaseY) {
-      this.moodTime += dt;
+    // Brasas del Yermo: ascienden y se reciclan al llegar arriba.
+    if (this.embers) {
       const pos = this.embers.geometry.getAttribute("position") as THREE.BufferAttribute;
-      for (let i = 0; i < this.emberBaseY.length; i++) {
+      for (let i = 0; i < pos.count; i++) {
         let y = pos.getY(i) + dt * 0.6;
         if (y > 7) y = 0;
         pos.setY(i, y);
