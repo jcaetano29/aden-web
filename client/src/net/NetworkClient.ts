@@ -8,6 +8,10 @@ import {
   type DeathEvent,
   type LevelUpEvent,
   type BossKilledEvent,
+  type DailyResetEvent,
+  type DailyCompleteEvent,
+  type AchievementEvent,
+  type SetTitleMessage,
   type InteractNpcMessage,
   type BuyItemMessage,
   type UseItemMessage,
@@ -33,6 +37,8 @@ export interface PlayerSnapshot {
   className?: string;
   /** Tag de guild ("" si no pertenece a ninguna); se sincroniza desde el server. Solo para jugadores. */
   guildTag?: string;
+  /** Título lucido (Etapa 13, logros); "" si ninguno. Solo para jugadores. */
+  title?: string;
 }
 
 /** Snapshot de mob: incluye combate (hp/maxHp/dead) para highlight/HUD. */
@@ -80,6 +86,12 @@ export interface RoomCallbacks {
   onLevelUp: (level: number) => void;
   /** Disparado server-wide cuando una guild abate al jefe (broadcast `bossKilled`). */
   onBossKilled: (ev: BossKilledEvent) => void;
+  /** Etapa 13: día nuevo (racha + recompensa + diaria asignada). */
+  onDailyReset: (ev: DailyResetEvent) => void;
+  /** Etapa 13: misión diaria completada. */
+  onDailyComplete: (ev: DailyCompleteEvent) => void;
+  /** Etapa 13: logro desbloqueado. */
+  onAchievement: (ev: AchievementEvent) => void;
 }
 
 export class NetworkClient {
@@ -100,6 +112,7 @@ export class NetworkClient {
       dead: p.dead,
       className: p.className,
       guildTag: p.guildTag ?? "",
+      title: p.title ?? "",
     });
 
     this.room.state.players.onAdd((player: any, id: string) => {
@@ -136,6 +149,9 @@ export class NetworkClient {
     this.room.onMessage(MessageType.Death, (data: DeathEvent) => cb.onDeath(data.entityId));
     this.room.onMessage(MessageType.LevelUp, (data: LevelUpEvent) => cb.onLevelUp(data.level));
     this.room.onMessage(MessageType.BossKilled, (data: BossKilledEvent) => cb.onBossKilled(data));
+    this.room.onMessage(MessageType.DailyReset, (data: DailyResetEvent) => cb.onDailyReset(data));
+    this.room.onMessage(MessageType.DailyComplete, (data: DailyCompleteEvent) => cb.onDailyComplete(data));
+    this.room.onMessage(MessageType.Achievement, (data: AchievementEvent) => cb.onAchievement(data));
   }
 
   sendMove(msg: MoveToMessage) {
@@ -198,6 +214,37 @@ export class NetworkClient {
   sendUnequipItem(slot: string) {
     const msg: UnequipItemMessage = { slot };
     this.room.send(MessageType.UnequipItem, msg);
+  }
+
+  /** Envía la intención de lucir un título desbloqueado ("" = ninguno). */
+  sendSetTitle(title: string) {
+    const msg: SetTitleMessage = { title };
+    this.room.send(MessageType.SetTitle, msg);
+  }
+
+  /** Estado de retención del jugador local (racha, diaria, logros, título). */
+  getProgress(): {
+    loginStreak: number;
+    dailyQuestId: string;
+    dailyProgress: number;
+    dailyDone: boolean;
+    totalKills: number;
+    title: string;
+    achievements: string[];
+  } {
+    const p: any = this.room.state.players.get(this.room.sessionId);
+    if (!p) return { loginStreak: 0, dailyQuestId: "", dailyProgress: 0, dailyDone: false, totalKills: 0, title: "", achievements: [] };
+    const achievements: string[] = [];
+    p.achievements?.forEach((id: string) => achievements.push(id));
+    return {
+      loginStreak: p.loginStreak ?? 0,
+      dailyQuestId: p.dailyQuestId ?? "",
+      dailyProgress: p.dailyProgress ?? 0,
+      dailyDone: p.dailyDone ?? false,
+      totalKills: p.totalKills ?? 0,
+      title: p.title ?? "",
+      achievements,
+    };
   }
 
   get sessionId(): string {

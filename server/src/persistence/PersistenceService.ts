@@ -14,7 +14,12 @@ export interface PersistenceService {
 }
 
 function cloneCharacterSave(data: CharacterSave): CharacterSave {
-  return { ...data, inventory: { ...data.inventory }, equipment: { ...(data.equipment ?? {}) } };
+  return {
+    ...data,
+    inventory: { ...data.inventory },
+    equipment: { ...(data.equipment ?? {}) },
+    progress: { ...data.progress, achievements: [...(data.progress?.achievements ?? [])] },
+  };
 }
 
 export class InMemoryPersistence implements PersistenceService {

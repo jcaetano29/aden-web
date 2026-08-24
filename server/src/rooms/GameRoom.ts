@@ -21,7 +21,17 @@ import {
   type EquipItemMessage,
   type UnequipItemMessage,
   type EquipSlot,
+  type SetTitleMessage,
   equipmentBonuses,
+  getRarity,
+  dayKey,
+  previousDay,
+  streakReward,
+  dailyQuestForDay,
+  getDailyQuest,
+  newlyUnlocked,
+  getAchievement,
+  isValidTitle,
   isValidGuildTag,
   isValidGuildName,
   MAP_BOUNDS,
@@ -114,6 +124,60 @@ export class GameRoom extends Room<GameState> {
     p.pDef = base.pDef + bonus.pDef;
     if (p.hp > p.maxHp) p.hp = p.maxHp;
     if (p.mp > p.maxMp) p.mp = p.maxMp;
+  }
+
+  /** true si el jugador posee (inventario o equipado) algún objeto legendario. */
+  private hasLegendary(p: PlayerState): boolean {
+    let found = false;
+    p.inventory.forEach((_v, id) => { if (getRarity(id) === "legendary") found = true; });
+    p.equipment.forEach((id) => { if (id && getRarity(id) === "legendary") found = true; });
+    return found;
+  }
+
+  /**
+   * Etapa 13: evalúa los logros del jugador y desbloquea los recién cumplidos —
+   * otorga oro, auto-equipa el título más fuerte si no tiene ninguno, y avisa al
+   * cliente. Se llama tras matar, subir de nivel, recoger/equipar loot.
+   */
+  private checkAchievements(p: PlayerState, sessionId: string): void {
+    const unlocked = [...p.achievements];
+    const news = newlyUnlocked(unlocked, {
+      level: p.level,
+      totalKills: p.totalKills,
+      bossKills: p.bossKills,
+      pvpKills: p.pvpKills,
+      hasLegendary: this.hasLegendary(p),
+    });
+    if (news.length === 0) return;
+    const client = this.clients.find((c) => c.sessionId === sessionId);
+    let grantedTitle = "";
+    for (const a of news) {
+      p.achievements.push(a.id);
+      p.gold += a.rewardGold;
+      if (a.title) grantedTitle = a.title;
+      client?.send(MessageType.Achievement, { id: a.id, name: a.name, title: a.title });
+    }
+    // Auto-lucir el título recién ganado sólo si no tenía ninguno puesto.
+    if (p.title === "" && grantedTitle !== "") p.title = grantedTitle;
+  }
+
+  /**
+   * Etapa 13: al entrar, si es un día nuevo actualiza la racha (consecutiva o
+   * reinicio), asigna la misión diaria del día, otorga la recompensa de racha y
+   * avisa al cliente. No hace nada si ya entró hoy.
+   */
+  private handleDailyRollover(p: PlayerState, client: Client): void {
+    const today = dayKey(new Date());
+    if (p.lastLoginDay === today) return;
+    p.loginStreak = (p.lastLoginDay === previousDay(today)) ? p.loginStreak + 1 : 1;
+    p.lastLoginDay = today;
+    const daily = dailyQuestForDay(today);
+    p.dailyQuestId = daily.id;
+    p.dailyProgress = 0;
+    p.dailyDone = false;
+    const reward = streakReward(p.loginStreak);
+    p.gold += reward;
+    client.send(MessageType.DailyReset, { streak: p.loginStreak, reward, dailyDesc: daily.desc });
   }
 
   /** Resuelve un targetId a un mob vivo o a un jugador vivo (o null). */
@@ -457,6 +521,7 @@ export class GameRoom extends Room<GameState> {
       if (prev) this.addToInventory(p, prev, 1);
       p.equipment.set(item.slot, id);
       this.recomputeStats(p);
+      this.checkAchievements(p, client.sessionId); // p.ej. equipar un legendario
     });
 
     // Etapa 12: desequipar el slot dado → el ítem vuelve al inventario.
@@ -470,6 +535,19 @@ export class GameRoom extends Room<GameState> {
       p.equipment.delete(slot);
       this.addToInventory(p, cur, 1);
       this.recomputeStats(p);
+    });
+
+    // Etapa 13: lucir un título desbloqueado ("" = ninguno).
+    this.onMessage(MessageType.SetTitle, (client, msg: SetTitleMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p) return;
+      const title = msg?.title ?? "";
+      if (!isValidTitle(title)) return;
+      // Sólo puede lucir un título de un logro que ya desbloqueó (o "").
+      if (title !== "" && ![...p.achievements].some((id) => {
+        try { return getAchievement(id).title === title; } catch { return false; }
+      })) return;
+      p.title = title;
     });
 
     const dt = 1 / TICK_RATE;
@@ -560,6 +638,28 @@ export class GameRoom extends Room<GameState> {
           });
         }
       }
+
+      // Etapa 13: retención — kills totales, jefes abatidos, progreso de la diaria y logros.
+      killer.totalKills += 1;
+      if (isBoss(mob.templateId)) killer.bossKills += 1;
+      if (killer.dailyQuestId !== "" && !killer.dailyDone) {
+        try {
+          const dq = getDailyQuest(killer.dailyQuestId);
+          if (dq.mobTemplateId === "" || dq.mobTemplateId === mob.templateId) {
+            killer.dailyProgress++;
+            if (killer.dailyProgress >= dq.amount) {
+              killer.dailyDone = true;
+              killer.gold += dq.rewardGold;
+              const client = this.clients.find((c) => c.sessionId === killerId);
+              if (client) {
+                this.grantExp(killer, client, dq.rewardExp);
+                client.send(MessageType.DailyComplete, { rewardGold: dq.rewardGold, rewardExp: dq.rewardExp });
+              }
+            }
+          }
+        } catch { /* diaria desconocida: ignorar */ }
+      }
+      if (killerId) this.checkAchievements(killer, killerId);
     }
 
     // Loot (R-E3b-2): rodar drop table del mob y crear ítems en el piso con scatter.
@@ -749,13 +849,14 @@ export class GameRoom extends Room<GameState> {
     for (const id of despawnIds) this.state.droppedItems.delete(id);
 
     // auto-pickup por proximidad (R-E3b-1: stacking sobre MapSchema; R-E3b-4: collect-then-delete)
-    this.state.players.forEach((p) => {
+    this.state.players.forEach((p, sessionId) => {
       if (p.dead) return; // un jugador muerto no recoge ítems
       const pickupIds: string[] = [];
       this.state.droppedItems.forEach((it, id) => {
         // sólo pickable si ya pasó el delay (loot visible al caer) y está en rango
         if (it.pickDelayMs <= 0 && distance2D(p.x, p.z, it.x, it.z) <= PICKUP_RANGE) pickupIds.push(id);
       });
+      let pickedItem = false;
       for (const id of pickupIds) {
         const it = this.state.droppedItems.get(id);
         if (!it) continue; // ya recogido/despawneado en este mismo tick
@@ -766,9 +867,12 @@ export class GameRoom extends Room<GameState> {
           p.gold += it.qty;
         } else {
           this.addToInventory(p, it.itemTemplateId, it.qty);
+          pickedItem = true;
         }
         this.state.droppedItems.delete(id);
       }
+      // Etapa 13: recoger un ítem (p.ej. un legendario) puede desbloquear un logro.
+      if (pickedItem) this.checkAchievements(p, sessionId);
     });
 
     // cooldowns/respawn de mobs
@@ -867,6 +971,19 @@ export class GameRoom extends Room<GameState> {
       this.recomputeStats(player);
       player.hp = player.maxHp;
       player.mp = player.maxMp;
+      // Etapa 13: restaurar el estado de retención (racha/diaria/logros/título).
+      const pr = save.progress;
+      if (pr) {
+        player.loginStreak = pr.loginStreak ?? 0;
+        player.lastLoginDay = pr.lastLoginDay ?? "";
+        player.dailyQuestId = pr.dailyQuestId ?? "";
+        player.dailyProgress = pr.dailyProgress ?? 0;
+        player.dailyDone = pr.dailyDone ?? false;
+        player.totalKills = pr.totalKills ?? 0;
+        player.bossKills = pr.bossKills ?? 0;
+        player.title = pr.title ?? "";
+        for (const id of pr.achievements ?? []) player.achievements.push(id);
+      }
     }
 
     // Etapa 3c (fix race save-before-load): recién ahora, con el save (si existía) ya
@@ -887,6 +1004,11 @@ export class GameRoom extends Room<GameState> {
       g.bossKills = row?.bossKills ?? 0;
       this.state.guilds.set(player.guildId, g);
     }
+
+    // Etapa 13: rollover diario (racha + diaria + recompensa) y chequeo de logros
+    // ya cargados. Corre para personajes nuevos (lastLoginDay "") y existentes.
+    this.handleDailyRollover(player, client);
+    this.checkAchievements(player, client.sessionId);
   }
 
   /** Guarda el estado de todos los jugadores conectados (fire-and-forget, periódico). */

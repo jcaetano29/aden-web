@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
-import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN } from "@aden/shared";
+import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN, getDailyQuest } from "@aden/shared";
 import appConfig from "../testServer.js";
 import { MobState } from "../state/MobState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
@@ -52,7 +52,6 @@ describe("GameRoom", () => {
     const p = room.state.players.get(client.sessionId)!;
     expect(p.questId).toBe(firstQuestId());
     expect(p.questProgress).toBe(0);
-    expect(p.gold).toBe(0);
   });
 
   it("no entrega la mision si el progreso no esta completo (no-op)", async () => {
@@ -62,10 +61,11 @@ describe("GameRoom", () => {
     const p = room.state.players.get(client.sessionId)!;
     p.x = TOWN.x; p.z = TOWN.z; // en el pueblo (radio de entrega)
     p.questProgress = 0; // incompleta
+    const gold0 = p.gold;
     client.send(MessageType.InteractNpc, {});
     await room.waitForNextPatch();
     expect(p.questId).toBe(firstQuestId()); // no avanzo
-    expect(p.gold).toBe(0);
+    expect(p.gold).toBe(gold0); // sin cambio de oro
   });
 
   it("entrega la mision completa en el NPC: da exp+oro y encadena la siguiente", async () => {
@@ -76,12 +76,13 @@ describe("GameRoom", () => {
     p.x = TOWN.x; p.z = TOWN.z; // en el pueblo, dentro del radio de entrega
     const q = getQuest(p.questId);
     const expBefore = p.exp;
+    const gold0 = p.gold;
     p.questProgress = q.amount; // simula haber matado los mobs requeridos
 
     client.send(MessageType.InteractNpc, {});
     await room.waitForNextPatch();
 
-    expect(p.gold).toBe(q.rewardGold);
+    expect(p.gold).toBe(gold0 + q.rewardGold);
     expect(p.exp).toBe(expBefore + q.rewardExp);
     expect(p.questId).not.toBe(q.id); // encadeno a la siguiente
     expect(p.questProgress).toBe(0);
@@ -95,10 +96,11 @@ describe("GameRoom", () => {
     p.x = 50; p.z = 50; // lejos del NPC
     const q = getQuest(p.questId);
     p.questProgress = q.amount;
+    const gold0 = p.gold;
     client.send(MessageType.InteractNpc, {});
     await room.waitForNextPatch();
     expect(p.questId).toBe(q.id); // no entrego
-    expect(p.gold).toBe(0);
+    expect(p.gold).toBe(gold0); // sin cambio de oro
   });
 
   it("compra una pocion en el mercader: baja el oro y la agrega al inventario", async () => {
@@ -616,6 +618,73 @@ describe("GameRoom", () => {
       await room.waitForNextPatch();
       expect(p.level).toBeGreaterThan(1);
       expect(p.pAtk).toBe(statsForClass("knight", p.level).pAtk + 4); // el +4 del arma sobrevive al level-up
+    });
+  });
+
+  describe("Retención (Etapa 13)", () => {
+    // Mata un enemigo cercano al jugador avanzando la simulación (auto-attack).
+    async function killOneMob(room: any, client: any, p: any, templateId: string): Promise<void> {
+      let mobId = ""; let mob: any;
+      room.state.mobs.forEach((m: any, id: string) => {
+        if (mobId === "" && m.templateId === templateId && !m.dead) { mobId = id; mob = m; }
+      });
+      mob.hp = 1;
+      p.x = p.targetX = mob.x; p.z = p.targetZ = mob.z + 1; p.moving = false; p.hp = 500;
+      client.send(MessageType.SetTarget, { targetId: mobId });
+      for (let i = 0; i < 4; i++) await room.waitForNextSimulationTick();
+    }
+
+    it("al entrar arranca la racha en 1 y asigna una misión diaria", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Nuevo", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      expect(p.loginStreak).toBe(1);
+      expect(p.dailyQuestId).not.toBe("");
+    });
+
+    it("matar un enemigo desbloquea 'Primera Sangre' y otorga el título Novato", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Novicio", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      await killOneMob(room, c, p, "skeleton_minion");
+      expect(p.totalKills).toBeGreaterThanOrEqual(1);
+      expect([...p.achievements]).toContain("first_blood");
+      expect(p.title).toBe("Novato");
+    });
+
+    it("la misión diaria progresa al matar y se auto-recompensa al completar", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Diario", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      // Forzar la diaria "caza cualquiera" (amount 12) a falta de 1.
+      const dq = getDailyQuest("d_hunt");
+      p.dailyQuestId = "d_hunt"; p.dailyDone = false; p.dailyProgress = dq.amount - 1;
+      const gold0 = p.gold;
+      await killOneMob(room, c, p, "skeleton_minion");
+      expect(p.dailyDone).toBe(true);
+      expect(p.gold).toBe(gold0 + dq.rewardGold);
+    });
+
+    it("lucir un título rechaza los no ganados y acepta los desbloqueados", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Titular", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      // Antes de ganar nada: un título no ganado se rechaza.
+      c.send(MessageType.SetTitle, { title: "Matarreyes" });
+      await room.waitForNextPatch();
+      expect(p.title).not.toBe("Matarreyes");
+      // Desbloquear first_blood → título Novato ganado y luego seleccionable.
+      await killOneMob(room, c, p, "skeleton_minion");
+      c.send(MessageType.SetTitle, { title: "" }); // sacárselo
+      await room.waitForNextPatch();
+      expect(p.title).toBe("");
+      c.send(MessageType.SetTitle, { title: "Novato" });
+      await room.waitForNextPatch();
+      expect(p.title).toBe("Novato");
     });
   });
 });

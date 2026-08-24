@@ -14,6 +14,10 @@ export const MessageType = {
   BossKilled: "bossKilled",
   EquipItem: "equipItem",
   UnequipItem: "unequipItem",
+  DailyReset: "dailyReset",
+  DailyComplete: "dailyComplete",
+  Achievement: "achievement",
+  SetTitle: "setTitle",
 } as const;
 
 export interface MoveToMessage {
@@ -81,4 +85,29 @@ export interface EquipItemMessage {
 export interface UnequipItemMessage {
   /** slot a vaciar: "weapon" | "armor" | "accessory". */
   slot: string;
+}
+
+/** Server→cliente: entraste en un día nuevo (racha + recompensa + diaria asignada). */
+export interface DailyResetEvent {
+  streak: number;
+  reward: number;
+  dailyDesc: string;
+}
+
+/** Server→cliente: completaste la misión diaria (recompensa otorgada). */
+export interface DailyCompleteEvent {
+  rewardGold: number;
+  rewardExp: number;
+}
+
+/** Server→cliente: desbloqueaste un logro. */
+export interface AchievementEvent {
+  id: string;
+  name: string;
+  title: string;
+}
+
+/** Cliente→server: lucir un título desbloqueado ("" = ninguno). */
+export interface SetTitleMessage {
+  title: string;
 }
