@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { CharacterSave } from "./CharacterSave.js";
+import type { CharacterSave, ProgressSave } from "./CharacterSave.js";
+import { emptyProgress } from "./CharacterSave.js";
 import type { GuildSave } from "./GuildSave.js";
 import type { CharacterRank, GuildRank, PersistenceService } from "./PersistenceService.js";
 
@@ -13,7 +14,7 @@ export class SupabasePersistence implements PersistenceService {
   async load(name: string): Promise<CharacterSave | null> {
     const { data, error } = await this.client
       .from("characters")
-      .select("level,exp,pos_x,pos_z,inventory,gold,questId,questProgress,className,pvpKills,guildId,guildName,guildTag,equipment")
+      .select("level,exp,pos_x,pos_z,inventory,gold,questId,questProgress,className,pvpKills,guildId,guildName,guildTag,equipment,progress")
       .eq("name", name)
       .maybeSingle();
 
@@ -41,6 +42,7 @@ export class SupabasePersistence implements PersistenceService {
       guildName: data.guildName ?? "",
       guildTag: data.guildTag ?? "",
       equipment: (data.equipment ?? {}) as Record<string, string>,
+      progress: { ...emptyProgress(), ...((data.progress ?? {}) as Partial<ProgressSave>) },
     };
   }
 
@@ -62,6 +64,7 @@ export class SupabasePersistence implements PersistenceService {
         guildName: data.guildName,
         guildTag: data.guildTag,
         equipment: data.equipment,
+        progress: data.progress,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "name" },
