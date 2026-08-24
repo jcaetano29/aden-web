@@ -114,7 +114,8 @@ async function main() {
   // Mostrar la premisa narrativa una sola vez
   await storyCard.show();
 
-  await net.connect(name, className, {
+  try {
+   await net.connect(name, className, {
     onAdd: (id, isSelf, snap) =>
       views.add(id, isSelf, modelForClass(snap.className ?? "knight"), snap),
     onChange: (id, snap) => views.update(id, snap),
@@ -212,7 +213,12 @@ async function main() {
     },
     onItemAdd: (id, itemTemplateId, x, z) => groundItems.add(id, itemTemplateId, x, z),
     onItemRemove: (id) => groundItems.remove(id),
-  });
+   });
+  } catch (err) {
+    console.error("[aden] no se pudo conectar al servidor:", err);
+    showServerOffline();
+    return;
+  }
 
   // Interacción con el NPC de misiones: diálogo narrativo contextual.
   // El server es autoritativo; el diálogo es presentación.
@@ -482,6 +488,26 @@ async function main() {
     requestAnimationFrame(loop);
   }
   loop();
+}
+
+/**
+ * Overlay amigable cuando el cliente no puede conectar al game server (p.ej. el
+ * cliente está desplegado pero el server —que va en un host de Node aparte, no en
+ * Vercel— todavía no está levantado o la URL no está configurada).
+ */
+function showServerOffline(): void {
+  const url = (import.meta as any).env?.VITE_SERVER_URL ?? "ws://localhost:2567";
+  const div = document.createElement("div");
+  div.style.cssText =
+    "position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;" +
+    "background:rgba(8,10,16,0.95);color:#fff;font:16px sans-serif;text-align:center;padding:24px;gap:10px;";
+  div.innerHTML =
+    `<div style="font:bold 26px 'Georgia',serif;color:#ffd54f;">Aden está dormida</div>` +
+    `<div style="max-width:520px;opacity:0.9;line-height:1.5;">No se pudo conectar al servidor del juego.<br>` +
+    `El mundo de Aden necesita su servidor en línea para jugar.</div>` +
+    `<div style="opacity:0.5;font-size:12px;margin-top:8px;">Servidor: ${url}</div>` +
+    `<button onclick="location.reload()" style="margin-top:14px;padding:8px 18px;background:#ffd54f;color:#000;border:none;border-radius:6px;font:bold 14px sans-serif;cursor:pointer;">Reintentar</button>`;
+  document.body.appendChild(div);
 }
 
 main().catch((err) => console.error("[aden] fallo al iniciar:", err));
