@@ -662,6 +662,11 @@ export class GameRoom extends Room<GameState> {
       if (killerId) this.checkAchievements(killer, killerId);
     }
 
+    // Etapa 14: evento de mundo — el jefe cae (anuncio server-wide, cualquiera lo haya matado).
+    if (isBoss(mob.templateId)) {
+      this.broadcast(MessageType.WorldAnnounce, { text: "💀 ¡El Rey Nihil ha caído!" });
+    }
+
     // Loot (R-E3b-2): rodar drop table del mob y crear ítems en el piso con scatter.
     for (const d of rollDrops(mob.templateId, Math.random)) {
       const item = new DroppedItemState();
@@ -881,7 +886,10 @@ export class GameRoom extends Room<GameState> {
       if (mob.dead) {
         mob.respawnMs -= dtMs;
         if (mob.respawnMs <= 0) {
+          const wasBoss = isBoss(mob.templateId);
           this.spawnMob(id, mob.templateId, mob.homeX, mob.homeZ);
+          // Etapa 14: evento de mundo — el jefe reaparece (carrera al Trono).
+          if (wasBoss) this.broadcast(MessageType.WorldAnnounce, { text: "⚔ ¡El Rey Nihil ha despertado en su Trono!" });
         }
       }
     });

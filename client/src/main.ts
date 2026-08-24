@@ -12,6 +12,7 @@ import { InventoryPanel } from "./render/InventoryPanel.js";
 import { GuildPanel } from "./render/GuildPanel.js";
 import { LeaderboardPanel } from "./render/LeaderboardPanel.js";
 import { ProgressPanel } from "./render/ProgressPanel.js";
+import { BossBar } from "./render/BossBar.js";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ShopPanel } from "./render/ShopPanel.js";
@@ -27,7 +28,7 @@ import { SkillInput } from "./input/SkillInput.js";
 import { AudioEngine } from "./audio/AudioEngine.js";
 import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss, ELDER_NAME, firstQuestId, SAFE_RADIUS, zoneAt } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss, ELDER_NAME, firstQuestId, SAFE_RADIUS, zoneAt, respawnForTemplate } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -74,6 +75,9 @@ async function main() {
   leaderboardPanel.mount(document.body);
   const progressPanel = new ProgressPanel((title) => net.sendSetTitle(title));
   progressPanel.mount(document.body);
+  const bossBar = new BossBar();
+  // Tiempo de reaparición del jefe (config compartida) para el contador de la barra.
+  const bossRespawnMs = respawnForTemplate("skeleton_king") ?? 60000;
   const classSelect = new ClassSelect();
   const storyCard = new StoryCard();
   const dialog = new DialogPanel();
@@ -200,6 +204,11 @@ async function main() {
     onAchievement: (ev) => {
       hud.toast(`🏆 ¡Logro: ${ev.name}!${ev.title ? ` — Título «${ev.title}»` : ""}`, "#ffd54f", 3800);
       audio.play("levelup");
+    },
+    onWorldAnnounce: (ev) => {
+      hud.announce(ev.text);
+      audio.play("boss");
+      screenShake.addTrauma(0.35);
     },
     onItemAdd: (id, itemTemplateId, x, z) => groundItems.add(id, itemTemplateId, x, z),
     onItemRemove: (id) => groundItems.remove(id),
@@ -421,6 +430,8 @@ async function main() {
     }
     minimap.setObjective(objective);
     minimap.update(net.getMinimapEntities());
+    // Barra del jefe en pantalla + contador de reaparición (Etapa 14).
+    bossBar.update(net.getBossState(), bossRespawnMs);
     if (selfCombat) {
       hud.update(
         selfCombat.hp,

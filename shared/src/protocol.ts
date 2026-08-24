@@ -18,6 +18,7 @@ export const MessageType = {
   DailyComplete: "dailyComplete",
   Achievement: "achievement",
   SetTitle: "setTitle",
+  WorldAnnounce: "worldAnnounce",
 } as const;
 
 export interface MoveToMessage {
@@ -110,4 +111,9 @@ export interface AchievementEvent {
 /** Cliente→server: lucir un título desbloqueado ("" = ninguno). */
 export interface SetTitleMessage {
   title: string;
+}
+
+/** Server→todos: anuncio de evento de mundo (jefe despierta / cae). */
+export interface WorldAnnounceEvent {
+  text: string;
 }
