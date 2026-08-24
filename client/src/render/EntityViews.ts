@@ -58,6 +58,8 @@ export class EntityViews {
   private readonly playerDead = new Map<string, boolean>();
   /** playerId -> guildTag actual (del snapshot sincronizado); detecta cambios para refrescar el texto del nameplate. */
   private readonly playerGuildTag = new Map<string, string>();
+  /** playerId -> título lucido actual; detecta cambios para refrescar la línea de título. */
+  private readonly playerTitle = new Map<string, string>();
   private currentTargetId: string | null = null;
   private selfId: string | null = null;
 
@@ -74,9 +76,10 @@ export class EntityViews {
     this.scene.add(view.object);
     this.views.set(id, view);
     this.playerRootToId.set(view.object, id);
-    this.nameplates.add(id, nameplateText(snap.name, snap.guildTag), view.object);
+    this.nameplates.add(id, nameplateText(snap.name, snap.guildTag), view.object, undefined, snap.title ?? "");
     this.playerDead.set(id, snap.dead);
     this.playerGuildTag.set(id, snap.guildTag ?? "");
+    this.playerTitle.set(id, snap.title ?? "");
     if (isSelf) {
       this.selfId = id;
       view.addSelfRing();
@@ -99,6 +102,13 @@ export class EntityViews {
       this.playerGuildTag.set(id, newTag);
       this.nameplates.setText(id, nameplateText(state.name, newTag));
     }
+    // Refrescar la línea de título si cambió (equipar/ganar un logro).
+    const prevTitle = this.playerTitle.get(id) ?? "";
+    const newTitle = state.title ?? "";
+    if (prevTitle !== newTitle) {
+      this.playerTitle.set(id, newTitle);
+      this.nameplates.setTitle(id, newTitle);
+    }
   }
 
   remove(id: string) {
@@ -112,6 +122,7 @@ export class EntityViews {
     }
     this.playerDead.delete(id);
     this.playerGuildTag.delete(id);
+    this.playerTitle.delete(id);
     if (this.currentTargetId === id) this.currentTargetId = null;
   }
 

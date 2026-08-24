@@ -11,6 +11,7 @@ import { SkillBar } from "./render/SkillBar.js";
 import { InventoryPanel } from "./render/InventoryPanel.js";
 import { GuildPanel } from "./render/GuildPanel.js";
 import { LeaderboardPanel } from "./render/LeaderboardPanel.js";
+import { ProgressPanel } from "./render/ProgressPanel.js";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ShopPanel } from "./render/ShopPanel.js";
@@ -71,6 +72,8 @@ async function main() {
   guildPanel.mount(document.body);
   const leaderboardPanel = new LeaderboardPanel();
   leaderboardPanel.mount(document.body);
+  const progressPanel = new ProgressPanel((title) => net.sendSetTitle(title));
+  progressPanel.mount(document.body);
   const classSelect = new ClassSelect();
   const storyCard = new StoryCard();
   const dialog = new DialogPanel();
@@ -186,6 +189,17 @@ async function main() {
       hud.toast(`⚔ ¡La guild [${ev.guildTag}] abatió al ${ev.bossName}!`, "#ff5252");
       audio.play("boss");
       screenShake.addTrauma(0.7);
+    },
+    onDailyReset: (ev) => {
+      hud.toast(`🔥 ¡Día ${ev.streak}! +${ev.reward} oro · Diaria: ${ev.dailyDesc}`, "#ffd54f", 3800);
+    },
+    onDailyComplete: (ev) => {
+      hud.toast(`✅ ¡Misión diaria completada! +${ev.rewardGold} oro`, "#4fd14f", 3200);
+      audio.play("levelup");
+    },
+    onAchievement: (ev) => {
+      hud.toast(`🏆 ¡Logro: ${ev.name}!${ev.title ? ` — Título «${ev.title}»` : ""}`, "#ffd54f", 3800);
+      audio.play("levelup");
     },
     onItemAdd: (id, itemTemplateId, x, z) => groundItems.add(id, itemTemplateId, x, z),
     onItemRemove: (id) => groundItems.remove(id),
@@ -324,6 +338,7 @@ async function main() {
   // Tecla "q" → usa una Poción de Vida (si la tienes y HP < maxHp).
   let guildPanelVisible = false;
   let leaderboardPanelVisible = false;
+  let progressPanelVisible = false;
   document.body.addEventListener("keydown", (e) => {
     // No disparar hotkeys de gameplay mientras se está tipeando en un input
     // (p.ej. el form de crear guild): sin esta guarda, escribir "Guerreros"
@@ -342,6 +357,11 @@ async function main() {
       leaderboardPanelVisible = !leaderboardPanelVisible;
       if (leaderboardPanelVisible) leaderboardPanel.update(net.getLeaderboardData());
       leaderboardPanel.setVisible(leaderboardPanelVisible);
+    }
+    if (e.key === "t" || e.key === "T" || e.code === "KeyT") {
+      progressPanelVisible = !progressPanelVisible;
+      progressPanel.setVisible(progressPanelVisible);
+      if (progressPanelVisible) progressPanel.update(net.getProgress());
     }
     if (e.key === "m" || e.key === "M") {
       const muted = audio.toggleMuted();
@@ -442,6 +462,9 @@ async function main() {
     }
     if (leaderboardPanelVisible) {
       leaderboardPanel.update(net.getLeaderboardData());
+    }
+    if (progressPanelVisible) {
+      progressPanel.update(net.getProgress());
     }
     renderer.render();
     renderer.css2d.render(renderer.scene, renderer.camera);
