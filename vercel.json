@@ -1,7 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build --workspace @aden/client",
-  "outputDirectory": "client/dist",
-  "installCommand": "npm install",
-  "framework": null
+  "outputDirectory": "dist",
+  "installCommand": "npm install"
 }

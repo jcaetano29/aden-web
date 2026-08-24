@@ -32,10 +32,10 @@ Hay un `server/Dockerfile` + `.dockerignore` listos (el server ya lee `process.e
 
 ## 2) Cliente → Vercel (estático)
 
-Hay un `vercel.json` en la raíz (build del workspace del cliente, output `client/dist`).
+Hay un `vercel.json` en la raíz (build del workspace del cliente, output `dist` (raíz)).
 
 1. Vercel → Add New Project → importá este repo de GitHub (team `jcaetano29's projects`).
-2. Vercel toma `vercel.json` (buildCommand `npm run build --workspace @aden/client`, output `client/dist`).
+2. Vercel toma `vercel.json` (buildCommand `npm run build --workspace @aden/client`, output `dist` (raíz)).
 3. Environment Variable:
    - `VITE_SERVER_URL` = **`wss://<tu-server-de-railway>`** (del paso 1).
 4. Deploy. Vercel te da `https://<algo>.vercel.app`.
