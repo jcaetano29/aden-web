@@ -7,11 +7,13 @@ describe("items", () => {
     expect(() => getItem("excalibur")).toThrow();
   });
 
-  it("skull_crown es un trofeo material no-stackable del Rey Nihil", () => {
+  it("skull_crown es un accesorio legendario equipable (Corona del Rey Nihil)", () => {
     const skull = getItem("skull_crown");
     expect(skull.id).toBe("skull_crown");
     expect(skull.name).toBe("Corona del Rey Nihil");
-    expect(skull.type).toBe("material");
+    expect(skull.type).toBe("equipment");
+    expect(skull.slot).toBe("accessory");
+    expect(skull.rarity).toBe("legendary");
     expect(skull.stackable).toBe(false);
   });
 });

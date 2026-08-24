@@ -3,6 +3,7 @@ import { ColyseusTestServer, boot } from "@colyseus/testing";
 import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN } from "@aden/shared";
 import appConfig from "../testServer.js";
 import { MobState } from "../state/MobState.js";
+import { InventoryItemState } from "../state/InventoryItemState.js";
 
 describe("GameRoom", () => {
   let colyseus: ColyseusTestServer;
@@ -541,6 +542,80 @@ describe("GameRoom", () => {
       await (room as any).refreshLeaderboard();
       const players = [...room.state.leaderboard.players].map((p: any) => p.name);
       expect(players.indexOf("Nivel8")).toBeLessThan(players.indexOf("Nivel3"));
+    });
+  });
+
+  describe("Equipo (Etapa 12)", () => {
+    async function buy(room: any, client: any, p: any, itemId: string): Promise<void> {
+      p.x = TOWN.x; p.z = TOWN.z; p.gold = 1000;
+      client.send(MessageType.BuyItem, { itemTemplateId: itemId, qty: 1 });
+      await room.waitForNextPatch();
+    }
+
+    it("equipar un arma sube el pAtk y ocupa el slot (sale del inventario)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Herrero", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      await buy(room, c, p, "worn_sword");
+      const atk0 = p.pAtk;
+      c.send(MessageType.EquipItem, { itemTemplateId: "worn_sword" });
+      await room.waitForNextPatch();
+      expect(p.equipment.get("weapon")).toBe("worn_sword");
+      expect(p.pAtk).toBe(atk0 + 4); // bonus de worn_sword
+      expect(p.inventory.get("worn_sword")).toBeUndefined();
+    });
+
+    it("desequipar devuelve el ítem al inventario y restaura el stat", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Desarmado", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      await buy(room, c, p, "worn_sword");
+      const atk0 = p.pAtk;
+      c.send(MessageType.EquipItem, { itemTemplateId: "worn_sword" });
+      await room.waitForNextPatch();
+      c.send(MessageType.UnequipItem, { slot: "weapon" });
+      await room.waitForNextPatch();
+      expect(p.equipment.get("weapon")).toBeUndefined();
+      expect(p.pAtk).toBe(atk0);
+      expect(p.inventory.get("worn_sword")?.qty).toBe(1);
+    });
+
+    it("equipar en un slot ocupado hace swap (el anterior vuelve al inventario)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Cambista", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      await buy(room, c, p, "worn_sword");
+      // iron_sword no se vende en la tienda → se inyecta directo al inventario (como un drop).
+      const iron = new InventoryItemState(); iron.itemTemplateId = "iron_sword"; iron.qty = 1;
+      p.inventory.set("iron_sword", iron);
+      const atk0 = p.pAtk;
+      c.send(MessageType.EquipItem, { itemTemplateId: "worn_sword" });
+      await room.waitForNextPatch();
+      c.send(MessageType.EquipItem, { itemTemplateId: "iron_sword" });
+      await room.waitForNextPatch();
+      expect(p.equipment.get("weapon")).toBe("iron_sword");
+      expect(p.pAtk).toBe(atk0 + 9); // iron_sword +9 (worn ya no cuenta)
+      expect(p.inventory.get("worn_sword")?.qty).toBe(1); // el viejo volvió
+    });
+
+    it("subir de nivel conserva el bonus del equipo", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Veterano", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      await buy(room, c, p, "worn_sword");
+      c.send(MessageType.EquipItem, { itemTemplateId: "worn_sword" });
+      await room.waitForNextPatch();
+      // Entregar q5 (900 exp) parado en el pueblo → sube varios niveles.
+      p.questId = "q5"; p.questProgress = getQuest("q5").amount;
+      p.x = TOWN.x; p.z = TOWN.z;
+      c.send(MessageType.InteractNpc, {});
+      await room.waitForNextPatch();
+      expect(p.level).toBeGreaterThan(1);
+      expect(p.pAtk).toBe(statsForClass("knight", p.level).pAtk + 4); // el +4 del arma sobrevive al level-up
     });
   });
 });

@@ -12,6 +12,8 @@ export interface CharacterSave {
   guildId: string;
   guildName: string;
   guildTag: string;
+  /** Etapa 12: equipo — slot → itemTemplateId. */
+  equipment: Record<string, string>;
 }
 
 export interface Persistable {
@@ -28,12 +30,18 @@ export interface Persistable {
   guildId: string;
   guildName: string;
   guildTag: string;
+  equipment: { forEach(cb: (v: string, k: string) => void): void };
 }
 
 export function toCharacterSave(p: Persistable): CharacterSave {
   const inventory: Record<string, number> = {};
   p.inventory.forEach((v, k) => {
     inventory[k] = v.qty;
+  });
+
+  const equipment: Record<string, string> = {};
+  p.equipment.forEach((v, k) => {
+    if (v) equipment[k] = v;
   });
 
   return {
@@ -50,6 +58,7 @@ export function toCharacterSave(p: Persistable): CharacterSave {
     guildId: p.guildId,
     guildName: p.guildName,
     guildTag: p.guildTag,
+    equipment,
   };
 }
 

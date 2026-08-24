@@ -6,6 +6,7 @@ export * from "./mobs.js";
 export * from "./combat.js";
 export * from "./progression.js";
 export * from "./items.js";
+export * from "./equipment.js";
 export * from "./quests.js";
 export * from "./classes.js";
 export * from "./pvp.js";

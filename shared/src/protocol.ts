@@ -12,6 +12,8 @@ export const MessageType = {
   JoinGuild: "joinGuild",
   LeaveGuild: "leaveGuild",
   BossKilled: "bossKilled",
+  EquipItem: "equipItem",
+  UnequipItem: "unequipItem",
 } as const;
 
 export interface MoveToMessage {
@@ -70,4 +72,13 @@ export interface BossKilledEvent {
   bossName: string;
   guildTag: string;
   guildName: string;
+}
+
+export interface EquipItemMessage {
+  itemTemplateId: string;
+}
+
+export interface UnequipItemMessage {
+  /** slot a vaciar: "weapon" | "armor" | "accessory". */
+  slot: string;
 }

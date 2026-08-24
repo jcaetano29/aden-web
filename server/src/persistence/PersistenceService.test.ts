@@ -19,6 +19,7 @@ describe("InMemoryPersistence", () => {
       guildId: "",
       guildName: "",
       guildTag: "",
+      equipment: { weapon: "iron_sword" },
     };
 
     await persistence.save("Aiden", data);
@@ -49,6 +50,7 @@ describe("InMemoryPersistence", () => {
       guildId: "",
       guildName: "",
       guildTag: "",
+      equipment: {},
     };
 
     await persistence.save("Mob", data);
@@ -57,7 +59,7 @@ describe("InMemoryPersistence", () => {
     loaded!.inventory.gold = 999;
 
     const reloaded = await persistence.load("Mob");
-    expect(reloaded).toEqual({ level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: { gold: 1 }, gold: 0, questId: "q1", questProgress: 0, className: "knight", pvpKills: 0, guildId: "", guildName: "", guildTag: "" });
+    expect(reloaded).toEqual({ level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: { gold: 1 }, gold: 0, questId: "q1", questProgress: 0, className: "knight", pvpKills: 0, guildId: "", guildName: "", guildTag: "", equipment: {} });
   });
 
   it("persiste y devuelve pvpKills", async () => {
@@ -65,7 +67,7 @@ describe("InMemoryPersistence", () => {
     await svc.save("Boromir", {
       level: 3, exp: 10, pos_x: 1, pos_z: 2, inventory: {}, gold: 50,
       questId: "q1", questProgress: 0, className: "knight", pvpKills: 7,
-      guildId: "", guildName: "", guildTag: "",
+      guildId: "", guildName: "", guildTag: "", equipment: {},
     });
     const loaded = await svc.load("Boromir");
     expect(loaded?.pvpKills).toBe(7);
@@ -76,7 +78,7 @@ describe("InMemoryPersistence", () => {
     await svc.save("Aragorn", {
       level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: {}, gold: 0,
       questId: "q1", questProgress: 0, className: "knight", pvpKills: 0,
-      guildId: "wolf-abc123", guildName: "Los Lobos", guildTag: "WOLF",
+      guildId: "wolf-abc123", guildName: "Los Lobos", guildTag: "WOLF", equipment: {},
     });
     const loaded = await svc.load("Aragorn");
     expect(loaded?.guildId).toBe("wolf-abc123");
@@ -98,7 +100,7 @@ describe("InMemoryPersistence", () => {
 
   it("topCharacters ordena por nivel desc, desempata por pvpKills desc y respeta el límite", async () => {
     const svc = new InMemoryPersistence();
-    const base = { exp: 0, pos_x: 0, pos_z: 0, inventory: {}, gold: 0, questId: "q1", questProgress: 0, className: "knight", guildId: "", guildName: "", guildTag: "" };
+    const base = { exp: 0, pos_x: 0, pos_z: 0, inventory: {}, gold: 0, questId: "q1", questProgress: 0, className: "knight", guildId: "", guildName: "", guildTag: "", equipment: {} };
     await svc.save("Bajo",  { ...base, level: 2, pvpKills: 0 });
     await svc.save("AltoA", { ...base, level: 9, pvpKills: 1 });
     await svc.save("AltoB", { ...base, level: 9, pvpKills: 7 });
