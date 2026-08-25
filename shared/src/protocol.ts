@@ -19,6 +19,7 @@ export const MessageType = {
   Achievement: "achievement",
   SetTitle: "setTitle",
   WorldAnnounce: "worldAnnounce",
+  WarpTo: "warpTo",
 } as const;
 
 export interface MoveToMessage {
@@ -116,4 +117,9 @@ export interface SetTitleMessage {
 /** Server→todos: anuncio de evento de mundo (jefe despierta / cae). */
 export interface WorldAnnounceEvent {
   text: string;
+}
+
+/** Cliente→server: viajar a un mapa (Etapa 15, menú M). El server valida el gate por nivel. */
+export interface WarpToMessage {
+  mapId: string;
 }

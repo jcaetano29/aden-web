@@ -62,6 +62,10 @@ export class EntityViews {
   private readonly playerTitle = new Map<string, string>();
   private currentTargetId: string | null = null;
   private selfId: string | null = null;
+  /** Mapa actual del jugador local: sólo se renderizan/targetean entidades de este mapa (Etapa 15). */
+  private currentMapId = "pueblo";
+  private readonly playerMap = new Map<string, string>();
+  private readonly mobMap = new Map<string, string>();
 
   constructor(
     private readonly scene: THREE.Scene,
@@ -80,6 +84,8 @@ export class EntityViews {
     this.playerDead.set(id, snap.dead);
     this.playerGuildTag.set(id, snap.guildTag ?? "");
     this.playerTitle.set(id, snap.title ?? "");
+    this.playerMap.set(id, snap.mapId ?? "");
+    view.object.visible = (snap.mapId ?? "") === this.currentMapId || isSelf;
     if (isSelf) {
       this.selfId = id;
       view.addSelfRing();
@@ -109,6 +115,10 @@ export class EntityViews {
       this.playerTitle.set(id, newTitle);
       this.nameplates.setTitle(id, newTitle);
     }
+    // Etapa 15: visibilidad por mapa (el self siempre visible).
+    const newMap = state.mapId ?? "";
+    this.playerMap.set(id, newMap);
+    this.views.get(id)?.object && (this.views.get(id)!.object.visible = newMap === this.currentMapId || id === this.selfId);
   }
 
   remove(id: string) {
@@ -123,6 +133,7 @@ export class EntityViews {
     this.playerDead.delete(id);
     this.playerGuildTag.delete(id);
     this.playerTitle.delete(id);
+    this.playerMap.delete(id);
     if (this.currentTargetId === id) this.currentTargetId = null;
   }
 
@@ -138,6 +149,8 @@ export class EntityViews {
     this.mobViews.set(id, view);
     this.mobRootToId.set(view.object, id);
     this.mobDead.set(id, snap.dead);
+    this.mobMap.set(id, snap.mapId ?? "");
+    view.object.visible = (snap.mapId ?? "") === this.currentMapId;
 
     // Nameplate: jefe final en rojo, mini-jefe de zona en violeta — ambos con nombre.
     if (isBoss(templateId)) {
@@ -215,6 +228,7 @@ export class EntityViews {
       this.mobTelegraphRings.delete(id);
     }
     this.mobDead.delete(id);
+    this.mobMap.delete(id);
     if (this.currentTargetId === id) this.currentTargetId = null;
   }
 
@@ -297,13 +311,13 @@ export class EntityViews {
    */
   raycastTargets(): { objects: THREE.Object3D[]; idOf: (o: THREE.Object3D) => string | null } {
     const objects = [...this.mobViews.entries()]
-      .filter(([id]) => !this.mobDead.get(id))
+      .filter(([id]) => !this.mobDead.get(id) && (this.mobMap.get(id) ?? "") === this.currentMapId)
       .map(([, v]) => v.object);
     const idOf = (o: THREE.Object3D): string | null => {
       let cur: THREE.Object3D | null = o;
       while (cur) {
         const id = this.mobRootToId.get(cur);
-        if (id) return this.mobDead.get(id) ? null : id;
+        if (id) return (this.mobDead.get(id) || (this.mobMap.get(id) ?? "") !== this.currentMapId) ? null : id;
         cur = cur.parent;
       }
       return null;
@@ -321,13 +335,13 @@ export class EntityViews {
    */
   raycastPlayerTargets(): { objects: THREE.Object3D[]; idOf: (o: THREE.Object3D) => string | null } {
     const objects = [...this.views.entries()]
-      .filter(([id]) => id !== this.selfId && !this.playerDead.get(id))
+      .filter(([id]) => id !== this.selfId && !this.playerDead.get(id) && (this.playerMap.get(id) ?? "") === this.currentMapId)
       .map(([, v]) => v.object);
     const idOf = (o: THREE.Object3D): string | null => {
       let cur: THREE.Object3D | null = o;
       while (cur) {
         const id = this.playerRootToId.get(cur);
-        if (id) return id === this.selfId || this.playerDead.get(id) ? null : id;
+        if (id) return (id === this.selfId || this.playerDead.get(id) || (this.playerMap.get(id) ?? "") !== this.currentMapId) ? null : id;
         cur = cur.parent;
       }
       return null;
@@ -350,6 +364,27 @@ export class EntityViews {
     if (id) {
       this.mobViews.get(id)?.addTargetRing();
       this.views.get(id)?.addTargetRing();
+    }
+  }
+
+  /**
+   * Etapa 15: fija el mapa actual del jugador local. Muestra sólo las entidades de
+   * ese mapa (el resto se ocultan) — al warpear con M, revela el nuevo mapa. El self
+   * siempre queda visible. Limpia el target si quedó en otro mapa.
+   */
+  setCurrentMap(mapId: string) {
+    if (mapId === this.currentMapId) return;
+    this.currentMapId = mapId;
+    this.views.forEach((v, id) => {
+      v.object.visible = (this.playerMap.get(id) ?? "") === mapId || id === this.selfId;
+    });
+    this.mobViews.forEach((v, id) => {
+      v.object.visible = (this.mobMap.get(id) ?? "") === mapId;
+    });
+    // Si el objetivo quedó en otro mapa, soltar el resaltado.
+    if (this.currentTargetId) {
+      const tm = this.mobMap.get(this.currentTargetId) ?? this.playerMap.get(this.currentTargetId);
+      if (tm !== undefined && tm !== mapId) this.setTargetHighlight(null);
     }
   }
 

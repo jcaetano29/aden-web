@@ -22,6 +22,10 @@ import {
   type UnequipItemMessage,
   type EquipSlot,
   type SetTitleMessage,
+  type WarpToMessage,
+  getZone,
+  canEnterZone,
+  TOWN_ZONE_ID,
   equipmentBonuses,
   getRarity,
   dayKey,
@@ -34,7 +38,6 @@ import {
   isValidTitle,
   isValidGuildTag,
   isValidGuildName,
-  MAP_BOUNDS,
   TICK_RATE,
   clampToBounds,
   SPAWN_ZONES,
@@ -45,7 +48,6 @@ import {
   ATTACK_RANGE,
   MOB_RESPAWN_MS,
   TOWN,
-  SAFE_RADIUS,
   PLAYER_RESPAWN_MS,
   getSkill,
   gainExp,
@@ -80,7 +82,7 @@ import { InventoryItemState } from "../state/InventoryItemState.js";
 import { LeaderPlayerEntry, LeaderGuildEntry } from "../state/LeaderboardState.js";
 import { advanceMovable } from "../systems/MovementSystem.js";
 import { createSpawns } from "../systems/SpawnSystem.js";
-import { stepMobAI, eligiblePlayersForAggro } from "../systems/MobAISystem.js";
+import { stepMobAI } from "../systems/MobAISystem.js";
 import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
 import { createPersistence } from "../persistence/createPersistence.js";
 import type { PersistenceService, CharacterRank, GuildRank } from "../persistence/PersistenceService.js";
@@ -180,22 +182,26 @@ export class GameRoom extends Room<GameState> {
     client.send(MessageType.DailyReset, { streak: p.loginStreak, reward, dailyDesc: daily.desc });
   }
 
-  /** Resuelve un targetId a un mob vivo o a un jugador vivo (o null). */
-  private resolveTarget(id: string):
+  /**
+   * Resuelve un targetId a un mob vivo o a un jugador vivo EN EL MISMO MAPA que el
+   * solicitante (Etapa 15). Entidades de otros mapas se ignoran (no se ven ni se
+   * targetean entre mapas).
+   */
+  private resolveTarget(id: string, mapId: string):
     | { kind: "mob"; entity: MobState }
     | { kind: "player"; entity: PlayerState; sessionId: string }
     | null {
     if (!id) return null;
     const mob = this.state.mobs.get(id);
-    if (mob && !mob.dead) return { kind: "mob", entity: mob };
+    if (mob && !mob.dead && mob.mapId === mapId) return { kind: "mob", entity: mob };
     const pl = this.state.players.get(id);
-    if (pl && !pl.dead) return { kind: "player", entity: pl, sessionId: id };
+    if (pl && !pl.dead && pl.mapId === mapId) return { kind: "player", entity: pl, sessionId: id };
     return null;
   }
 
-  /** true si la posición está fuera de la zona segura del pueblo (PvP habilitado). */
-  private inPvpZone(p: { x: number; z: number }): boolean {
-    return distance2D(p.x, p.z, TOWN.x, TOWN.z) > SAFE_RADIUS;
+  /** true si el mapa actual del jugador NO es seguro (PvP/combate habilitado). */
+  private inPvpZone(p: { mapId: string }): boolean {
+    return !getZone(p.mapId).safe;
   }
 
   /** Centraliza la muerte de un jugador (por mob o por PvP). Aplica penalidad si es PvP. */
@@ -271,13 +277,14 @@ export class GameRoom extends Room<GameState> {
     void this.refreshLeaderboard();
 
     for (const s of createSpawns(SPAWN_ZONES, Math.random)) {
-      this.spawnMob(s.id, s.templateId, s.x, s.z);
+      this.spawnMob(s.id, s.templateId, s.x, s.z, s.mapId);
     }
 
     this.onMessage(MessageType.MoveTo, (client, msg: MoveToMessage) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.dead) return;
-      const target = clampToBounds(msg.x, msg.z, MAP_BOUNDS);
+      // Etapa 15: el movimiento se clampea a los bounds del MAPA ACTUAL (no se camina afuera).
+      const target = clampToBounds(msg.x, msg.z, getZone(player.mapId).bounds);
       player.targetX = target.x;
       player.targetZ = target.z;
       player.moving = true;
@@ -287,9 +294,11 @@ export class GameRoom extends Room<GameState> {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.dead) return;
       if (msg.targetId === "") { player.targetId = ""; return; }
-      const mobOk = this.state.mobs.has(msg.targetId) && !this.state.mobs.get(msg.targetId)!.dead;
+      // Etapa 15: sólo se puede targetear entidades del mismo mapa.
+      const mob = this.state.mobs.get(msg.targetId);
+      const mobOk = !!mob && !mob.dead && mob.mapId === player.mapId;
       const other = this.state.players.get(msg.targetId);
-      const playerOk = msg.targetId !== client.sessionId && !!other && !other.dead;
+      const playerOk = msg.targetId !== client.sessionId && !!other && !other.dead && other.mapId === player.mapId;
       if (mobOk || playerOk) player.targetId = msg.targetId;
     });
 
@@ -314,7 +323,7 @@ export class GameRoom extends Room<GameState> {
 
       // Branch by skill type
       if (skill.type === "damage") {
-        const t = p.targetId ? this.resolveTarget(p.targetId) : null;
+        const t = p.targetId ? this.resolveTarget(p.targetId, p.mapId) : null;
         if (!t) return;
         if (t.kind === "mob") {
           const mob = t.entity;
@@ -357,9 +366,9 @@ export class GameRoom extends Room<GameState> {
           p.defBuffMult = skill.buffMult ?? 1;
         }
       } else if (skill.type === "dot") {
-        // DoT skill: requires mob target in range
+        // DoT skill: requires mob target in range (mismo mapa)
         const mob = p.targetId ? this.state.mobs.get(p.targetId) : undefined;
-        if (!mob || mob.dead) return;
+        if (!mob || mob.dead || mob.mapId !== p.mapId) return;
         if (!canAttack(p, mob, ATTACK_RANGE)) return;
 
         // All checks passed: spend resources
@@ -550,6 +559,21 @@ export class GameRoom extends Room<GameState> {
       p.title = title;
     });
 
+    // Etapa 15: viajar a un mapa (menú M). Validado por nivel; teletransporta al spawn.
+    this.onMessage(MessageType.WarpTo, (client, msg: WarpToMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.dead) return;
+      let zone;
+      try { zone = getZone(msg?.mapId ?? ""); } catch { return; }
+      if (zone.id === p.mapId) return; // ya estás ahí
+      if (!canEnterZone(zone, p.level)) return; // nivel insuficiente
+      p.mapId = zone.id;
+      p.x = p.targetX = zone.spawn.x;
+      p.z = p.targetZ = zone.spawn.z;
+      p.moving = false;
+      p.targetId = "";
+    });
+
     const dt = 1 / TICK_RATE;
     this.setSimulationInterval(() => this.tick(dt), 1000 / TICK_RATE);
   }
@@ -565,9 +589,10 @@ export class GameRoom extends Room<GameState> {
   }
 
   /** Crea (o resetea al respawnear) un mob con posición/home/target y stats de combate. */
-  spawnMob(id: string, templateId: string, x: number, z: number): MobState {
+  spawnMob(id: string, templateId: string, x: number, z: number, mapId: string): MobState {
     const mob = this.state.mobs.get(id) ?? new MobState();
     mob.templateId = templateId;
+    mob.mapId = mapId;
     mob.x = x;
     mob.z = z;
     mob.homeX = x;
@@ -672,6 +697,7 @@ export class GameRoom extends Room<GameState> {
       const item = new DroppedItemState();
       item.itemTemplateId = d.itemTemplateId;
       item.qty = d.qty;
+      item.mapId = mob.mapId;
       item.x = mob.x + (Math.random() - 0.5) * 1.5;
       item.z = mob.z + (Math.random() - 0.5) * 1.5;
       item.despawnMs = DROP_DESPAWN_MS;
@@ -686,12 +712,15 @@ export class GameRoom extends Room<GameState> {
       advanceMovable(p, dt);
     });
 
-    // aggro: excluye jugadores muertos y los que están en la zona segura (pueblo)
-    const aggroPlayers = eligiblePlayersForAggro(
-      [...this.state.players.entries()].map(([id, p]) => ({ id, x: p.x, z: p.z, dead: p.dead })),
-      TOWN,
-      SAFE_RADIUS,
-    );
+    // Etapa 15: aggro por MAPA — un mob sólo persigue jugadores vivos de su mismo mapa.
+    // Se agrupan los jugadores vivos por mapId una vez por tick.
+    const playersByMap = new Map<string, { id: string; x: number; z: number }[]>();
+    this.state.players.forEach((p, id) => {
+      if (p.dead) return;
+      const arr = playersByMap.get(p.mapId) ?? [];
+      arr.push({ id, x: p.x, z: p.z });
+      playersByMap.set(p.mapId, arr);
+    });
     const dtMs = dt * 1000;
     this.state.mobs.forEach((mob) => {
       if (mob.dead) return; // R-E2b1-3: un mob muerto no deambula ni persigue
@@ -699,7 +728,7 @@ export class GameRoom extends Room<GameState> {
         mob.moving = false;
         return; // Plantado mientras carga el ataque
       }
-      stepMobAI(mob, aggroPlayers, AI_CONFIG, Math.random, dtMs);
+      stepMobAI(mob, playersByMap.get(mob.mapId) ?? [], AI_CONFIG, Math.random, dtMs);
       advanceMovable(mob, dt, MOB_MOVE_SPEED);
     });
 
@@ -739,7 +768,7 @@ export class GameRoom extends Room<GameState> {
     // auto-attack del jugador sobre su target
     this.state.players.forEach((p, sessionId) => {
       if (p.dead || !p.targetId) return;
-      const t = this.resolveTarget(p.targetId);
+      const t = this.resolveTarget(p.targetId, p.mapId);
       if (!t) { p.targetId = ""; return; }
       if (t.kind === "mob") {
         const mob = t.entity;
@@ -775,7 +804,7 @@ export class GameRoom extends Room<GameState> {
         mob.windupTargetId = "";
         mob.attackCooldownMs = getMobCombat(mob.templateId).attackCooldownMs; // cooldown tras el swing
         const target = this.state.players.get(targetId);
-        if (!target || target.dead) return;
+        if (!target || target.dead || target.mapId !== mob.mapId) return; // se fue del mapa (warp) o murió
         if (distance2D(mob.x, mob.z, target.x, target.z) > ATTACK_RANGE) {
           // esquivado: fuera de rango al impacto
           this.broadcast(MessageType.Damage, { attackerId: mobId, targetId, amount: 0, hp: target.hp, dodged: true });
@@ -858,8 +887,8 @@ export class GameRoom extends Room<GameState> {
       if (p.dead) return; // un jugador muerto no recoge ítems
       const pickupIds: string[] = [];
       this.state.droppedItems.forEach((it, id) => {
-        // sólo pickable si ya pasó el delay (loot visible al caer) y está en rango
-        if (it.pickDelayMs <= 0 && distance2D(p.x, p.z, it.x, it.z) <= PICKUP_RANGE) pickupIds.push(id);
+        // sólo pickable si ya pasó el delay, es del mismo mapa y está en rango
+        if (it.pickDelayMs <= 0 && it.mapId === p.mapId && distance2D(p.x, p.z, it.x, it.z) <= PICKUP_RANGE) pickupIds.push(id);
       });
       let pickedItem = false;
       for (const id of pickupIds) {
@@ -887,7 +916,7 @@ export class GameRoom extends Room<GameState> {
         mob.respawnMs -= dtMs;
         if (mob.respawnMs <= 0) {
           const wasBoss = isBoss(mob.templateId);
-          this.spawnMob(id, mob.templateId, mob.homeX, mob.homeZ);
+          this.spawnMob(id, mob.templateId, mob.homeX, mob.homeZ, mob.mapId);
           // Etapa 14: evento de mundo — el jefe reaparece (carrera al Trono).
           if (wasBoss) this.broadcast(MessageType.WorldAnnounce, { text: "⚔ ¡El Rey Nihil ha despertado en su Trono!" });
         }
@@ -902,8 +931,10 @@ export class GameRoom extends Room<GameState> {
         p.hp = p.maxHp;
         p.mp = p.maxMp;
         p.dead = false;
-        p.x = p.targetX = TOWN.x;
-        p.z = p.targetZ = TOWN.z;
+        // Etapa 15: respawnea en el punto de spawn de su mapa actual.
+        const sp = getZone(p.mapId).spawn;
+        p.x = p.targetX = sp.x;
+        p.z = p.targetZ = sp.z;
         p.moving = false;
         p.targetId = "";
       }
@@ -940,6 +971,11 @@ export class GameRoom extends Room<GameState> {
     player.guildId = "";
     player.guildTag = "";
     player.guildName = "";
+    // Etapa 15: arranca en el pueblo, en su punto de spawn.
+    player.mapId = TOWN_ZONE_ID;
+    const townSpawn = getZone(TOWN_ZONE_ID).spawn;
+    player.x = player.targetX = townSpawn.x;
+    player.z = player.targetZ = townSpawn.z;
     this.state.players.set(client.sessionId, player);
 
     // Etapa 3c: cargar el save (si existe) y aplicarlo sobre el player ya insertado en el
@@ -957,8 +993,13 @@ export class GameRoom extends Room<GameState> {
       player.pDef = st.pDef;
       player.hp = st.maxHp;
       player.mp = st.maxMp;
-      player.x = player.targetX = save.pos_x;
-      player.z = player.targetZ = save.pos_z;
+      // Etapa 15: restaurar el mapa (si es válido) y aterrizar en su punto de spawn.
+      let loadedMap = save.mapId ?? TOWN_ZONE_ID;
+      try { getZone(loadedMap); } catch { loadedMap = TOWN_ZONE_ID; }
+      player.mapId = loadedMap;
+      const sp = getZone(loadedMap).spawn;
+      player.x = player.targetX = sp.x;
+      player.z = player.targetZ = sp.z;
       player.gold = save.gold ?? 0;
       player.questId = save.questId ?? firstQuestId();
       player.questProgress = save.questProgress ?? 0;

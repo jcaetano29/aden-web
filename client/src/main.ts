@@ -13,6 +13,7 @@ import { GuildPanel } from "./render/GuildPanel.js";
 import { LeaderboardPanel } from "./render/LeaderboardPanel.js";
 import { ProgressPanel } from "./render/ProgressPanel.js";
 import { BossBar } from "./render/BossBar.js";
+import { MapPanel } from "./render/MapPanel.js";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ShopPanel } from "./render/ShopPanel.js";
@@ -28,7 +29,7 @@ import { SkillInput } from "./input/SkillInput.js";
 import { AudioEngine } from "./audio/AudioEngine.js";
 import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, SPAWN_ZONES, isBoss, ELDER_NAME, firstQuestId, SAFE_RADIUS, zoneAt, respawnForTemplate } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -86,15 +87,12 @@ async function main() {
   const zoneBanner = new ZoneBanner();
   zoneBanner.mount(document.body);
 
-  // Minimapa (esquina sup. der.) con marcadores fijos: NPCs y la arena del jefe.
+  // Minimapa (esquina sup. der.): radar del mapa actual (Etapa 15).
   const minimap = new Minimap();
-  const bossZone = SPAWN_ZONES.find((z) => isBoss(z.templateId));
-  minimap.setMarkers([
-    { x: TOWN.x, z: TOWN.z, label: "!", color: "#ffd54f" }, // Anciano (misiones)
-    { x: merchant.object.position.x, z: merchant.object.position.z, label: "$", color: "#f4c430" }, // Mercader
-    ...(bossZone ? [{ x: bossZone.centerX, z: bossZone.centerZ, label: "♛", color: "#ff5252" }] : []), // arena del jefe (♛)
-  ]);
   const net = new NetworkClient();
+  // Menú de mapas (tecla M): viajar entre mapas.
+  const mapPanel = new MapPanel((mapId) => net.sendWarpTo(mapId));
+  mapPanel.mount(document.body);
 
   // Objetivo actualmente seleccionado por este cliente (no autoritativo: sólo
   // se usa para saber cuándo limpiar el resaltado visual).
@@ -354,6 +352,7 @@ async function main() {
   let guildPanelVisible = false;
   let leaderboardPanelVisible = false;
   let progressPanelVisible = false;
+  let lastMapId = "";
   document.body.addEventListener("keydown", (e) => {
     // No disparar hotkeys de gameplay mientras se está tipeando en un input
     // (p.ej. el form de crear guild): sin esta guarda, escribir "Guerreros"
@@ -378,7 +377,14 @@ async function main() {
       progressPanel.setVisible(progressPanelVisible);
       if (progressPanelVisible) progressPanel.update(net.getProgress());
     }
-    if (e.key === "m" || e.key === "M") {
+    // Tecla M: menú de mapas (viajar). Etapa 15.
+    if (e.key === "m" || e.key === "M" || e.code === "KeyM") {
+      const sc = net.getSelf();
+      mapPanel.toggle(sc?.level ?? 1, sc?.mapId ?? "pueblo");
+      return;
+    }
+    // Tecla N: silenciar/activar sonido (movido desde M).
+    if (e.key === "n" || e.key === "N") {
       const muted = audio.toggleMuted();
       hud.toast(muted ? "🔇 Sonido apagado" : "🔊 Sonido encendido", "#ffd23f");
       return;
@@ -414,27 +420,24 @@ async function main() {
     groundItems.update(dt);
     const self = views.selfPosition();
     const shake = screenShake.update(dt);
+    const selfCombat = net.getSelf();
     if (self) {
       renderer.followTarget(self.x, self.z, dt, shake.x, shake.y);
-      zoneIndicator.update(distance2D(self.x, self.z, TOWN.x, TOWN.z) > SAFE_RADIUS);
-      // Bioma/niebla/luz de la zona actual + cartel al cruzar a una zona nueva.
+      // Bioma/niebla/luz del mapa actual + cartel al entrar a un mapa nuevo.
       environment.updateMood(self.x, self.z, dt);
-      zoneBanner.setZone(zoneAt(self.x, self.z).id);
+      const curZone = zoneAt(self.x, self.z);
+      zoneIndicator.update(!curZone.safe);
+      zoneBanner.setZone(curZone.id);
     }
-    const selfCombat = net.getSelf();
+    // Etapa 15: mapa actual del jugador → filtra el render y el minimapa; cambia al warpear.
+    const myMapId = selfCombat?.mapId ?? "pueblo";
+    views.setCurrentMap(myMapId);
+    if (myMapId !== lastMapId) {
+      lastMapId = myMapId;
+      minimap.setMap(getZone(myMapId));
+    }
     npc.update(dt);
     merchant.update(dt);
-    // Marcador de objetivo en el minimapa: la zona de spawn del enemigo de la
-    // misión activa (dónde ir a cazar). null si no hay misión o zona conocida.
-    let objective = null;
-    if (selfCombat?.questId) {
-      try {
-        const mobId = getQuest(selfCombat.questId).mobTemplateId;
-        const zone = SPAWN_ZONES.find((z) => z.templateId === mobId);
-        if (zone) objective = { x: zone.centerX, z: zone.centerZ, label: "⚔", color: "#ff184c" };
-      } catch { /* questId desconocido: sin objetivo */ }
-    }
-    minimap.setObjective(objective);
     minimap.update(net.getMinimapEntities());
     // Barra del jefe en pantalla + contador de reaparición (Etapa 14).
     bossBar.update(net.getBossState(), bossRespawnMs);

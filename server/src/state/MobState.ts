@@ -8,6 +8,8 @@ export class MobState extends Schema {
   @type("boolean") moving = false;
   @type("string") templateId = "";
   @type("string") aiState = "wander";
+  /** Mapa al que pertenece el mob (Etapa 15). El cliente sólo renderiza su mapa actual. */
+  @type("string") mapId = "";
 
   // Combat — synced to clients
   @type("number") hp = 0;

@@ -1,46 +1,55 @@
 import { distance2D } from "./math.js";
 
 /**
- * El Mundo de Aden (Etapa 11): en lugar de un único plano genérico, el mundo se
- * divide en ZONAS encadenadas de sur (seguro) a norte (peligro creciente). Cada
- * zona tiene identidad visual (bioma), rango de nivel recomendado y un centro/radio
- * que define su "footprint" en el mapa. Este módulo es la fuente de verdad
- * compartida: el server la usa para organizar spawns y el cliente para pintar los
- * biomas, la niebla, el minimapa y el cartel de zona.
- *
- * Norte = -Z (más profundo, más peligroso), encaja con el lore ("las Ruinas del
- * Norte"). El pueblo está al sur (+Z).
+ * El Mundo de Aden como MAPAS DISCRETOS (Etapa 15, estilo Mu Online). En vez de
+ * un único plano con zonas contiguas, el mundo son mapas separados y grandes a los
+ * que se VIAJA con el menú de mapas (tecla M), no caminando. Cada mapa ocupa su
+ * propia región (bounds) de un plano global, muy espaciada de las demás para que la
+ * niebla oculte a las vecinas: el jugador nunca ve más de un mapa a la vez. El
+ * movimiento está clampeado a los bounds del mapa actual → no se puede caminar
+ * afuera; para cambiar de mapa hay que warpear (gateado por nivel).
  */
+
+export interface MapBounds {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
 
 /** Paleta visual de un bioma (colores en hex 0xRRGGBB). Puramente presentación. */
 export interface ZoneBiome {
-  /** Color base del suelo de la zona. */
   ground: number;
-  /** Color de la niebla ambiental cuando el jugador está en la zona. */
   fog: number;
-  /** Distancia a la que arranca la niebla (más chico = más cerrado/opresivo). */
   fogNear: number;
-  /** Distancia a la que la niebla es total. */
   fogFar: number;
-  /** Color de acento (partículas, luz, props) que define el mood de la zona. */
   accent: number;
 }
 
+/** Un "Zone" ES un mapa (se mantiene el nombre del tipo por compatibilidad). */
 export interface Zone {
   id: string;
-  /** Nombre para el cartel de zona y el minimapa. */
   name: string;
-  /** Subtítulo del cartel (una línea de flavor). */
   subtitle: string;
+  /** Centro del mapa (para el minimapa y referencia). */
   center: { x: number; z: number };
-  /** Radio del footprint de la zona (para pintar el bioma y detectar entrada). */
-  radius: number;
-  /** Nivel recomendado (para señalizar peligro). 0/0 = zona segura sin combate. */
+  /** Región caminable del mapa (coords globales). El movimiento se clampea acá. */
+  bounds: MapBounds;
+  /** Punto de llegada al warpear/respawnear a este mapa. */
+  spawn: { x: number; z: number };
+  /** Nivel mínimo para poder viajar a este mapa (gate estilo Mu). */
+  levelReq: number;
+  /** Rango recomendado (para mostrar). */
   levelMin: number;
   levelMax: number;
-  /** Zona segura del pueblo (sin combate/PvP). */
+  /** Mapa seguro (pueblo): sin combate ni PvP, los mobs no aparecen acá. */
   safe: boolean;
   biome: ZoneBiome;
+}
+
+const HALF = 65; // semilado de cada mapa (mapas de 130x130, ~8x el área anterior)
+function boundsAround(cx: number, cz: number): MapBounds {
+  return { minX: cx - HALF, maxX: cx + HALF, minZ: cz - HALF, maxZ: cz + HALF };
 }
 
 export const ZONES: Zone[] = [
@@ -48,79 +57,103 @@ export const ZONES: Zone[] = [
     id: "pueblo",
     name: "Pueblo de Aden",
     subtitle: "Refugio de los vivos",
-    center: { x: 0, z: 30 },
-    radius: 18,
+    center: { x: 0, z: 0 },
+    bounds: boundsAround(0, 0),
+    spawn: { x: 0, z: 14 },
+    levelReq: 0,
     levelMin: 0,
     levelMax: 0,
     safe: true,
-    biome: { ground: 0x4a7c3a, fog: 0xbcd9f0, fogNear: 45, fogFar: 170, accent: 0xffd54f },
+    biome: { ground: 0x4a7c3a, fog: 0xbcd9f0, fogNear: 55, fogFar: 190, accent: 0xffd54f },
   },
   {
     id: "bosque",
     name: "Bosque de Umbra",
     subtitle: "Los huesos despiertan bajo los árboles",
-    center: { x: 0, z: -14 },
-    radius: 30,
+    center: { x: 300, z: 0 },
+    bounds: boundsAround(300, 0),
+    spawn: { x: 300, z: 50 },
+    levelReq: 1,
     levelMin: 1,
     levelMax: 3,
     safe: false,
-    biome: { ground: 0x2f5a2c, fog: 0x8fae86, fogNear: 30, fogFar: 125, accent: 0x6fae57 },
+    biome: { ground: 0x2f5a2c, fog: 0x8fae86, fogNear: 34, fogFar: 140, accent: 0x6fae57 },
   },
   {
     id: "ruinas",
     name: "Ruinas de Nihil",
     subtitle: "Piedra caída, guardianes que no descansan",
-    center: { x: -34, z: -64 },
-    radius: 26,
+    center: { x: 0, z: 300 },
+    bounds: boundsAround(0, 300),
+    spawn: { x: 0, z: 350 },
+    levelReq: 3,
     levelMin: 3,
     levelMax: 6,
     safe: false,
-    biome: { ground: 0x474459, fog: 0x6a5f80, fogNear: 24, fogFar: 105, accent: 0x9b7fd4 },
+    biome: { ground: 0x474459, fog: 0x6a5f80, fogNear: 30, fogFar: 120, accent: 0x9b7fd4 },
   },
   {
     id: "yermo",
     name: "Yermo Ceniciento",
     subtitle: "Donde la tierra misma arde",
-    center: { x: 30, z: -82 },
-    radius: 26,
+    center: { x: 300, z: 300 },
+    bounds: boundsAround(300, 300),
+    spawn: { x: 300, z: 350 },
+    levelReq: 6,
     levelMin: 6,
     levelMax: 9,
     safe: false,
-    biome: { ground: 0x53433c, fog: 0x7a5148, fogNear: 22, fogFar: 98, accent: 0xff7a3c },
+    biome: { ground: 0x53433c, fog: 0x7a5148, fogNear: 28, fogFar: 115, accent: 0xff7a3c },
   },
   {
     id: "trono",
     name: "Trono del Rey Nihil",
     subtitle: "El corazón de la maldición",
-    center: { x: 0, z: -120 },
-    radius: 18,
+    center: { x: 600, z: 150 },
+    bounds: boundsAround(600, 150),
+    spawn: { x: 600, z: 200 },
+    levelReq: 9,
     levelMin: 9,
     levelMax: 10,
     safe: false,
-    biome: { ground: 0x2b2733, fog: 0x3a2f45, fogNear: 20, fogFar: 92, accent: 0xff3b3b },
+    biome: { ground: 0x2b2733, fog: 0x3a2f45, fogNear: 26, fogFar: 108, accent: 0xff3b3b },
   },
 ];
 
+/** id del mapa seguro / punto de partida. */
+export const TOWN_ZONE_ID = "pueblo";
+
 export function getZone(id: string): Zone {
   const z = ZONES.find((zn) => zn.id === id);
-  if (!z) throw new Error(`getZone: zona desconocida ${id}`);
+  if (!z) throw new Error(`getZone: mapa desconocido ${id}`);
   return z;
 }
 
+export function firstZone(): Zone {
+  return getZone(TOWN_ZONE_ID);
+}
+
+/** ¿El jugador de nivel `level` puede viajar a este mapa? (gate por nivel). */
+export function canEnterZone(z: Zone, level: number): boolean {
+  return level >= z.levelReq;
+}
+
 /**
- * Devuelve la zona a la que pertenece una posición del mundo. Partición por
- * "centro más cercano" (Voronoi): garantiza que TODA posición cae en exactamente
- * una zona (sin huecos ni ambigüedad), así el bioma/niebla siempre está definido.
+ * Mapa al que pertenece una posición global: el mapa cuyos bounds la contienen
+ * (los mapas no se solapan). Si ninguno la contiene (en un hueco), devuelve el de
+ * centro más cercano como fallback, así el bioma/niebla siempre está definido.
  */
 export function zoneAt(x: number, z: number): Zone {
+  for (const zn of ZONES) {
+    if (x >= zn.bounds.minX && x <= zn.bounds.maxX && z >= zn.bounds.minZ && z <= zn.bounds.maxZ) {
+      return zn;
+    }
+  }
   let best = ZONES[0];
   let bestD = Infinity;
   for (const zn of ZONES) {
     const d = distance2D(x, z, zn.center.x, zn.center.z);
-    if (d < bestD) {
-      bestD = d;
-      best = zn;
-    }
+    if (d < bestD) { bestD = d; best = zn; }
   }
   return best;
 }
