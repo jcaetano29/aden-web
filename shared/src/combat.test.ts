@@ -58,7 +58,7 @@ describe("skills y config defensiva", () => {
   });
   it("jugador tiene MP; pueblo y respawn definidos", () => {
     expect(PLAYER_COMBAT.maxMp).toBe(50);
-    expect(TOWN).toEqual({ x: 0, z: 30 });
+    expect(TOWN).toEqual({ x: 0, z: 0 });
     expect(SAFE_RADIUS).toBeGreaterThan(0);
     expect(PLAYER_RESPAWN_MS).toBeGreaterThan(0);
   });

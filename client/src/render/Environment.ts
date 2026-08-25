@@ -60,7 +60,6 @@ export class Environment {
     this.curSun = SUN_INTENSITY.pueblo;
 
     this.paintBiomes();
-    this.addPaths();
     this.populate();
   }
 
@@ -93,40 +92,17 @@ export class Environment {
     this.scene.add(new THREE.Mesh(geo, mat));
   }
 
-  /** Disco de suelo coloreado por cada zona, encima del suelo base (Renderer). */
+  /** Suelo coloreado por cada MAPA (Etapa 15): una placa rectangular sobre su región. */
   private paintBiomes() {
-    ZONES.forEach((z, i) => {
-      const geo = new THREE.CircleGeometry(z.radius * 1.25, 40);
+    for (const z of ZONES) {
+      const w = z.bounds.maxX - z.bounds.minX;
+      const d = z.bounds.maxZ - z.bounds.minZ;
+      const geo = new THREE.PlaneGeometry(w, d);
       const mat = new THREE.MeshStandardMaterial({ color: z.biome.ground, flatShading: true });
-      const disc = new THREE.Mesh(geo, mat);
-      disc.rotation.x = -Math.PI / 2;
-      // y creciente por profundidad para que los bordes se solapen sin z-fighting.
-      disc.position.set(z.center.x, 0.01 + i * 0.004, z.center.z);
-      this.scene.add(disc);
-    });
-  }
-
-  /** Caminos de tierra que encadenan las zonas (guían la exploración al norte). */
-  private addPaths() {
-    const links: Array<[string, string]> = [
-      ["pueblo", "bosque"],
-      ["bosque", "ruinas"],
-      ["bosque", "yermo"],
-      ["ruinas", "trono"],
-      ["yermo", "trono"],
-    ];
-    const mat = new THREE.MeshStandardMaterial({ color: 0x6b5a3c });
-    for (const [a, b] of links) {
-      const za = getZone(a).center;
-      const zb = getZone(b).center;
-      const dx = zb.x - za.x;
-      const dz = zb.z - za.z;
-      const len = Math.hypot(dx, dz);
-      const path = new THREE.Mesh(new THREE.PlaneGeometry(4.5, len), mat);
-      path.rotation.x = -Math.PI / 2;
-      path.rotation.z = -Math.atan2(dx, dz);
-      path.position.set((za.x + zb.x) / 2, 0.03, (za.z + zb.z) / 2);
-      this.scene.add(path);
+      const plate = new THREE.Mesh(geo, mat);
+      plate.rotation.x = -Math.PI / 2;
+      plate.position.set(z.center.x, 0.02, z.center.z);
+      this.scene.add(plate);
     }
   }
 
@@ -144,11 +120,12 @@ export class Environment {
     }
   }
 
-  /** Punto aleatorio dentro de la zona (anillo interno..radio), evitando el centro exacto. */
-  private spot(z: Zone, rng: () => number, innerFrac = 0.15): [number, number] {
-    const ang = rng() * Math.PI * 2;
-    const r = z.radius * (innerFrac + rng() * (1 - innerFrac));
-    return [z.center.x + Math.cos(ang) * r, z.center.z + Math.sin(ang) * r];
+  /** Punto aleatorio dentro de los bounds del mapa, con un margen desde el borde. */
+  private spot(z: Zone, rng: () => number, _innerFrac = 0.15): [number, number] {
+    const m = 6; // margen desde el borde
+    const x = z.bounds.minX + m + rng() * (z.bounds.maxX - z.bounds.minX - 2 * m);
+    const zz = z.bounds.minZ + m + rng() * (z.bounds.maxZ - z.bounds.minZ - 2 * m);
+    return [x, zz];
   }
 
   private rock(x: number, z: number, rng: () => number, color = 0x7a7d80): void {
@@ -180,11 +157,11 @@ export class Environment {
     // Postes de valla en anillo alrededor del pueblo.
     const postGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.1, 6);
     const postMat = new THREE.MeshStandardMaterial({ color: 0x7a5a34 });
-    for (let i = 0; i < 20; i++) {
-      const ang = (i / 20) * Math.PI * 2;
-      const r = z.radius * 0.82;
+    const fenceR = ((z.bounds.maxX - z.bounds.minX) / 2) * 0.85;
+    for (let i = 0; i < 28; i++) {
+      const ang = (i / 28) * Math.PI * 2;
       const post = new THREE.Mesh(postGeo, postMat);
-      post.position.set(TOWN.x + Math.cos(ang) * r, 0.55, TOWN.z + Math.sin(ang) * r);
+      post.position.set(z.center.x + Math.cos(ang) * fenceR, 0.55, z.center.z + Math.sin(ang) * fenceR);
       this.scene.add(post);
     }
     // Cajas y barriles dispersos.
@@ -380,15 +357,15 @@ export class Environment {
 
   /** Sistema de partículas de brasas ascendentes para el Yermo. */
   private addEmbers(z: Zone): void {
-    const N = 140;
+    const N = 200;
     const positions = new Float32Array(N * 3);
     const rng = mulberry32(777);
+    const hw = (z.bounds.maxX - z.bounds.minX) / 2;
+    const hd = (z.bounds.maxZ - z.bounds.minZ) / 2;
     for (let i = 0; i < N; i++) {
-      const ang = rng() * Math.PI * 2;
-      const r = rng() * z.radius;
-      positions[i * 3] = z.center.x + Math.cos(ang) * r;
+      positions[i * 3] = z.center.x + (rng() * 2 - 1) * hw;
       positions[i * 3 + 1] = rng() * 6;
-      positions[i * 3 + 2] = z.center.z + Math.sin(ang) * r;
+      positions[i * 3 + 2] = z.center.z + (rng() * 2 - 1) * hd;
     }
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));

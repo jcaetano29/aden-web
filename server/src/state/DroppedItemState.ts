@@ -5,6 +5,8 @@ export class DroppedItemState extends Schema {
   @type("number") z = 0;
   @type("string") itemTemplateId = "";
   @type("number") qty = 0;
+  /** Mapa donde cayó el ítem (Etapa 15): sólo se recoge/renderiza en ese mapa. */
+  @type("string") mapId = "";
 
   // Server-only (NO @type)
   despawnMs = 0;

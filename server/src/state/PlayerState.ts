@@ -19,6 +19,8 @@ export class PlayerState extends Schema {
   @type("number") maxMp = 0;
   @type("boolean") dead = false;
   @type("string") className = "knight";
+  /** Mapa actual del jugador (Etapa 15, estilo Mu). Se cambia warpeando (tecla M). */
+  @type("string") mapId = "pueblo";
   @type("number") pvpKills = 0;
   @type("string") guildId = "";
   @type("string") guildTag = "";

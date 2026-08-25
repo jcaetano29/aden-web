@@ -56,6 +56,13 @@ export class CharacterView {
 
   update(dt: number) {
     const root = this.character.root;
+    // Etapa 15: si el salto es enorme (warp entre mapas / respawn a otro mapa),
+    // teletransportar en vez de deslizar por el vacío entre regiones.
+    const jump = Math.hypot(this.state.x - root.position.x, this.state.z - root.position.z);
+    if (jump > 40) {
+      root.position.x = this.state.x;
+      root.position.z = this.state.z;
+    }
     // Interpolación de posición en el render loop (frame-rate independiente).
     root.position.x = smoothTowards(root.position.x, this.state.x, SMOOTH_K, dt);
     root.position.z = smoothTowards(root.position.z, this.state.z, SMOOTH_K, dt);

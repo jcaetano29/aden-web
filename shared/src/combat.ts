@@ -76,9 +76,11 @@ export function getSkill(id: string): SkillConfig {
   return s;
 }
 
-// Etapa 11: el pueblo de Aden se ubica al sur del mundo (ver world.ts, zona "pueblo").
-// TOWN es el centro de spawn/respawn y el ancla de la zona segura (PvP off).
-export const TOWN = { x: 0, z: 30 } as const;
+// Etapa 15: el pueblo es un MAPA seguro entero (ver world.ts). TOWN queda como el
+// centro del mapa pueblo, ancla de los NPCs. La seguridad (PvP/aggro off) ahora la
+// determina `zone.safe` del mapa actual, no un radio. SAFE_RADIUS se conserva por
+// compatibilidad de algunos chequeos legacy, pero el pueblo entero es seguro.
+export const TOWN = { x: 0, z: 0 } as const;
 export const SAFE_RADIUS = 12;
 export const PLAYER_RESPAWN_MS = 4000;
 

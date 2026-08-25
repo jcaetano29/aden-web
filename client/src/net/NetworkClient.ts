@@ -20,6 +20,7 @@ import {
   type EquipItemMessage,
   type UnequipItemMessage,
   type WorldAnnounceEvent,
+  type WarpToMessage,
   isBoss,
   getTemplate,
 } from "@aden/shared";
@@ -41,6 +42,8 @@ export interface PlayerSnapshot {
   guildTag?: string;
   /** Título lucido (Etapa 13, logros); "" si ninguno. Solo para jugadores. */
   title?: string;
+  /** Mapa donde está la entidad (Etapa 15). El cliente sólo renderiza su mapa actual. */
+  mapId?: string;
 }
 
 /** Snapshot de mob: incluye combate (hp/maxHp/dead) para highlight/HUD. */
@@ -70,6 +73,8 @@ export interface SelfCombatSnapshot {
   /** Stats de combate efectivos (base + equipo), para mostrar el impacto del gear. */
   pAtk: number;
   pDef: number;
+  /** Mapa actual del jugador local (Etapa 15). */
+  mapId: string;
 }
 
 export interface RoomCallbacks {
@@ -117,6 +122,7 @@ export class NetworkClient {
       className: p.className,
       guildTag: p.guildTag ?? "",
       title: p.title ?? "",
+      mapId: p.mapId ?? "pueblo",
     });
 
     this.room.state.players.onAdd((player: any, id: string) => {
@@ -136,6 +142,7 @@ export class NetworkClient {
       maxHp: m.maxHp,
       dead: m.dead,
       windupMs: m.windupMs ?? 0,
+      mapId: m.mapId ?? "",
     });
 
     this.room.state.mobs.onAdd((mob: any, id: string) => {
@@ -261,14 +268,23 @@ export class NetworkClient {
    * si está muerto. Escanea los mobs por `isBoss`; null si no hay jefe en el estado.
    */
   getBossState(): { name: string; hp: number; maxHp: number; dead: boolean } | null {
+    // Sólo mostrar la barra del jefe si el jugador local está en el mapa del jefe.
+    const self: any = this.room.state.players.get(this.room.sessionId);
+    const myMap = self?.mapId ?? "pueblo";
     let out: { name: string; hp: number; maxHp: number; dead: boolean } | null = null;
     this.room.state.mobs.forEach((m: any) => {
       if (out) return;
-      if (isBoss(m.templateId)) {
+      if (isBoss(m.templateId) && (m.mapId ?? "") === myMap) {
         out = { name: getTemplate(m.templateId).name, hp: m.hp, maxHp: m.maxHp, dead: m.dead };
       }
     });
     return out;
+  }
+
+  /** Envía la intención de viajar a un mapa (Etapa 15, menú M). El server valida el gate. */
+  sendWarpTo(mapId: string) {
+    const msg: WarpToMessage = { mapId };
+    this.room.send(MessageType.WarpTo, msg);
   }
 
   /**
@@ -294,6 +310,7 @@ export class NetworkClient {
       className: p.className ?? "knight",
       pAtk: p.pAtk ?? 0,
       pDef: p.pDef ?? 0,
+      mapId: p.mapId ?? "pueblo",
     };
   }
 
@@ -330,13 +347,15 @@ export class NetworkClient {
    * Sólo lectura del estado sincronizado; los muertos se omiten.
    */
   getMinimapEntities(): { x: number; z: number; kind: "self" | "player" | "mob" | "boss" }[] {
+    const self: any = this.room.state.players.get(this.room.sessionId);
+    const myMap = self?.mapId ?? "pueblo";
     const out: { x: number; z: number; kind: "self" | "player" | "mob" | "boss" }[] = [];
     this.room.state.players.forEach((p: any, id: string) => {
-      if (p.dead) return;
+      if (p.dead || (p.mapId ?? "pueblo") !== myMap) return; // sólo el mapa actual
       out.push({ x: p.x, z: p.z, kind: id === this.room.sessionId ? "self" : "player" });
     });
     this.room.state.mobs.forEach((m: any) => {
-      if (m.dead) return;
+      if (m.dead || (m.mapId ?? "") !== myMap) return;
       out.push({ x: m.x, z: m.z, kind: isBoss(m.templateId) ? "boss" : "mob" });
     });
     return out;

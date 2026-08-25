@@ -11,6 +11,7 @@ describe("InMemoryPersistence", () => {
       exp: 120,
       pos_x: 5,
       pos_z: -3,
+      mapId: "pueblo",
       inventory: { gold: 10, bone: 2 },
       gold: 100,
       questId: "q1",
@@ -43,6 +44,7 @@ describe("InMemoryPersistence", () => {
       exp: 0,
       pos_x: 0,
       pos_z: 0,
+      mapId: "pueblo",
       inventory: { gold: 1 },
       gold: 0,
       questId: "q1",
@@ -62,13 +64,13 @@ describe("InMemoryPersistence", () => {
     loaded!.inventory.gold = 999;
 
     const reloaded = await persistence.load("Mob");
-    expect(reloaded).toEqual({ level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: { gold: 1 }, gold: 0, questId: "q1", questProgress: 0, className: "knight", pvpKills: 0, guildId: "", guildName: "", guildTag: "", equipment: {}, progress: emptyProgress() });
+    expect(reloaded).toEqual({ level: 1, exp: 0, pos_x: 0, pos_z: 0, mapId: "pueblo", inventory: { gold: 1 }, gold: 0, questId: "q1", questProgress: 0, className: "knight", pvpKills: 0, guildId: "", guildName: "", guildTag: "", equipment: {}, progress: emptyProgress() });
   });
 
   it("persiste y devuelve pvpKills", async () => {
     const svc = new InMemoryPersistence();
     await svc.save("Boromir", {
-      level: 3, exp: 10, pos_x: 1, pos_z: 2, inventory: {}, gold: 50,
+      level: 3, exp: 10, pos_x: 1, pos_z: 2, mapId: "pueblo", inventory: {}, gold: 50,
       questId: "q1", questProgress: 0, className: "knight", pvpKills: 7,
       guildId: "", guildName: "", guildTag: "", equipment: {}, progress: emptyProgress(),
     });
@@ -79,7 +81,7 @@ describe("InMemoryPersistence", () => {
   it("persiste y devuelve la identidad de guild del personaje", async () => {
     const svc = new InMemoryPersistence();
     await svc.save("Aragorn", {
-      level: 1, exp: 0, pos_x: 0, pos_z: 0, inventory: {}, gold: 0,
+      level: 1, exp: 0, pos_x: 0, pos_z: 0, mapId: "pueblo", inventory: {}, gold: 0,
       questId: "q1", questProgress: 0, className: "knight", pvpKills: 0,
       guildId: "wolf-abc123", guildName: "Los Lobos", guildTag: "WOLF", equipment: {}, progress: emptyProgress(),
     });
@@ -103,7 +105,7 @@ describe("InMemoryPersistence", () => {
 
   it("topCharacters ordena por nivel desc, desempata por pvpKills desc y respeta el límite", async () => {
     const svc = new InMemoryPersistence();
-    const base = { exp: 0, pos_x: 0, pos_z: 0, inventory: {}, gold: 0, questId: "q1", questProgress: 0, className: "knight", guildId: "", guildName: "", guildTag: "", equipment: {}, progress: emptyProgress() };
+    const base = { exp: 0, pos_x: 0, pos_z: 0, mapId: "pueblo", inventory: {}, gold: 0, questId: "q1", questProgress: 0, className: "knight", guildId: "", guildName: "", guildTag: "", equipment: {}, progress: emptyProgress() };
     await svc.save("Bajo",  { ...base, level: 2, pvpKills: 0 });
     await svc.save("AltoA", { ...base, level: 9, pvpKills: 1 });
     await svc.save("AltoB", { ...base, level: 9, pvpKills: 7 });

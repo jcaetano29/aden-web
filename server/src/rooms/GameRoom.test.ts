@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
-import { MessageType, MAP_BOUNDS, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN, getDailyQuest } from "@aden/shared";
+import { MessageType, getZone, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN, getDailyQuest } from "@aden/shared";
 import appConfig from "../testServer.js";
 import { MobState } from "../state/MobState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
@@ -30,11 +30,13 @@ describe("GameRoom", () => {
     const client = await colyseus.connectTo(room, { name: "Zeus" });
     await room.waitForNextPatch();
 
-    client.send(MessageType.MoveTo, { x: 100, z: 0 });
+    // Etapa 15: el movimiento se clampea a los bounds del MAPA ACTUAL (pueblo).
+    const puebloMax = getZone("pueblo").bounds.maxX;
+    client.send(MessageType.MoveTo, { x: 1000, z: 0 });
     // targetX se fija sincronicamente en el handler de moveTo, antes de cualquier tick
     await room.waitForNextPatch();
     const target = room.state.players.get(client.sessionId)!;
-    expect(target.targetX).toBe(MAP_BOUNDS.maxX); // recortado a MAP_BOUNDS por clampToBounds
+    expect(target.targetX).toBe(puebloMax); // recortado a los bounds del mapa
 
     // avanzar ~0.5s de simulacion
     await room.waitForNextSimulationTick();
@@ -42,7 +44,7 @@ describe("GameRoom", () => {
 
     const p = room.state.players.get(client.sessionId)!;
     expect(p.x).toBeGreaterThan(0);
-    expect(p.x).toBeLessThanOrEqual(MAP_BOUNDS.maxX); // nunca supera el bound clampeado
+    expect(p.x).toBeLessThanOrEqual(puebloMax); // nunca supera el bound clampeado
   });
 
   it("asigna la primera mision al unirse", async () => {
@@ -241,11 +243,13 @@ describe("GameRoom", () => {
     expect(hpAfterFirst).toBeGreaterThan(10); // la primera sí curó
   });
 
-  // Helper: arma un mob con aggro sobre el jugador, pegado a él y fuera del pueblo.
+  // Helper: arma un mob con aggro sobre el jugador, pegado a él, en un mapa de combate.
   function setupMeleeMob(room: any, sessionId: string, p: any) {
-    p.x = p.targetX = 20; p.z = p.targetZ = 20; // fuera de la zona segura (SAFE_RADIUS 8)
+    p.mapId = "bosque"; // mapa de combate (Etapa 15)
+    p.x = p.targetX = 300; p.z = p.targetZ = 0;
     const mob = new MobState();
     mob.templateId = "skeleton_minion";
+    mob.mapId = "bosque";
     const mc = getMobCombat("skeleton_minion");
     mob.hp = mob.maxHp = mc.maxHp; mob.pAtk = mc.pAtk; mob.pDef = mc.pDef; mob.dead = false;
     mob.x = mob.homeX = p.x; mob.z = mob.homeZ = p.z; // home = su posición → no leashea
@@ -304,9 +308,9 @@ describe("GameRoom", () => {
     room.state.mobs.forEach((m: any, id: string) => {
       if (m.templateId === "skeleton_king") { bossId = id; boss = m; }
     });
-    // Preparar: jugador con la q6 (final) activa, pegado al jefe, jefe casi muerto.
+    // Preparar: jugador con la q6 (final) activa, en el mapa del jefe, pegado, jefe casi muerto.
     p.questId = "q6"; p.questProgress = 0;
-    p.x = boss.x; p.z = boss.z;
+    p.mapId = boss.mapId; p.x = boss.x; p.z = boss.z;
     boss.hp = 1;
     p.targetId = bossId;
     c.send(MessageType.SetTarget, { targetId: bossId });
@@ -333,6 +337,7 @@ describe("GameRoom", () => {
     // Crear un mob pegado al jugador (dentro de rango)
     const mob = new MobState();
     mob.templateId = "skeleton_minion";
+    mob.mapId = p.mapId; // mismo mapa que el jugador (Etapa 15)
     mob.hp = 100; mob.maxHp = 100; mob.pDef = 5; mob.dead = false;
     mob.x = p.x; mob.z = p.z;
     room.state.mobs.set("mob-test", mob);
@@ -349,11 +354,12 @@ describe("GameRoom", () => {
       const room = await colyseus.createRoom("game", {});
       const a = await colyseus.connectTo(room, { name: "Atacante", className: "knight" });
       const b = await colyseus.connectTo(room, { name: "Victima", className: "knight" });
-      // ambos fuera del pueblo, pegados
+      // ambos en un mapa de combate (bosque), pegados
       const pa = room.state.players.get(a.sessionId)!;
       const pb = room.state.players.get(b.sessionId)!;
-      pa.x = 30; pa.z = 0; pa.targetX = 30; pa.targetZ = 0; pa.moving = false;
-      pb.x = 31; pb.z = 0; pb.targetX = 31; pb.targetZ = 0; pb.moving = false;
+      pa.mapId = "bosque"; pb.mapId = "bosque";
+      pa.x = 300; pa.z = 0; pa.targetX = 300; pa.targetZ = 0; pa.moving = false;
+      pb.x = 301; pb.z = 0; pb.targetX = 301; pb.targetZ = 0; pb.moving = false;
       const hp0 = pb.hp;
       a.send("setTarget", { targetId: b.sessionId });
       await room.waitForNextSimulationTick();
@@ -384,8 +390,9 @@ describe("GameRoom", () => {
       const b = await colyseus.connectTo(room, { name: "Dead", className: "knight" });
       const pa = room.state.players.get(a.sessionId)!;
       const pb = room.state.players.get(b.sessionId)!;
-      pa.x = 30; pa.z = 0; pa.targetX = 30; pa.targetZ = 0;
-      pb.x = 31; pb.z = 0; pb.targetX = 31; pb.targetZ = 0;
+      pa.mapId = "bosque"; pb.mapId = "bosque";
+      pa.x = 300; pa.z = 0; pa.targetX = 300; pa.targetZ = 0;
+      pb.x = 301; pb.z = 0; pb.targetX = 301; pb.targetZ = 0;
       pb.hp = 1; pb.gold = 100;
       a.send("setTarget", { targetId: b.sessionId });
       await room.waitForNextSimulationTick();
@@ -452,8 +459,9 @@ describe("GameRoom", () => {
       const b = await colyseus.connectTo(room, { name: "Aliado2", className: "knight" });
       const pa = room.state.players.get(a.sessionId)!;
       const pb = room.state.players.get(b.sessionId)!;
-      pa.x = 30; pa.z = 0; pa.targetX = 30; pa.targetZ = 0;
-      pb.x = 31; pb.z = 0; pb.targetX = 31; pb.targetZ = 0;
+      pa.mapId = "bosque"; pb.mapId = "bosque";
+      pa.x = 300; pa.z = 0; pa.targetX = 300; pa.targetZ = 0;
+      pb.x = 301; pb.z = 0; pb.targetX = 301; pb.targetZ = 0;
       a.send("createGuild", { name: "Pactados", tag: "PAX" });
       await room.waitForNextSimulationTick();
       b.send("joinGuild", { guildId: pa.guildId });
@@ -496,7 +504,7 @@ describe("GameRoom", () => {
       const bossId = findBoss(room);
       const boss = room.state.mobs.get(bossId)!;
       boss.hp = 1;
-      pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
+      pa.mapId = boss.mapId; pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
       a.send("setTarget", { targetId: bossId });
       await room.waitForNextSimulationTick();
       await room.waitForNextSimulationTick();
@@ -511,7 +519,7 @@ describe("GameRoom", () => {
       const bossId = findBoss(room);
       const boss = room.state.mobs.get(bossId)!;
       boss.hp = 1;
-      pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
+      pa.mapId = boss.mapId; pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
       a.send("setTarget", { targetId: bossId });
       await room.waitForNextSimulationTick();
       await room.waitForNextSimulationTick();
@@ -629,7 +637,7 @@ describe("GameRoom", () => {
         if (mobId === "" && m.templateId === templateId && !m.dead) { mobId = id; mob = m; }
       });
       mob.hp = 1;
-      p.x = p.targetX = mob.x; p.z = p.targetZ = mob.z + 1; p.moving = false; p.hp = 500;
+      p.mapId = mob.mapId; p.x = p.targetX = mob.x; p.z = p.targetZ = mob.z + 1; p.moving = false; p.hp = 500;
       client.send(MessageType.SetTarget, { targetId: mobId });
       for (let i = 0; i < 4; i++) await room.waitForNextSimulationTick();
     }
@@ -701,11 +709,47 @@ describe("GameRoom", () => {
         if (m.templateId === "skeleton_king") { bossId = id; boss = m; }
       });
       boss.hp = 1;
-      p.x = p.targetX = boss.x; p.z = p.targetZ = boss.z + 1; p.moving = false; p.hp = 500;
+      p.mapId = boss.mapId; p.x = p.targetX = boss.x; p.z = p.targetZ = boss.z + 1; p.moving = false; p.hp = 500;
       c.send(MessageType.SetTarget, { targetId: bossId });
       for (let i = 0; i < 10; i++) await room.waitForNextSimulationTick();
       expect(boss.dead).toBe(true);
       expect(announces.some((t) => t.includes("caído"))).toBe(true);
+    });
+  });
+
+  describe("Mapas / viaje (Etapa 15)", () => {
+    it("arranca en el pueblo y los mobs spawnean con su mapId", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Viajero", className: "knight" });
+      await room.waitForNextPatch();
+      expect(room.state.players.get(c.sessionId)!.mapId).toBe("pueblo");
+      let boss: any;
+      room.state.mobs.forEach((m: any) => { if (m.templateId === "skeleton_king") boss = m; });
+      expect(boss.mapId).toBe("trono");
+    });
+
+    it("warpear a un mapa habilitado mueve al jugador y setea su mapId", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Warp", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 1; // habilita bosque (req 1)
+      c.send(MessageType.WarpTo, { mapId: "bosque" });
+      await room.waitForNextPatch();
+      expect(p.mapId).toBe("bosque");
+      expect(p.x).toBe(getZone("bosque").spawn.x);
+      expect(p.z).toBe(getZone("bosque").spawn.z);
+    });
+
+    it("no se puede warpear a un mapa si el nivel es insuficiente", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Novato", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 1; // trono requiere 9
+      c.send(MessageType.WarpTo, { mapId: "trono" });
+      await room.waitForNextPatch();
+      expect(p.mapId).toBe("pueblo"); // no viajó
     });
   });
 });

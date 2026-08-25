@@ -3,6 +3,7 @@ import type { SpawnZone } from "@aden/shared";
 export interface SpawnedMob {
   id: string;
   templateId: string;
+  mapId: string;
   x: number;
   z: number;
 }
@@ -17,6 +18,7 @@ export function createSpawns(zones: SpawnZone[], rng: () => number): SpawnedMob[
       mobs.push({
         id: `${zone.id}_${i}`,
         templateId: zone.templateId,
+        mapId: zone.mapId,
         x: zone.centerX + Math.cos(angle) * dist,
         z: zone.centerZ + Math.sin(angle) * dist,
       });

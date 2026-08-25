@@ -145,6 +145,10 @@ export class Renderer {
    * (evita drift acumulado frame a frame).
    */
   followTarget(x: number, z: number, dt: number, shakeX = 0, shakeY = 0): void {
+    // Etapa 15: al warpear (salto grande), teletransportar la cámara en vez de barrer el vacío.
+    if (Math.hypot(this.camBaseX - x, this.camBaseZ - (z + 22)) > 60) {
+      this.camBaseX = x; this.camBaseZ = z + 22;
+    }
     const K = 6; // rapidez de convergencia
     this.camBaseX = smoothTowards(this.camBaseX, x, K, dt);
     this.camBaseY = smoothTowards(this.camBaseY, 22, K, dt);

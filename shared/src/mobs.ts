@@ -44,6 +44,8 @@ export function getTemplate(id: string): MobTemplate {
 
 export interface SpawnZone {
   id: string;
+  /** Mapa (ver world.ts ZONES) al que pertenece este cluster de spawn. */
+  mapId: string;
   templateId: string;
   centerX: number;
   centerZ: number;
@@ -56,20 +58,29 @@ export interface SpawnZone {
 // dificultad escala con la profundidad (norte), lo que gatea la progresión de forma
 // natural sin muros: un jugador de bajo nivel que se adentra al Yermo o al Trono es
 // aplastado.
+// Etapa 15: cada cluster vive DENTRO de un mapa (mapId) y se reparte por su región
+// grande (center ±65). Más clusters/mobs para llenar los mapas amplios. Los mapas se
+// viajan con M (no se camina entre ellos); la dificultad sigue escalando por mapa.
 export const SPAWN_ZONES: SpawnZone[] = [
-  // Bosque de Umbra (Lv 1-3)
-  { id: "bosque_scouts_1", templateId: "skeleton_minion", centerX: 0, centerZ: -6, radius: 7, count: 4 },
-  { id: "bosque_scouts_2", templateId: "skeleton_minion", centerX: -16, centerZ: -20, radius: 7, count: 3 },
-  { id: "bosque_warriors", templateId: "skeleton_warrior", centerX: 15, centerZ: -26, radius: 7, count: 4 },
-  // Ruinas de Nihil (Lv 3-6) + mini-jefe
-  { id: "ruinas_siervos", templateId: "crypt_minion", centerX: -24, centerZ: -52, radius: 7, count: 4 },
-  { id: "ruinas_guardianes", templateId: "crypt_warrior", centerX: -42, centerZ: -66, radius: 8, count: 4 },
-  { id: "ruinas_centinela", templateId: "crypt_sentinel", centerX: -40, centerZ: -80, radius: 2, count: 1 },
-  // Yermo Ceniciento (Lv 6-9) — élites
-  { id: "yermo_cenicientos", templateId: "ash_minion", centerX: 22, centerZ: -70, radius: 7, count: 4 },
-  { id: "yermo_verdugos", templateId: "ash_warrior", centerX: 36, centerZ: -88, radius: 8, count: 4 },
-  // Trono del Rey Nihil — jefe final
-  { id: "trono_rey", templateId: "skeleton_king", centerX: 0, centerZ: -122, radius: 2, count: 1 },
+  // ── Bosque de Umbra (mapa center 300,0) — Lv 1-3 ──
+  { id: "bosque_scouts_1", mapId: "bosque", templateId: "skeleton_minion", centerX: 280, centerZ: 20, radius: 12, count: 5 },
+  { id: "bosque_scouts_2", mapId: "bosque", templateId: "skeleton_minion", centerX: 320, centerZ: -30, radius: 12, count: 5 },
+  { id: "bosque_warriors_1", mapId: "bosque", templateId: "skeleton_warrior", centerX: 265, centerZ: -20, radius: 12, count: 4 },
+  { id: "bosque_warriors_2", mapId: "bosque", templateId: "skeleton_warrior", centerX: 335, centerZ: 25, radius: 12, count: 4 },
+  { id: "bosque_deep", mapId: "bosque", templateId: "skeleton_warrior", centerX: 300, centerZ: -45, radius: 10, count: 3 },
+  // ── Ruinas de Nihil (mapa center 0,300) — Lv 3-6 + mini-jefe ──
+  { id: "ruinas_siervos_1", mapId: "ruinas", templateId: "crypt_minion", centerX: -25, centerZ: 320, radius: 12, count: 5 },
+  { id: "ruinas_siervos_2", mapId: "ruinas", templateId: "crypt_minion", centerX: 25, centerZ: 285, radius: 12, count: 4 },
+  { id: "ruinas_guardianes_1", mapId: "ruinas", templateId: "crypt_warrior", centerX: -30, centerZ: 275, radius: 12, count: 4 },
+  { id: "ruinas_guardianes_2", mapId: "ruinas", templateId: "crypt_warrior", centerX: 30, centerZ: 325, radius: 12, count: 4 },
+  { id: "ruinas_centinela", mapId: "ruinas", templateId: "crypt_sentinel", centerX: 0, centerZ: 265, radius: 3, count: 1 },
+  // ── Yermo Ceniciento (mapa center 300,300) — Lv 6-9 élites ──
+  { id: "yermo_cenicientos_1", mapId: "yermo", templateId: "ash_minion", centerX: 275, centerZ: 320, radius: 12, count: 5 },
+  { id: "yermo_cenicientos_2", mapId: "yermo", templateId: "ash_minion", centerX: 325, centerZ: 285, radius: 12, count: 4 },
+  { id: "yermo_verdugos_1", mapId: "yermo", templateId: "ash_warrior", centerX: 285, centerZ: 275, radius: 12, count: 4 },
+  { id: "yermo_verdugos_2", mapId: "yermo", templateId: "ash_warrior", centerX: 320, centerZ: 325, radius: 12, count: 4 },
+  // ── Trono del Rey Nihil (mapa center 600,150) — jefe ──
+  { id: "trono_rey", mapId: "trono", templateId: "skeleton_king", centerX: 600, centerZ: 130, radius: 3, count: 1 },
 ];
 
 export const AI_CONFIG = {

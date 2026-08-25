@@ -3,8 +3,8 @@ import { createSpawns } from "./SpawnSystem.js";
 import { distance2D } from "@aden/shared";
 
 const ZONES = [
-  { id: "z1", templateId: "skeleton_minion", centerX: 10, centerZ: 0, radius: 5, count: 3 },
-  { id: "z2", templateId: "skeleton_warrior", centerX: -10, centerZ: 0, radius: 4, count: 2 },
+  { id: "z1", mapId: "bosque", templateId: "skeleton_minion", centerX: 10, centerZ: 0, radius: 5, count: 3 },
+  { id: "z2", mapId: "bosque", templateId: "skeleton_warrior", centerX: -10, centerZ: 0, radius: 4, count: 2 },
 ];
 
 describe("createSpawns", () => {

@@ -16,6 +16,8 @@ export interface CharacterSave {
   exp: number;
   pos_x: number;
   pos_z: number;
+  /** Etapa 15: mapa actual (estilo Mu). */
+  mapId: string;
   inventory: Record<string, number>;
   gold: number;
   questId: string;
@@ -36,6 +38,7 @@ export interface Persistable {
   exp: number;
   x: number;
   z: number;
+  mapId: string;
   inventory: { forEach(cb: (v: { qty: number }, k: string) => void): void };
   gold: number;
   questId: string;
@@ -77,6 +80,7 @@ export function toCharacterSave(p: Persistable): CharacterSave {
     exp: p.exp,
     pos_x: p.x,
     pos_z: p.z,
+    mapId: p.mapId,
     inventory,
     gold: p.gold,
     questId: p.questId,
