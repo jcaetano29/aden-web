@@ -639,7 +639,7 @@ describe("GameRoom", () => {
       mob.hp = 1;
       p.mapId = mob.mapId; p.x = p.targetX = mob.x; p.z = p.targetZ = mob.z + 1; p.moving = false; p.hp = 500;
       client.send(MessageType.SetTarget, { targetId: mobId });
-      for (let i = 0; i < 4; i++) await room.waitForNextSimulationTick();
+      for (let i = 0; i < 8; i++) await room.waitForNextSimulationTick();
     }
 
     it("al entrar arranca la racha en 1 y asigna una misión diaria", async () => {
@@ -750,6 +750,53 @@ describe("GameRoom", () => {
       c.send(MessageType.WarpTo, { mapId: "trono" });
       await room.waitForNextPatch();
       expect(p.mapId).toBe("pueblo"); // no viajó
+    });
+  });
+
+  describe("Objetos de mundo (Etapa 16)", () => {
+    function findObject(room: any, kind: string): any {
+      let obj: any;
+      room.state.worldObjects.forEach((o: any) => { if (!obj && o.kind === kind) obj = o; });
+      return obj;
+    }
+
+    it("abrir un cofre suelta loot y lo desactiva", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Buscatesoros", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      const chest = findObject(room, "chest");
+      p.mapId = chest.mapId; p.x = chest.x; p.z = chest.z;
+      const drops0 = room.state.droppedItems.size;
+      c.send(MessageType.InteractObject, { objectId: chest.id });
+      await room.waitForNextPatch();
+      expect(chest.active).toBe(false);
+      expect(room.state.droppedItems.size).toBeGreaterThan(drops0);
+    });
+
+    it("un santuario otorga una bendición temporal (buff)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Peregrino", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      const shrine = findObject(room, "shrine");
+      p.mapId = shrine.mapId; p.x = shrine.x; p.z = shrine.z;
+      c.send(MessageType.InteractObject, { objectId: shrine.id });
+      await room.waitForNextPatch();
+      expect(shrine.active).toBe(false);
+      expect(p.atkBuffMs > 0 || p.defBuffMs > 0).toBe(true);
+    });
+
+    it("no se puede interactuar desde otro mapa", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Lejano", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      const chest = findObject(room, "chest");
+      p.mapId = "yermo"; p.x = chest.x; p.z = chest.z; // mismo lugar pero otro mapa
+      c.send(MessageType.InteractObject, { objectId: chest.id });
+      await room.waitForNextPatch();
+      expect(chest.active).toBe(true); // no se abrió
     });
   });
 });

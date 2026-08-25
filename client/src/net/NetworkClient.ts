@@ -21,9 +21,11 @@ import {
   type UnequipItemMessage,
   type WorldAnnounceEvent,
   type WarpToMessage,
+  type InteractObjectMessage,
   isBoss,
   getTemplate,
 } from "@aden/shared";
+import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
 
@@ -101,6 +103,10 @@ export interface RoomCallbacks {
   onAchievement: (ev: AchievementEvent) => void;
   /** Etapa 14: anuncio de evento de mundo (jefe despierta/cae). */
   onWorldAnnounce: (ev: WorldAnnounceEvent) => void;
+  /** Etapa 16: objetos de mundo (cofres/barriles/santuarios). */
+  onObjectAdd: (id: string, snap: WorldObjectSnapshot) => void;
+  onObjectChange: (id: string, snap: WorldObjectSnapshot) => void;
+  onObjectRemove: (id: string) => void;
 }
 
 export class NetworkClient {
@@ -164,6 +170,16 @@ export class NetworkClient {
     this.room.onMessage(MessageType.DailyComplete, (data: DailyCompleteEvent) => cb.onDailyComplete(data));
     this.room.onMessage(MessageType.Achievement, (data: AchievementEvent) => cb.onAchievement(data));
     this.room.onMessage(MessageType.WorldAnnounce, (data: WorldAnnounceEvent) => cb.onWorldAnnounce(data));
+
+    // Etapa 16: objetos de mundo.
+    const snapObj = (o: any): WorldObjectSnapshot => ({
+      id: o.id, kind: o.kind, mapId: o.mapId, x: o.x, z: o.z, active: o.active,
+    });
+    this.room.state.worldObjects.onAdd((o: any, id: string) => {
+      cb.onObjectAdd(id, snapObj(o));
+      o.onChange(() => cb.onObjectChange(id, snapObj(o)));
+    });
+    this.room.state.worldObjects.onRemove((_o: any, id: string) => cb.onObjectRemove(id));
   }
 
   sendMove(msg: MoveToMessage) {
@@ -285,6 +301,12 @@ export class NetworkClient {
   sendWarpTo(mapId: string) {
     const msg: WarpToMessage = { mapId };
     this.room.send(MessageType.WarpTo, msg);
+  }
+
+  /** Envía la intención de interactuar con un objeto de mundo (Etapa 16). */
+  sendInteractObject(objectId: string) {
+    const msg: InteractObjectMessage = { objectId };
+    this.room.send(MessageType.InteractObject, msg);
   }
 
   /**

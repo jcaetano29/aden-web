@@ -23,9 +23,16 @@ import {
   type EquipSlot,
   type SetTitleMessage,
   type WarpToMessage,
+  type InteractObjectMessage,
   getZone,
   canEnterZone,
   TOWN_ZONE_ID,
+  WORLD_OBJECTS,
+  getWorldObject,
+  OBJECT_INTERACT_RANGE,
+  objectRespawnMs,
+  SHRINE_BUFF_MS,
+  SHRINE_BUFF_MULT,
   equipmentBonuses,
   getRarity,
   dayKey,
@@ -78,6 +85,7 @@ import { PlayerState } from "../state/PlayerState.js";
 import { MobState } from "../state/MobState.js";
 import { DroppedItemState } from "../state/DroppedItemState.js";
 import { GuildState } from "../state/GuildState.js";
+import { WorldObjectState } from "../state/WorldObjectState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
 import { LeaderPlayerEntry, LeaderGuildEntry } from "../state/LeaderboardState.js";
 import { advanceMovable } from "../systems/MovementSystem.js";
@@ -278,6 +286,13 @@ export class GameRoom extends Room<GameState> {
 
     for (const s of createSpawns(SPAWN_ZONES, Math.random)) {
       this.spawnMob(s.id, s.templateId, s.x, s.z, s.mapId);
+    }
+
+    // Etapa 16: instanciar los objetos de mundo (cofres/barriles/santuarios).
+    for (const def of WORLD_OBJECTS) {
+      const o = new WorldObjectState();
+      o.id = def.id; o.kind = def.kind; o.mapId = def.mapId; o.x = def.x; o.z = def.z; o.active = true;
+      this.state.worldObjects.set(def.id, o);
     }
 
     this.onMessage(MessageType.MoveTo, (client, msg: MoveToMessage) => {
@@ -574,6 +589,26 @@ export class GameRoom extends Room<GameState> {
       p.targetId = "";
     });
 
+    // Etapa 16: interactuar con un objeto de mundo (cofre / barril / santuario).
+    this.onMessage(MessageType.InteractObject, (client, msg: InteractObjectMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || p.dead) return;
+      const o = this.state.worldObjects.get(msg?.objectId ?? "");
+      if (!o || !o.active || o.mapId !== p.mapId) return;
+      if (distance2D(p.x, p.z, o.x, o.z) > OBJECT_INTERACT_RANGE) return;
+      let def;
+      try { def = getWorldObject(o.id); } catch { return; }
+      if (o.kind === "shrine") {
+        // Bendición temporal (reusa el sistema de buffs de skills).
+        if (def.buff === "atk") { p.atkBuffMs = SHRINE_BUFF_MS; p.atkBuffMult = SHRINE_BUFF_MULT; }
+        else { p.defBuffMs = SHRINE_BUFF_MS; p.defBuffMult = SHRINE_BUFF_MULT; }
+      } else if (def.lootId) {
+        this.dropLoot(def.lootId, o.x, o.z, o.mapId);
+      }
+      o.active = false;
+      o.respawnMs = objectRespawnMs(def.kind);
+    });
+
     const dt = 1 / TICK_RATE;
     this.setSimulationInterval(() => this.tick(dt), 1000 / TICK_RATE);
   }
@@ -693,16 +728,21 @@ export class GameRoom extends Room<GameState> {
     }
 
     // Loot (R-E3b-2): rodar drop table del mob y crear ítems en el piso con scatter.
-    for (const d of rollDrops(mob.templateId, Math.random)) {
+    this.dropLoot(mob.templateId, mob.x, mob.z, mob.mapId);
+  }
+
+  /** Rueda una tabla de loot y deja los ítems en el piso (mobs y objetos de mundo). */
+  private dropLoot(lootId: string, x: number, z: number, mapId: string): void {
+    for (const d of rollDrops(lootId, Math.random)) {
       const item = new DroppedItemState();
       item.itemTemplateId = d.itemTemplateId;
       item.qty = d.qty;
-      item.mapId = mob.mapId;
-      item.x = mob.x + (Math.random() - 0.5) * 1.5;
-      item.z = mob.z + (Math.random() - 0.5) * 1.5;
+      item.mapId = mapId;
+      item.x = x + (Math.random() - 0.5) * 1.5;
+      item.z = z + (Math.random() - 0.5) * 1.5;
       item.despawnMs = DROP_DESPAWN_MS;
       item.pickDelayMs = PICKUP_DELAY_MS; // visible al caer, no pickable hasta que expire
-      this.state.droppedItems.set(`${mobId}_${d.itemTemplateId}_${this.dropSeq++}`, item);
+      this.state.droppedItems.set(`${lootId}_${d.itemTemplateId}_${this.dropSeq++}`, item);
     }
   }
 
@@ -921,6 +961,14 @@ export class GameRoom extends Room<GameState> {
           if (wasBoss) this.broadcast(MessageType.WorldAnnounce, { text: "⚔ ¡El Rey Nihil ha despertado en su Trono!" });
         }
       }
+    });
+
+    // Etapa 16: reactivar objetos de mundo usados (cofre reaparece, barril se regenera,
+    // santuario sale de cooldown).
+    this.state.worldObjects.forEach((o) => {
+      if (o.active) return;
+      o.respawnMs -= dtMs;
+      if (o.respawnMs <= 0) o.active = true;
     });
 
     // respawn del jugador en el pueblo

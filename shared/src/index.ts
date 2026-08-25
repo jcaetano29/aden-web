@@ -7,6 +7,7 @@ export * from "./combat.js";
 export * from "./progression.js";
 export * from "./items.js";
 export * from "./equipment.js";
+export * from "./worldobjects.js";
 export * from "./retention.js";
 export * from "./quests.js";
 export * from "./classes.js";

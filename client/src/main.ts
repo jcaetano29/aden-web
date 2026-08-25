@@ -14,6 +14,7 @@ import { LeaderboardPanel } from "./render/LeaderboardPanel.js";
 import { ProgressPanel } from "./render/ProgressPanel.js";
 import { BossBar } from "./render/BossBar.js";
 import { MapPanel } from "./render/MapPanel.js";
+import { WorldObjectViews } from "./render/WorldObjectViews.js";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ShopPanel } from "./render/ShopPanel.js";
@@ -29,7 +30,7 @@ import { SkillInput } from "./input/SkillInput.js";
 import { AudioEngine } from "./audio/AudioEngine.js";
 import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE } from "@aden/shared";
 
 async function main() {
   const app = document.getElementById("app")!;
@@ -43,6 +44,7 @@ async function main() {
   const views = new EntityViews(renderer.scene, factory, nameplates);
   const damageNumbers = new DamageNumbers(renderer.scene);
   const groundItems = new GroundItems(renderer.scene);
+  const worldObjects = new WorldObjectViews(renderer.scene);
   const audio = new AudioEngine();
   const screenShake = new ScreenShake();
   // Autoplay policy: el AudioContext sólo puede arrancar/reanudarse tras un
@@ -211,6 +213,9 @@ async function main() {
     },
     onItemAdd: (id, itemTemplateId, x, z) => groundItems.add(id, itemTemplateId, x, z),
     onItemRemove: (id) => groundItems.remove(id),
+    onObjectAdd: (id, snap) => worldObjects.add(id, snap),
+    onObjectChange: (id, snap) => worldObjects.update(id, snap),
+    onObjectRemove: (id) => worldObjects.remove(id),
    });
   } catch (err) {
     console.error("[aden] no se pudo conectar al servidor:", err);
@@ -297,6 +302,20 @@ async function main() {
     views.setTargetHighlight(id);
   };
 
+  // Interacción con un objeto de mundo (cofre/barril/santuario): gate de cercanía + feedback.
+  const interactObject = (id: string) => {
+    let def;
+    try { def = getWorldObject(id); } catch { return; }
+    const pos = views.selfPosition();
+    if (pos && distance2D(pos.x, pos.z, def.x, def.z) > OBJECT_INTERACT_RANGE) {
+      hud.toast("Acercate para interactuar", "#ffe066");
+      return;
+    }
+    net.sendInteractObject(id);
+    if (def.kind === "chest") hud.toast("Abriste un cofre 🎁", "#ffd54f");
+    else if (def.kind === "shrine") hud.toast("¡Bendición del santuario! ✨", "#66e0ff");
+  };
+
   const input = new InputController(
     renderer,
     views,
@@ -307,6 +326,8 @@ async function main() {
     npc.object,
     () => interactMerchant(),
     merchant.object,
+    interactObject,
+    () => worldObjects.raycastTargets(),
   );
   input.attach(document.body);
 
@@ -432,6 +453,8 @@ async function main() {
     // Etapa 15: mapa actual del jugador → filtra el render y el minimapa; cambia al warpear.
     const myMapId = selfCombat?.mapId ?? "pueblo";
     views.setCurrentMap(myMapId);
+    worldObjects.setCurrentMap(myMapId);
+    worldObjects.update3d(dt);
     if (myMapId !== lastMapId) {
       lastMapId = myMapId;
       minimap.setMap(getZone(myMapId));

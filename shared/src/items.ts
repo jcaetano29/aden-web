@@ -145,6 +145,49 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemTemplateId: "nihil_aegis", chance: 0.5, qtyMin: 1, qtyMax: 1 },
     { itemTemplateId: "ember_axe", chance: 0.4, qtyMin: 1, qtyMax: 1 },
   ],
+
+  // ── Etapa 16: objetos de mundo ──
+  // Barril/urna rompible (piñata de loot menor, igual en todos los mapas).
+  breakable: [
+    { itemTemplateId: "gold", chance: 0.85, qtyMin: 2, qtyMax: 12 },
+    { itemTemplateId: "bone", chance: 0.35, qtyMin: 1, qtyMax: 2 },
+    { itemTemplateId: "health_potion", chance: 0.06, qtyMin: 1, qtyMax: 1 },
+  ],
+  // Cofres por mapa (recompensa a explorar; chance de gear acorde al mapa).
+  chest_pueblo: [
+    { itemTemplateId: "gold", chance: 1.0, qtyMin: 15, qtyMax: 30 },
+    { itemTemplateId: "health_potion", chance: 0.6, qtyMin: 1, qtyMax: 2 },
+    { itemTemplateId: "worn_sword", chance: 0.15, qtyMin: 1, qtyMax: 1 },
+  ],
+  chest_bosque: [
+    { itemTemplateId: "gold", chance: 1.0, qtyMin: 20, qtyMax: 45 },
+    { itemTemplateId: "health_potion", chance: 0.7, qtyMin: 1, qtyMax: 2 },
+    { itemTemplateId: "leather_vest", chance: 0.2, qtyMin: 1, qtyMax: 1 },
+    { itemTemplateId: "iron_sword", chance: 0.1, qtyMin: 1, qtyMax: 1 },
+  ],
+  chest_ruinas: [
+    { itemTemplateId: "gold", chance: 1.0, qtyMin: 40, qtyMax: 80 },
+    { itemTemplateId: "greater_potion", chance: 0.6, qtyMin: 1, qtyMax: 1 },
+    { itemTemplateId: "ancient_relic", chance: 0.35, qtyMin: 1, qtyMax: 1 },
+    { itemTemplateId: "bone_blade", chance: 0.14, qtyMin: 1, qtyMax: 1 },
+    { itemTemplateId: "crypt_plate", chance: 0.14, qtyMin: 1, qtyMax: 1 },
+    { itemTemplateId: "crypt_ring", chance: 0.1, qtyMin: 1, qtyMax: 1 },
+  ],
+  chest_yermo: [
+    { itemTemplateId: "gold", chance: 1.0, qtyMin: 70, qtyMax: 130 },
+    { itemTemplateId: "greater_potion", chance: 0.8, qtyMin: 1, qtyMax: 2 },
+    { itemTemplateId: "ember_core", chance: 0.4, qtyMin: 1, qtyMax: 2 },
+    { itemTemplateId: "ember_axe", chance: 0.14, qtyMin: 1, qtyMax: 1 },
+    { itemTemplateId: "ash_guard", chance: 0.14, qtyMin: 1, qtyMax: 1 },
+    { itemTemplateId: "ember_band", chance: 0.12, qtyMin: 1, qtyMax: 1 },
+  ],
+  chest_trono: [
+    { itemTemplateId: "gold", chance: 1.0, qtyMin: 120, qtyMax: 200 },
+    { itemTemplateId: "greater_potion", chance: 1.0, qtyMin: 1, qtyMax: 2 },
+    { itemTemplateId: "crown_blade", chance: 0.15, qtyMin: 1, qtyMax: 1 },
+    { itemTemplateId: "nihil_aegis", chance: 0.15, qtyMin: 1, qtyMax: 1 },
+    { itemTemplateId: "skull_crown", chance: 0.05, qtyMin: 1, qtyMax: 1 },
+  ],
 };
 
 export interface DropResult {

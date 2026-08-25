@@ -15,6 +15,8 @@ export class InputController {
     private readonly npcObject?: THREE.Object3D,
     private readonly onInteractMerchant?: () => void,
     private readonly merchantObject?: THREE.Object3D,
+    private readonly onPickObject?: (objectId: string) => void,
+    private readonly objectTargets?: () => { objects: THREE.Object3D[]; idOf: (o: THREE.Object3D) => string | null },
   ) {}
 
   attach(dom: HTMLElement) {
@@ -59,6 +61,15 @@ export class InputController {
       if (playerId) {
         this.onPickPlayer(playerId);
         return;
+      }
+
+      // Raycast a objetos de mundo (cofres/barriles/santuarios) — antes que el suelo.
+      if (this.onPickObject && this.objectTargets) {
+        const objId = this.renderer.pickMobs(ndcX, ndcY, this.objectTargets());
+        if (objId) {
+          this.onPickObject(objId);
+          return;
+        }
       }
 
       const point = this.renderer.pickGround(ndcX, ndcY);

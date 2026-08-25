@@ -4,6 +4,7 @@ import { MobState } from "./MobState.js";
 import { DroppedItemState } from "./DroppedItemState.js";
 import { GuildState } from "./GuildState.js";
 import { LeaderboardState } from "./LeaderboardState.js";
+import { WorldObjectState } from "./WorldObjectState.js";
 
 export class GameState extends Schema {
   @type({ map: PlayerState }) players = new MapSchema<PlayerState>();
@@ -11,4 +12,5 @@ export class GameState extends Schema {
   @type({ map: DroppedItemState }) droppedItems = new MapSchema<DroppedItemState>();
   @type({ map: GuildState }) guilds = new MapSchema<GuildState>();
   @type(LeaderboardState) leaderboard = new LeaderboardState();
+  @type({ map: WorldObjectState }) worldObjects = new MapSchema<WorldObjectState>();
 }
