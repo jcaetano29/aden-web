@@ -39,6 +39,8 @@ export class CharacterFactory {
     const model = this.loaded.get(modelName);
     if (!model) throw new Error(`CharacterFactory: modelo no precargado: ${modelName}`);
     const root = cloneSkeleton(model.scene);
+    // Etapa 18: los personajes proyectan sombra (no la reciben — son delgados).
+    root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.castShadow = true; });
     const mixer = new THREE.AnimationMixer(root);
     const actions = new Map<string, THREE.AnimationAction>();
     for (const clip of model.animations) {

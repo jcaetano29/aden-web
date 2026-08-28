@@ -1,5 +1,9 @@
 import * as THREE from "three";
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
 import { MAP_BOUNDS } from "@aden/shared";
 import { smoothTowards } from "./motion.js";
 
@@ -47,6 +51,7 @@ export class Renderer {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly ground: THREE.Mesh;
   private readonly css2dRenderer: CSS2DRenderer;
+  private readonly composer: EffectComposer;
   // Base de la cámara (sin shake) que `followTarget` suaviza; el shake se suma
   // encima al final de cada frame para no acumularse sobre sí mismo (drift).
   private camBaseX = 0;
@@ -56,6 +61,12 @@ export class Renderer {
   constructor(container: HTMLElement) {
     this.renderer = new THREE.WebGLRenderer({ antialias: true });
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // Etapa 18: sombras suaves + tone mapping cinematográfico (ACES).
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
     container.appendChild(this.renderer.domElement);
 
     // CSS2DRenderer para nameplates: capa DOM superpuesta al canvas WebGL,
@@ -92,7 +103,21 @@ export class Renderer {
       0,
       (MAP_BOUNDS.minZ + MAP_BOUNDS.maxZ) / 2,
     );
+    this.ground.receiveShadow = true; // el suelo recibe sombras (no las proyecta)
     this.scene.add(this.ground);
+
+    // Etapa 18: post-proceso — bloom para que emissivos (fuego, santuarios, brasas,
+    // VFX de skills) resplandezcan. RenderPass (HDR lineal) → Bloom → OutputPass (tone map + sRGB).
+    this.composer = new EffectComposer(this.renderer);
+    this.composer.addPass(new RenderPass(this.scene, this.camera));
+    const bloom = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.6, // strength
+      0.5, // radius
+      0.82, // threshold: sólo lo muy brillante/emissivo florece
+    );
+    this.composer.addPass(bloom);
+    this.composer.addPass(new OutputPass());
 
     window.addEventListener("resize", () => this.onResize());
   }
@@ -131,7 +156,7 @@ export class Renderer {
   }
 
   render() {
-    this.renderer.render(this.scene, this.camera);
+    this.composer.render();
   }
 
   /**
@@ -161,6 +186,7 @@ export class Renderer {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
     this.css2dRenderer.setSize(window.innerWidth, window.innerHeight);
   }
 }

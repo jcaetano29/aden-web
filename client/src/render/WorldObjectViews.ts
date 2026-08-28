@@ -38,6 +38,7 @@ export class WorldObjectViews {
     if (this.views.has(id)) return;
     const v = this.build(snap);
     v.root.position.set(snap.x, 0, snap.z);
+    v.root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.castShadow = true; });
     v.root.visible = snap.mapId === this.currentMapId;
     this.scene.add(v.root);
     this.views.set(id, v);

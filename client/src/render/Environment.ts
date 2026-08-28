@@ -36,6 +36,8 @@ export class Environment {
   private readonly fog: THREE.Fog;
   private readonly bgColor: THREE.Color;
   private embers: THREE.Points | null = null;
+  private skyMesh: THREE.Mesh | null = null;
+  private readonly sunTarget = new THREE.Object3D();
   // Objetivos de mood (se interpolan suavemente frame a frame).
   private curFogNear: number;
   private curFogFar: number;
@@ -48,7 +50,16 @@ export class Environment {
     this.scene.add(this.hemi);
     this.sun = new THREE.DirectionalLight(0xfff2d9, SUN_INTENSITY.pueblo);
     this.sun.position.set(30, 60, 20);
+    // Etapa 18: el sol proyecta sombras. La cámara de sombra es ortográfica y sigue
+    // al jugador (updateMood) para mantener el frustum acotado alrededor de él.
+    this.sun.castShadow = true;
+    this.sun.shadow.mapSize.set(2048, 2048);
+    const sc = this.sun.shadow.camera;
+    sc.near = 1; sc.far = 220; sc.left = -55; sc.right = 55; sc.top = 55; sc.bottom = -55;
+    this.sun.shadow.bias = -0.0004;
     this.scene.add(this.sun);
+    this.scene.add(this.sunTarget);
+    this.sun.target = this.sunTarget;
     this.scene.add(new THREE.AmbientLight(0xffffff, 0.22));
 
     this.fog = new THREE.Fog(pueblo.fog, pueblo.fogNear, pueblo.fogFar);
@@ -62,6 +73,15 @@ export class Environment {
     this.paintBiomes();
     this.structures();
     this.populate();
+    this.enableShadows();
+  }
+
+  /** Etapa 18: activa proyección/recepción de sombras en todas las mallas (menos el cielo). */
+  private enableShadows(): void {
+    this.scene.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && m !== this.skyMesh) { m.castShadow = true; m.receiveShadow = true; }
+    });
   }
 
   private addSky() {
@@ -90,7 +110,8 @@ export class Environment {
           gl_FragColor = vec4(mix(bottom, top, t), 1.0);
         }`,
     });
-    this.scene.add(new THREE.Mesh(geo, mat));
+    this.skyMesh = new THREE.Mesh(geo, mat);
+    this.scene.add(this.skyMesh);
   }
 
   /** Suelo coloreado por cada MAPA (Etapa 15): una placa rectangular sobre su región. */
@@ -531,6 +552,12 @@ export class Environment {
    * cada frame con la posición del self. También anima las brasas del Yermo.
    */
   updateMood(x: number, z: number, dt: number): void {
+    // Etapa 18: el sol (y su cámara de sombra) siguen al jugador para mantener el
+    // frustum de sombras acotado a su alrededor.
+    this.sun.position.set(x + 40, 75, z + 28);
+    this.sunTarget.position.set(x, 0, z);
+    this.sunTarget.updateMatrixWorld();
+
     const zone = zoneAt(x, z);
     const b = zone.biome;
     const k = Math.min(1, dt * 1.5); // rapidez de transición
