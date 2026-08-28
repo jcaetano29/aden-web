@@ -21,6 +21,7 @@ export const MessageType = {
   WorldAnnounce: "worldAnnounce",
   WarpTo: "warpTo",
   InteractObject: "interactObject",
+  SkillCast: "skillCast",
 } as const;
 
 export interface MoveToMessage {
@@ -128,4 +129,12 @@ export interface WarpToMessage {
 /** Cliente→server: interactuar con un objeto de mundo (Etapa 16): cofre/barril/santuario. */
 export interface InteractObjectMessage {
   objectId: string;
+}
+
+/** Server→todos: un jugador lanzó una skill (Etapa 17), para renderizar su VFX en todos los clientes. */
+export interface SkillCastEvent {
+  casterId: string;
+  skillId: string;
+  /** objetivo del efecto ("" para heal/buff sobre uno mismo). */
+  targetId: string;
 }

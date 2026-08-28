@@ -347,6 +347,7 @@ export class GameRoom extends Room<GameState> {
           p.skillCooldowns.set(skill.id, skill.cooldownMs);
           const variance = 0.9 + Math.random() * 0.2;
           const dmg = resolveAttack(p, mob, skill.factor ?? 1, variance, getClass(p.className).base.attackCooldownMs);
+          this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId });
           this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
           if (mob.hp <= 0) this.killMob(mob, p.targetId, client.sessionId);
         } else {
@@ -358,6 +359,7 @@ export class GameRoom extends Room<GameState> {
           p.skillCooldowns.set(skill.id, skill.cooldownMs);
           const variance = 0.9 + Math.random() * 0.2;
           const dmg = resolveAttack(p, victim, skill.factor ?? 1, variance, getClass(p.className).base.attackCooldownMs);
+          this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId });
           this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: victim.hp });
           if (victim.hp <= 0) this.killPlayer(victim, p.targetId, client.sessionId);
         }
@@ -368,6 +370,7 @@ export class GameRoom extends Room<GameState> {
 
         const healAmount = Math.round(p.maxHp * (skill.healPct ?? 0));
         p.hp = Math.min(p.maxHp, p.hp + healAmount);
+        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: "" });
       } else if (skill.type === "buff") {
         // Buff skill: no target needed, set buff on caster
         p.mp -= skill.mpCost;
@@ -380,6 +383,7 @@ export class GameRoom extends Room<GameState> {
           p.defBuffMs = skill.buffMs ?? 0;
           p.defBuffMult = skill.buffMult ?? 1;
         }
+        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: "" });
       } else if (skill.type === "dot") {
         // DoT skill: requires mob target in range (mismo mapa)
         const mob = p.targetId ? this.state.mobs.get(p.targetId) : undefined;
@@ -395,6 +399,7 @@ export class GameRoom extends Room<GameState> {
         mob.dotDps = skill.dotDps ?? 0;
         mob.dotAttackerId = client.sessionId;
         mob.dotAccumMs = 0;
+        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId });
       }
     });
 

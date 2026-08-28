@@ -60,6 +60,7 @@ export class Environment {
     this.curSun = SUN_INTENSITY.pueblo;
 
     this.paintBiomes();
+    this.structures();
     this.populate();
   }
 
@@ -103,6 +104,153 @@ export class Environment {
       plate.rotation.x = -Math.PI / 2;
       plate.position.set(z.center.x, 0.02, z.center.z);
       this.scene.add(plate);
+    }
+  }
+
+  // ── Estructuras (Etapa 17): landmarks arquitectónicos colocados a mano por mapa ──
+  private structures(): void {
+    // Pueblo (0,0): casas alrededor de la plaza + pozo.
+    this.house(-24, -6, 0.3, 0xb98a5a);
+    this.house(24, -8, -0.5, 0xa87d4e);
+    this.house(-20, 18, 2.6, 0xc39866);
+    this.house(20, 20, 3.6, 0xb98a5a);
+    this.house(0, -28, 0, 0xa87d4e);
+    this.well(10, -2);
+
+    // Bosque (300,0): torre de vigía en ruinas + arco de entrada.
+    this.tower(340, -30, 9, 0x8a8497);
+    this.arch(300, 55, 0, 0x6b6577, 1.2);
+    this.tower(262, 30, 6, 0x7a7d80);
+
+    // Ruinas (0,300): gran templo caído — plataforma + columnatas + arco.
+    this.templeHall(0, 300);
+    this.arch(0, 355, 0, 0x9b7fd4, 1.6);
+
+    // Yermo (300,300): campo de obeliscos de obsidiana + torre quemada.
+    this.obeliskField(300, 300);
+    this.tower(340, 320, 8, 0x3b322c, true);
+
+    // Trono (600,150): gran pórtico de entrada + escalinata al trono.
+    this.arch(600, 200, 0, 0x1e1b26, 2.0);
+    this.stairs(600, 130);
+  }
+
+  private house(cx: number, cz: number, rot: number, color: number): void {
+    const g = new THREE.Group();
+    const wall = new THREE.MeshStandardMaterial({ color, flatShading: true });
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x7a3b2b, flatShading: true });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4.5), wall);
+    body.position.y = 1.5;
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(4.1, 2.4, 4), roofMat);
+    roof.position.y = 4.2; roof.rotation.y = Math.PI / 4;
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 0.2), new THREE.MeshStandardMaterial({ color: 0x4a3018 }));
+    door.position.set(0, 0.9, 2.3);
+    g.add(body, roof, door);
+    g.position.set(cx, 0, cz); g.rotation.y = rot;
+    this.scene.add(g);
+  }
+
+  private well(cx: number, cz: number): void {
+    const g = new THREE.Group();
+    const stone = new THREE.MeshStandardMaterial({ color: 0x9a938a, flatShading: true });
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.1, 12), stone);
+    ring.position.y = 0.55;
+    const post1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.4, 6), new THREE.MeshStandardMaterial({ color: 0x6b4a2b }));
+    post1.position.set(-0.9, 1.7, 0);
+    const post2 = post1.clone(); post2.position.x = 0.9;
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 0.9, 4), new THREE.MeshStandardMaterial({ color: 0x7a3b2b, flatShading: true }));
+    roof.position.y = 3.2; roof.rotation.y = Math.PI / 4;
+    g.add(ring, post1, post2, roof);
+    g.position.set(cx, 0, cz);
+    this.scene.add(g);
+  }
+
+  private tower(cx: number, cz: number, h: number, color: number, broken = false): void {
+    const g = new THREE.Group();
+    const stone = new THREE.MeshStandardMaterial({ color, flatShading: true });
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.4, h, 10), stone);
+    shaft.position.y = h / 2;
+    g.add(shaft);
+    if (!broken) {
+      // almenas
+      for (let i = 0; i < 8; i++) {
+        const a = (i / 8) * Math.PI * 2;
+        const m = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.9, 0.7), stone);
+        m.position.set(Math.cos(a) * 2, h + 0.3, Math.sin(a) * 2);
+        g.add(m);
+      }
+    } else {
+      // corona rota (bloques desparejos)
+      for (let i = 0; i < 5; i++) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8 + Math.random(), 1.2), stone);
+        m.position.set((Math.random() - 0.5) * 3, h + Math.random(), (Math.random() - 0.5) * 3);
+        m.rotation.y = Math.random();
+        g.add(m);
+      }
+    }
+    g.position.set(cx, 0, cz);
+    this.scene.add(g);
+  }
+
+  private arch(cx: number, cz: number, rot: number, color: number, scale = 1): void {
+    const g = new THREE.Group();
+    const stone = new THREE.MeshStandardMaterial({ color, flatShading: true });
+    const p1 = new THREE.Mesh(new THREE.BoxGeometry(1, 7, 1), stone); p1.position.set(-3, 3.5, 0);
+    const p2 = p1.clone(); p2.position.x = 3;
+    const top = new THREE.Mesh(new THREE.BoxGeometry(8, 1.2, 1.2), stone); top.position.y = 7.2;
+    g.add(p1, p2, top);
+    g.position.set(cx, 0, cz); g.rotation.y = rot; g.scale.setScalar(scale);
+    this.scene.add(g);
+  }
+
+  private templeHall(cx: number, cz: number): void {
+    const g = new THREE.Group();
+    const stone = new THREE.MeshStandardMaterial({ color: 0x8a8497, flatShading: true });
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(30, 1, 20), stone);
+    platform.position.y = 0.5;
+    g.add(platform);
+    // dos hileras de columnas (algunas rotas)
+    for (let i = 0; i < 6; i++) {
+      const z = -8 + i * 3.2;
+      for (const sx of [-12, 12]) {
+        const h = 6 + (Math.random() < 0.3 ? -3 - Math.random() * 2 : Math.random());
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, h, 10), stone);
+        col.position.set(sx, 1 + h / 2, z);
+        g.add(col);
+      }
+    }
+    // vigas del techo caídas encima
+    for (let i = 0; i < 4; i++) {
+      const beam = new THREE.Mesh(new THREE.BoxGeometry(26, 0.9, 1.4), stone);
+      beam.position.set((Math.random() - 0.5) * 3, 8 + Math.random(), -6 + i * 4);
+      beam.rotation.z = (Math.random() - 0.5) * 0.2;
+      g.add(beam);
+    }
+    g.position.set(cx, 0, cz);
+    this.scene.add(g);
+  }
+
+  private obeliskField(cx: number, cz: number): void {
+    const obs = new THREE.MeshStandardMaterial({ color: 0x241f2e, flatShading: true });
+    const pts: Array<[number, number, number]> = [
+      [-30, 20, 10], [28, -18, 12], [-10, -30, 8], [18, 26, 9], [-26, -8, 11], [8, 8, 7],
+    ];
+    for (const [dx, dz, h] of pts) {
+      const g = new THREE.Group();
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(1.6, h, 4), obs);
+      spire.position.y = h / 2; spire.rotation.y = Math.random();
+      g.add(spire);
+      g.position.set(cx + dx, 0, cz + dz);
+      this.scene.add(g);
+    }
+  }
+
+  private stairs(cx: number, cz: number): void {
+    const stone = new THREE.MeshStandardMaterial({ color: 0x2b2733, flatShading: true });
+    for (let i = 0; i < 5; i++) {
+      const step = new THREE.Mesh(new THREE.BoxGeometry(14 - i * 1.5, 0.6, 2.2), stone);
+      step.position.set(cx, 0.3 + i * 0.55, cz + i * 2);
+      this.scene.add(step);
     }
   }
 

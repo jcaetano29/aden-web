@@ -22,6 +22,7 @@ import {
   type WorldAnnounceEvent,
   type WarpToMessage,
   type InteractObjectMessage,
+  type SkillCastEvent,
   isBoss,
   getTemplate,
 } from "@aden/shared";
@@ -107,6 +108,8 @@ export interface RoomCallbacks {
   onObjectAdd: (id: string, snap: WorldObjectSnapshot) => void;
   onObjectChange: (id: string, snap: WorldObjectSnapshot) => void;
   onObjectRemove: (id: string) => void;
+  /** Etapa 17: un jugador lanzó una skill (para renderizar su VFX). */
+  onSkillCast: (ev: SkillCastEvent) => void;
 }
 
 export class NetworkClient {
@@ -180,6 +183,8 @@ export class NetworkClient {
       o.onChange(() => cb.onObjectChange(id, snapObj(o)));
     });
     this.room.state.worldObjects.onRemove((_o: any, id: string) => cb.onObjectRemove(id));
+
+    this.room.onMessage(MessageType.SkillCast, (data: SkillCastEvent) => cb.onSkillCast(data));
   }
 
   sendMove(msg: MoveToMessage) {

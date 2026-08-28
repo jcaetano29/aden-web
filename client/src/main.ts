@@ -15,6 +15,7 @@ import { ProgressPanel } from "./render/ProgressPanel.js";
 import { BossBar } from "./render/BossBar.js";
 import { MapPanel } from "./render/MapPanel.js";
 import { WorldObjectViews } from "./render/WorldObjectViews.js";
+import { SkillEffects } from "./render/SkillEffects.js";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ShopPanel } from "./render/ShopPanel.js";
@@ -45,6 +46,7 @@ async function main() {
   const damageNumbers = new DamageNumbers(renderer.scene);
   const groundItems = new GroundItems(renderer.scene);
   const worldObjects = new WorldObjectViews(renderer.scene);
+  const skillEffects = new SkillEffects(renderer.scene);
   const audio = new AudioEngine();
   const screenShake = new ScreenShake();
   // Autoplay policy: el AudioContext sólo puede arrancar/reanudarse tras un
@@ -216,6 +218,15 @@ async function main() {
     onObjectAdd: (id, snap) => worldObjects.add(id, snap),
     onObjectChange: (id, snap) => worldObjects.update(id, snap),
     onObjectRemove: (id) => worldObjects.remove(id),
+    onSkillCast: (ev) => {
+      const caster = views.playerWorldPosition(ev.casterId);
+      if (!caster) return;
+      let target: THREE.Vector3 | null = null;
+      if (ev.targetId) {
+        target = views.hasMob(ev.targetId) ? views.mobWorldPosition(ev.targetId) : views.playerWorldPosition(ev.targetId);
+      }
+      skillEffects.cast(ev.skillId, { x: caster.x, z: caster.z }, target ? { x: target.x, z: target.z } : null);
+    },
    });
   } catch (err) {
     console.error("[aden] no se pudo conectar al servidor:", err);
@@ -439,6 +450,7 @@ async function main() {
     views.updateAll(dt);
     damageNumbers.update(dt);
     groundItems.update(dt);
+    skillEffects.update(dt);
     const self = views.selfPosition();
     const shake = screenShake.update(dt);
     const selfCombat = net.getSelf();
