@@ -18,7 +18,11 @@ Hay un `server/Dockerfile` + `.dockerignore` listos (el server ya lee `process.e
 
 **Railway** (recomendado, simple):
 1. New Project → Deploy from GitHub repo (o `railway up` con la CLI) apuntando a este repo.
-2. Railway detecta el `Dockerfile` en `server/` — o setealo como *Root Directory* `server` / *Dockerfile path* `server/Dockerfile`.
+2. **Root Directory = RAÍZ del repo (dejalo vacío)** + **Dockerfile Path = `server/Dockerfile`**.
+   ⚠️ NO pongas Root Directory = `server`: el server depende de `@aden/shared` (workspace),
+   y el Dockerfile copia `shared/` + el `package.json` de la raíz, así que el *build context*
+   tiene que ser la RAÍZ del repo (si el context es `server/`, el `COPY shared/...` falla).
+   En Railway se setea con la variable `RAILWAY_DOCKERFILE_PATH=server/Dockerfile` o en Settings → Build.
 3. Variables de entorno:
    - `SUPABASE_URL` = `https://lvxcgzfrxrrlkbvasidl.supabase.co`
    - `SUPABASE_SERVICE_KEY` = *(tu service_role key de Supabase — Settings → API)*
