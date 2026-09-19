@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
+import { COLORS, FONT_DISPLAY, FONT_BODY } from "./theme.js";
 
 interface Plate {
   label: CSS2DObject;
@@ -21,12 +22,15 @@ export class Nameplates {
     const titleEl = document.createElement("div");
     titleEl.textContent = title;
     titleEl.style.cssText =
-      "color:#ffd54f;font:italic bold 10px sans-serif;text-shadow:0 0 3px #000;" +
+      `color:${COLORS.goldBright};font-family:${FONT_DISPLAY};font-style:italic;font-weight:600;font-size:10px;` +
+      "letter-spacing:0.5px;text-shadow:0 0 4px #000,0 1px 2px #000;" +
       (title ? "" : "display:none;");
 
     const nameEl = document.createElement("div");
     nameEl.textContent = name;
-    nameEl.style.cssText = `color:${color ?? "#fff"};font:12px sans-serif;text-shadow:0 0 3px #000;`;
+    nameEl.style.cssText =
+      `color:${color ?? "#f3ecdd"};font-family:${FONT_BODY};font-weight:600;font-size:13px;` +
+      "letter-spacing:0.3px;text-shadow:0 0 4px #000,0 1px 2px #000,0 0 2px #000;";
 
     wrap.append(titleEl, nameEl);
     const label = new CSS2DObject(wrap);

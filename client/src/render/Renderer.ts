@@ -4,6 +4,28 @@ import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
+
+/** Viñeta sutil + tinte cálido en sombras: encuadra la escena, look cinematográfico. */
+const VignetteShader = {
+  uniforms: {
+    tDiffuse: { value: null as THREE.Texture | null },
+    offset: { value: 1.08 },
+    darkness: { value: 0.72 },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float offset; uniform float darkness;
+    varying vec2 vUv;
+    void main() {
+      vec4 tex = texture2D(tDiffuse, vUv);
+      vec2 uv = (vUv - 0.5) * offset;
+      float vig = clamp(1.0 - dot(uv, uv) * darkness, 0.0, 1.0);
+      gl_FragColor = vec4(tex.rgb * vig, tex.a);
+    }`,
+};
 import { MAP_BOUNDS } from "@aden/shared";
 import { smoothTowards } from "./motion.js";
 
@@ -66,7 +88,7 @@ export class Renderer {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.2;
     container.appendChild(this.renderer.domElement);
 
     // CSS2DRenderer para nameplates: capa DOM superpuesta al canvas WebGL,
@@ -112,12 +134,14 @@ export class Renderer {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.6, // strength
-      0.5, // radius
-      0.82, // threshold: sólo lo muy brillante/emissivo florece
+      0.75, // strength: brasas, oro, cristales y el sol florecen más
+      0.6, // radius
+      0.78, // threshold
     );
     this.composer.addPass(bloom);
     this.composer.addPass(new OutputPass());
+    // Viñeta final (sobre la imagen ya tone-mapeada) → encuadre cinematográfico.
+    this.composer.addPass(new ShaderPass(VignetteShader));
 
     window.addEventListener("resize", () => this.onResize());
   }

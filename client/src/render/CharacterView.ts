@@ -12,6 +12,11 @@ const TURN_K = 12;
 //   Math.PI/2 o -Math.PI/2 = mira de costado
 const YAW_OFFSET = 0;
 
+/** Anillo plano suave (más segmentos → borde limpio) para los indicadores de suelo. */
+function makeRingGeometry(inner: number, outer: number): THREE.RingGeometry {
+  return new THREE.RingGeometry(inner, outer, 48);
+}
+
 export interface ServerState {
   x: number;
   z: number;
@@ -27,6 +32,8 @@ export class CharacterView {
   private readonly idleClip: string | null;
   private readonly walkClip: string | null;
   private targetRing: THREE.Mesh | null = null;
+  private selfRing: THREE.Mesh | null = null;
+  private ringT = 0;
 
   constructor(private readonly character: Character) {
     this.idleClip = selectClip(character.clipNames, "idle");
@@ -80,28 +87,53 @@ export class CharacterView {
     }
 
     this.character.mixer.update(dt);
+
+    // Anillos: pulso suave (self) + pulso + giro (objetivo) para que "respiren".
+    this.ringT += dt;
+    if (this.selfRing) {
+      const m = this.selfRing.material as THREE.MeshBasicMaterial;
+      m.opacity = 0.5 + Math.sin(this.ringT * 2.4) * 0.22;
+      this.selfRing.rotation.z += dt * 0.4;
+    }
+    if (this.targetRing) {
+      const m = this.targetRing.material as THREE.MeshBasicMaterial;
+      m.opacity = 0.6 + Math.sin(this.ringT * 5) * 0.3;
+      this.targetRing.rotation.z -= dt * 1.6;
+      const s = 1 + Math.sin(this.ringT * 5) * 0.05;
+      this.targetRing.scale.set(s, s, s);
+    }
   }
 
-  /** Adjunta un anillo azul bajo los pies del self como indicador visual. */
+  /** Adjunta un anillo arcano (glow dorado-azulado) bajo los pies del self. */
   addSelfRing() {
+    if (this.selfRing) return;
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.6, 0.8, 24),
-      new THREE.MeshBasicMaterial({ color: 0x4fa3ff, side: THREE.DoubleSide }),
-    );
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.02;
-    this.character.root.add(ring);
-  }
-
-  /** Adjunta un anillo rojo bajo los pies como indicador de "objetivo seleccionado". */
-  addTargetRing() {
-    if (this.targetRing) return;
-    const ring = new THREE.Mesh(
-      new THREE.RingGeometry(0.7, 0.95, 24),
-      new THREE.MeshBasicMaterial({ color: 0xff3b3b, side: THREE.DoubleSide }),
+      makeRingGeometry(0.58, 0.86),
+      new THREE.MeshBasicMaterial({
+        color: 0x6fb6ff, side: THREE.DoubleSide, transparent: true, opacity: 0.6,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }),
     );
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.03;
+    ring.renderOrder = 2;
+    this.selfRing = ring;
+    this.character.root.add(ring);
+  }
+
+  /** Adjunta un anillo rojo brillante bajo los pies como indicador de "objetivo". */
+  addTargetRing() {
+    if (this.targetRing) return;
+    const ring = new THREE.Mesh(
+      makeRingGeometry(0.72, 1.02),
+      new THREE.MeshBasicMaterial({
+        color: 0xff4433, side: THREE.DoubleSide, transparent: true, opacity: 0.8,
+        blending: THREE.AdditiveBlending, depthWrite: false,
+      }),
+    );
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.04;
+    ring.renderOrder = 2;
     this.targetRing = ring;
     this.character.root.add(ring);
   }

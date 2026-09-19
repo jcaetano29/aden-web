@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
+import { FONT_DISPLAY } from "./theme.js";
 
 const LIFETIME_MS = 800;
 const RISE_HEIGHT = 1.2; // unidades de mundo que sube durante toda su vida
@@ -24,11 +25,17 @@ export class DamageNumbers {
 
   spawn(worldPos: THREE.Vector3, amount: number) {
     const el = document.createElement("div");
-    el.textContent = String(Math.round(amount));
-    // Tamaño de fuente escala con el golpe: los críticos/golpes grandes se
-    // sienten más satisfactorios cuando "pesan" más visualmente (14..29px).
-    const size = 14 + Math.min(30, Math.round(amount)) * 0.5;
-    el.style.cssText = `color:#ffd23f;font:bold ${size}px sans-serif;text-shadow:0 0 3px #000;pointer-events:none;white-space:nowrap;transform-origin:center;`;
+    const n = Math.round(amount);
+    // Golpes grandes (≥40) se leen como "críticos": naranja ardiente, más grandes
+    // y con resplandor — se sienten más satisfactorios cuando "pesan" más.
+    const crit = n >= 40;
+    el.textContent = crit ? `${n}!` : String(n);
+    const size = (crit ? 22 : 15) + Math.min(28, n) * 0.45;
+    const color = crit ? "#ff8a2a" : "#ffe08a";
+    const glow = crit ? ",0 0 12px rgba(255,120,30,0.9)" : ",0 0 6px rgba(255,200,80,0.5)";
+    el.style.cssText =
+      `color:${color};font-family:${FONT_DISPLAY};font-weight:700;font-size:${size}px;` +
+      `text-shadow:0 2px 3px #000,0 0 3px #000${glow};pointer-events:none;white-space:nowrap;transform-origin:center;`;
     const obj = new CSS2DObject(el);
     obj.position.copy(worldPos);
     this.scene.add(obj);
@@ -39,7 +46,9 @@ export class DamageNumbers {
   spawnText(worldPos: THREE.Vector3, text: string, color: string) {
     const el = document.createElement("div");
     el.textContent = text;
-    el.style.cssText = `color:${color};font:bold 16px sans-serif;text-shadow:0 0 3px #000;pointer-events:none;white-space:nowrap;`;
+    el.style.cssText =
+      `color:${color};font-family:${FONT_DISPLAY};font-weight:700;font-size:17px;` +
+      "text-shadow:0 2px 3px #000,0 0 4px #000;pointer-events:none;white-space:nowrap;transform-origin:center;";
     const obj = new CSS2DObject(el);
     obj.position.copy(worldPos);
     this.scene.add(obj);

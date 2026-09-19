@@ -1,8 +1,9 @@
 import { expToNextLevel, getQuest, getClass, getSkill } from "@aden/shared";
+import { COLORS, FONT_DISPLAY, makeThemedBar } from "./theme.js";
 
-const BAR_WIDTH_PX = 160;
-const BAR_HEIGHT_PX = 14;
-const LEVEL_UP_BANNER_MS = 2000;
+const BAR_WIDTH_PX = 190;
+const BAR_HEIGHT_PX = 15;
+const LEVEL_UP_BANNER_MS = 2200;
 
 /**
  * HUD fijo (esquina inferior izq.) con las barras HP/MP/EXP del jugador
@@ -10,16 +11,20 @@ const LEVEL_UP_BANNER_MS = 2000;
  * estado sincronizado por el server (`update(...)`) — no muta HP/MP/exp/nivel
  * del lado cliente (autoritativo); `expToNextLevel` se usa únicamente para
  * calcular el relleno de la barra de EXP.
+ *
+ * Tema "dark fantasy épico" (medallón de nivel, barras con degradé + brillo,
+ * flash rojo al recibir daño). Ver [[theme]].
  */
 export class Hud {
   private readonly root: HTMLDivElement;
   private readonly hpFill: HTMLDivElement;
   private readonly hpLabel: HTMLDivElement;
+  private readonly hpTrack: HTMLDivElement;
   private readonly mpFill: HTMLDivElement;
   private readonly mpLabel: HTMLDivElement;
   private readonly expFill: HTMLDivElement;
   private readonly expLabel: HTMLDivElement;
-  private readonly levelLabel: HTMLDivElement;
+  private readonly levelMedallion: HTMLDivElement;
   private readonly classLabel: HTMLDivElement;
   private readonly skillLabel: HTMLDivElement;
   private readonly deathBanner: HTMLDivElement;
@@ -31,85 +36,107 @@ export class Hud {
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly announceBanner: HTMLDivElement;
   private announceTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastHp = Infinity;
 
   constructor(parent: HTMLElement = document.body) {
     this.root = document.createElement("div");
+    this.root.className = "aden-panel aden-fadein";
     this.root.style.cssText =
-      "position:fixed;left:12px;bottom:12px;pointer-events:none;z-index:1000;" +
-      "display:flex;flex-direction:column;gap:4px;font:12px sans-serif;" +
-      "text-shadow:0 0 3px #000;color:#fff;user-select:none;";
+      "position:fixed;left:14px;bottom:14px;pointer-events:none;z-index:1000;" +
+      "display:flex;gap:12px;align-items:flex-start;padding:12px 14px 11px 12px;" +
+      `font-family:${FONT_DISPLAY};color:${COLORS.text};user-select:none;`;
 
-    this.levelLabel = document.createElement("div");
-    this.levelLabel.style.cssText = "font-weight:bold;";
-    this.levelLabel.textContent = "Nv. 1";
-    this.root.appendChild(this.levelLabel);
+    // Medallón de nivel (círculo de oro grabado).
+    this.levelMedallion = document.createElement("div");
+    this.levelMedallion.style.cssText =
+      "flex:0 0 auto;width:52px;height:52px;border-radius:50%;display:flex;flex-direction:column;" +
+      "align-items:center;justify-content:center;line-height:1;" +
+      "background:radial-gradient(circle at 50% 35%, #f4dc92, #c9a24b 55%, #6f5320);" +
+      "border:2px solid #4a380f;box-shadow:0 3px 10px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255,255,255,0.6);" +
+      "color:#2a1e08;text-shadow:0 1px 0 rgba(255,255,255,0.35);";
+    const lvCaption = document.createElement("div");
+    lvCaption.textContent = "NIVEL";
+    lvCaption.style.cssText = "font-size:8px;letter-spacing:1.5px;opacity:0.8;";
+    const lvNum = document.createElement("div");
+    lvNum.textContent = "1";
+    lvNum.style.cssText = "font-size:22px;font-weight:700;";
+    this.levelMedallion.append(lvCaption, lvNum);
+    (this.levelMedallion as any)._num = lvNum;
+    this.root.appendChild(this.levelMedallion);
 
+    // Columna derecha: clase/skill + barras + misión + oro.
+    const col = document.createElement("div");
+    col.style.cssText = "display:flex;flex-direction:column;gap:5px;";
+    this.root.appendChild(col);
+
+    const metaRow = document.createElement("div");
+    metaRow.style.cssText = "display:flex;gap:10px;align-items:baseline;font-size:13px;";
     this.classLabel = document.createElement("div");
-    this.classLabel.style.cssText = "font-size:12px;color:#aaa;";
-    this.classLabel.textContent = "Clase: —";
-    this.root.appendChild(this.classLabel);
-
+    this.classLabel.style.cssText = `color:${COLORS.goldBright};font-weight:600;letter-spacing:0.5px;`;
+    this.classLabel.textContent = "—";
     this.skillLabel = document.createElement("div");
-    this.skillLabel.style.cssText = "font-size:12px;color:#aaa;";
-    this.skillLabel.textContent = "Skill: —";
-    this.root.appendChild(this.skillLabel);
+    this.skillLabel.style.cssText = `color:${COLORS.textDim};font-size:12px;`;
+    this.skillLabel.textContent = "";
+    metaRow.append(this.classLabel, this.skillLabel);
+    col.appendChild(metaRow);
 
-    const [hpRow, hpFill, hpLabel] = makeBar(BAR_WIDTH_PX, BAR_HEIGHT_PX, "#8b1e1e", "#e53935");
-    const [mpRow, mpFill, mpLabel] = makeBar(BAR_WIDTH_PX, BAR_HEIGHT_PX, "#12305c", "#2979ff");
-    const [expRow, expFill, expLabel] = makeBar(BAR_WIDTH_PX, BAR_HEIGHT_PX, "#4a3b12", "#ffd54f");
-    this.hpFill = hpFill;
-    this.hpLabel = hpLabel;
-    this.mpFill = mpFill;
-    this.mpLabel = mpLabel;
-    this.expFill = expFill;
-    this.expLabel = expLabel;
-    this.root.appendChild(hpRow);
-    this.root.appendChild(mpRow);
-    this.root.appendChild(expRow);
+    const hp = this.makeBar("hp", "❤", COLORS.hp1);
+    const mp = this.makeBar("mp", "✦", COLORS.mp1);
+    const exp = this.makeBar("exp", "★", COLORS.exp1, 9);
+    this.hpFill = hp.fill; this.hpLabel = hp.label; this.hpTrack = hp.track;
+    this.mpFill = mp.fill; this.mpLabel = mp.label;
+    this.expFill = exp.fill; this.expLabel = exp.label;
+    col.append(hp.row, mp.row, exp.row);
 
-    // Línea de misión (resaltada para que se note el objetivo)
+    // Misión (pergamino) + oro.
     this.questLabel = document.createElement("div");
     this.questLabel.style.cssText =
-      "margin-top:4px;font-weight:bold;color:#ffe066;";
-    this.questLabel.textContent = "Sin misión";
-    this.root.appendChild(this.questLabel);
+      `margin-top:3px;font-size:13px;color:${COLORS.exp1};font-weight:600;` +
+      "display:flex;align-items:center;gap:6px;";
+    this.questLabel.textContent = "⚑ Sin misión";
+    col.appendChild(this.questLabel);
 
-    // Línea de oro
     this.goldLabel = document.createElement("div");
-    this.goldLabel.style.cssText = "margin-top:4px;";
-    this.goldLabel.textContent = "Oro: 0";
-    this.root.appendChild(this.goldLabel);
+    this.goldLabel.style.cssText = `font-size:13px;color:${COLORS.parchment};display:flex;align-items:center;gap:6px;`;
+    this.goldLabel.innerHTML = `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe9a6,#c9a24b 60%,#7a5c22);box-shadow:0 0 5px rgba(201,162,75,0.6);"></span><span data-gold>0</span>`;
+    col.appendChild(this.goldLabel);
 
     this.deathBanner = document.createElement("div");
-    this.deathBanner.textContent = "Has muerto — respawneando…";
+    this.deathBanner.textContent = "Has caído — renaciendo…";
     this.deathBanner.style.cssText =
-      "position:fixed;left:50%;top:40%;transform:translate(-50%,-50%);" +
-      "pointer-events:none;z-index:1000;display:none;" +
-      "font:bold 22px sans-serif;color:#ff5252;text-shadow:0 0 6px #000,0 0 12px #000;" +
-      "background:rgba(0,0,0,0.5);padding:10px 20px;border-radius:6px;";
+      "position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);" +
+      "pointer-events:none;z-index:1000;display:none;text-align:center;" +
+      `font-family:${FONT_DISPLAY};font-weight:700;font-size:30px;color:${COLORS.danger};` +
+      "text-shadow:0 0 10px #000,0 0 24px rgba(224,64,47,0.6);letter-spacing:2px;" +
+      "background:radial-gradient(ellipse at center, rgba(30,0,0,0.55), rgba(0,0,0,0) 70%);padding:30px 60px;";
 
     this.levelUpBanner = document.createElement("div");
     this.levelUpBanner.style.cssText =
-      "position:fixed;left:50%;top:30%;transform:translate(-50%,-50%);" +
-      "pointer-events:none;z-index:1000;display:none;" +
-      "font:bold 26px sans-serif;color:#ffd54f;text-shadow:0 0 6px #000,0 0 12px #000;" +
-      "background:rgba(0,0,0,0.5);padding:10px 20px;border-radius:6px;";
+      "position:fixed;left:50%;top:32%;transform:translate(-50%,-50%);" +
+      "pointer-events:none;z-index:1000;display:none;text-align:center;" +
+      `font-family:${FONT_DISPLAY};font-weight:700;font-size:34px;color:${COLORS.goldBright};` +
+      "text-shadow:0 0 10px #000,0 0 28px rgba(242,216,150,0.7);letter-spacing:2px;";
 
     this.toastBanner = document.createElement("div");
     this.toastBanner.style.cssText =
-      "position:fixed;left:50%;top:18%;transform:translate(-50%,-50%);" +
+      "position:fixed;left:50%;top:20%;transform:translate(-50%,-50%);" +
       "pointer-events:none;z-index:1000;display:none;text-align:center;" +
-      "font:bold 18px sans-serif;color:#fff;text-shadow:0 0 6px #000,0 0 12px #000;" +
-      "background:rgba(0,0,0,0.55);padding:8px 18px;border-radius:6px;max-width:70vw;";
+      `font-family:${FONT_DISPLAY};font-weight:600;font-size:17px;color:#fff;` +
+      "text-shadow:0 0 6px #000;letter-spacing:0.5px;" +
+      "background:linear-gradient(180deg, rgba(20,15,9,0.92), rgba(10,7,4,0.92));" +
+      "padding:9px 20px;border-radius:8px;max-width:70vw;border:1px solid rgba(201,162,75,0.4);" +
+      "box-shadow:0 6px 20px rgba(0,0,0,0.6);";
 
-    // Banner de anuncio de evento de mundo (Etapa 14): más prominente que el toast,
-    // ubicado más arriba, para eventos server-wide (el jefe despierta/cae).
+    // Banner de anuncio de evento de mundo (Etapa 14): más prominente que el toast.
     this.announceBanner = document.createElement("div");
     this.announceBanner.style.cssText =
-      "position:fixed;left:50%;top:9%;transform:translate(-50%,-50%);" +
+      "position:fixed;left:50%;top:11%;transform:translate(-50%,-50%);" +
       "pointer-events:none;z-index:1100;display:none;text-align:center;" +
-      "font:bold 22px 'Georgia',serif;color:#ffd54f;text-shadow:0 0 8px #000,0 0 16px #000;" +
-      "background:rgba(20,8,8,0.7);padding:10px 24px;border-radius:8px;border:1px solid #6b2b2b;max-width:80vw;";
+      `font-family:${FONT_DISPLAY};font-weight:700;font-size:23px;color:${COLORS.goldBright};` +
+      "text-shadow:0 0 10px #000,0 0 20px rgba(163,35,28,0.6);letter-spacing:1.5px;" +
+      "background:linear-gradient(180deg, rgba(38,10,10,0.85), rgba(16,6,6,0.85));" +
+      "padding:12px 30px;border-radius:10px;border:1px solid #6b2b2b;max-width:82vw;" +
+      "box-shadow:0 8px 28px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(201,162,75,0.2);";
 
     parent.appendChild(this.root);
     parent.appendChild(this.deathBanner);
@@ -118,10 +145,32 @@ export class Hud {
     parent.appendChild(this.announceBanner);
   }
 
+  /** Fila `icono + barra + valor` temática. */
+  private makeBar(kind: "hp" | "mp" | "exp", icon: string, iconColor: string, height = BAR_HEIGHT_PX) {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;gap:7px;";
+    const ic = document.createElement("div");
+    ic.textContent = icon;
+    ic.style.cssText = `width:14px;text-align:center;font-size:12px;color:${iconColor};text-shadow:0 0 4px rgba(0,0,0,0.9);`;
+    const { track, fill } = makeThemedBar(kind);
+    track.style.width = `${BAR_WIDTH_PX}px`;
+    track.style.height = `${height}px`;
+    const label = document.createElement("div");
+    label.style.cssText =
+      "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;" +
+      "font-size:11px;font-weight:600;color:#fff;text-shadow:0 1px 2px #000,0 0 3px #000;letter-spacing:0.3px;";
+    track.appendChild(label);
+    row.append(ic, track);
+    return { row, track, fill, label };
+  }
+
   /** Anuncio de evento de mundo (más prominente/duradero que un toast). */
   announce(msg: string, ms = 4500): void {
     this.announceBanner.textContent = msg;
     this.announceBanner.style.display = "";
+    this.announceBanner.style.animation = "none";
+    void this.announceBanner.offsetHeight;
+    this.announceBanner.style.animation = "aden-flash-in 4.5s ease forwards";
     if (this.announceTimer) clearTimeout(this.announceTimer);
     this.announceTimer = setTimeout(() => {
       this.announceBanner.style.display = "none";
@@ -137,6 +186,9 @@ export class Hud {
     this.toastBanner.textContent = msg;
     this.toastBanner.style.color = color;
     this.toastBanner.style.display = "";
+    this.toastBanner.classList.remove("aden-pop");
+    void this.toastBanner.offsetHeight;
+    this.toastBanner.classList.add("aden-pop");
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.toastTimer = setTimeout(() => {
       this.toastBanner.style.display = "none";
@@ -166,57 +218,59 @@ export class Hud {
     const hpRatio = maxHp > 0 ? Math.max(0, Math.min(1, hp / maxHp)) : 0;
     const mpRatio = maxMp > 0 ? Math.max(0, Math.min(1, mp / maxMp)) : 0;
     this.hpFill.style.width = `${hpRatio * 100}%`;
-    this.hpLabel.textContent = `HP ${Math.max(0, Math.round(hp))}/${Math.round(maxHp)}`;
+    this.hpLabel.textContent = `${Math.max(0, Math.round(hp))} / ${Math.round(maxHp)}`;
     this.mpFill.style.width = `${mpRatio * 100}%`;
-    this.mpLabel.textContent = `MP ${Math.max(0, Math.round(mp))}/${Math.round(maxMp)}`;
+    this.mpLabel.textContent = `${Math.max(0, Math.round(mp))} / ${Math.round(maxMp)}`;
     this.deathBanner.style.display = dead ? "" : "none";
+
+    // Flash rojo del marco al recibir daño.
+    if (hp < this.lastHp - 0.5 && !dead) {
+      this.hpTrack.style.boxShadow = "0 0 0 2px rgba(224,64,47,0.9), 0 0 14px rgba(224,64,47,0.7)";
+      setTimeout(() => { this.hpTrack.style.boxShadow = ""; }, 220);
+    }
+    this.lastHp = hp;
 
     const expNeeded = expToNextLevel(level);
     const expRatio = expNeeded > 0 ? Math.max(0, Math.min(1, exp / expNeeded)) : 0;
     this.expFill.style.width = `${expRatio * 100}%`;
-    this.expLabel.textContent = `EXP ${Math.max(0, Math.round(exp))}/${Math.round(expNeeded)}`;
-    this.levelLabel.textContent = `Nv. ${level}`;
-
-    // Actualizar clase y skill
-    try {
-      const classDef = getClass(className);
-      this.classLabel.textContent = `Clase: ${classDef.name}`;
-    } catch {
-      this.classLabel.textContent = "Clase: —";
-    }
+    this.expLabel.textContent = `${Math.max(0, Math.round(exp))} / ${Math.round(expNeeded)}`;
+    (this.levelMedallion as any)._num.textContent = String(level);
 
     try {
-      const skillDef = getSkill(skillId);
-      this.skillLabel.textContent = `Skill: ${skillDef.id}`;
+      this.classLabel.textContent = getClass(className).name;
     } catch {
-      this.skillLabel.textContent = "Skill: —";
+      this.classLabel.textContent = "—";
+    }
+    try {
+      this.skillLabel.textContent = `· ${getSkill(skillId).name}`;
+    } catch {
+      this.skillLabel.textContent = "";
     }
 
-    // Actualizar quest tracker
     if (questId === "") {
-      this.questLabel.textContent = "Sin misión";
+      this.questLabel.textContent = "⚑ Sin misión";
     } else {
       try {
         const quest = getQuest(questId);
-        const questText = `${quest.title} — ${questProgress}/${quest.amount}`;
-        if (questProgress >= quest.amount) {
-          this.questLabel.textContent = questText + " — ¡Volvé al NPC!";
-        } else {
-          this.questLabel.textContent = questText;
-        }
+        const questText = `⚑ ${quest.title} — ${questProgress}/${quest.amount}`;
+        this.questLabel.textContent =
+          questProgress >= quest.amount ? questText + " — ¡Volvé al Anciano!" : questText;
       } catch {
-        this.questLabel.textContent = "Misión desconocida";
+        this.questLabel.textContent = "⚑ Misión desconocida";
       }
     }
 
-    // Actualizar oro
-    this.goldLabel.textContent = `Oro: ${Math.round(gold)}`;
+    const goldSpan = this.goldLabel.querySelector("[data-gold]");
+    if (goldSpan) goldSpan.textContent = String(Math.round(gold));
   }
 
   /** Muestra "¡Subiste a nivel {level}!" centrado ~2s y luego lo oculta. */
   flashLevelUp(level: number) {
-    this.levelUpBanner.textContent = `¡Subiste a nivel ${level}!`;
+    this.levelUpBanner.textContent = `✦ ¡Nivel ${level}! ✦`;
     this.levelUpBanner.style.display = "";
+    this.levelUpBanner.style.animation = "none";
+    void this.levelUpBanner.offsetHeight;
+    this.levelUpBanner.style.animation = "aden-flash-in 2.2s ease forwards";
     if (this.levelUpTimer !== null) clearTimeout(this.levelUpTimer);
     this.levelUpTimer = setTimeout(() => {
       this.levelUpBanner.style.display = "none";
@@ -232,31 +286,4 @@ export class Hud {
     this.toastBanner.remove();
     this.announceBanner.remove();
   }
-}
-
-/** Crea una fila `label + barra` y devuelve [fila, relleno, label] para que el caller los guarde. */
-function makeBar(
-  width: number,
-  height: number,
-  bg: string,
-  fg: string,
-): [HTMLDivElement, HTMLDivElement, HTMLDivElement] {
-  const row = document.createElement("div");
-  row.style.cssText = "display:flex;align-items:center;gap:6px;";
-
-  const bar = document.createElement("div");
-  bar.style.cssText =
-    `width:${width}px;height:${height}px;background:${bg};` +
-    "border:1px solid rgba(0,0,0,0.8);border-radius:3px;overflow:hidden;position:relative;";
-
-  const fill = document.createElement("div");
-  fill.style.cssText = `height:100%;width:100%;background:${fg};`;
-  bar.appendChild(fill);
-
-  const label = document.createElement("div");
-  label.style.cssText = "min-width:70px;";
-  row.appendChild(bar);
-  row.appendChild(label);
-
-  return [row, fill, label];
 }

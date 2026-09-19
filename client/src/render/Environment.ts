@@ -12,15 +12,67 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-const SKY_TOP = 0x4a90d9;
+// Cielo de atardecer "dark fantasy épico": cenit índigo profundo → horizonte dorado.
+/** Descompone 0xRRGGBB en [r,g,b] 0-255. */
+function rgb(n: number): [number, number, number] {
+  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
+}
+/** Mezcla un color hacia negro/blanco por un factor (-1 oscurece, +1 aclara). */
+function shade([r, g, b]: [number, number, number], f: number): string {
+  const t = f < 0 ? 0 : 255;
+  const a = Math.abs(f);
+  return `rgb(${Math.round(r + (t - r) * a)},${Math.round(g + (t - g) * a)},${Math.round(b + (t - b) * a)})`;
+}
+
+/**
+ * Textura de suelo procedural (canvas, sin descargas) derivada del color del bioma:
+ * base + manchas de tonos cercanos (más claros/oscuros) + motas finas. Le da grano
+ * y variación al piso para que no se lea plano. Se repite (RepeatWrapping).
+ */
+function makeBiomeTexture(base: number): THREE.CanvasTexture {
+  const size = 256;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext("2d")!;
+  const c = rgb(base);
+  ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
+  ctx.fillRect(0, 0, size, size);
+  const rand = mulberry32(base ^ 0x9e3779b9);
+  // Manchas suaves de tonos cercanos.
+  const shades = [shade(c, 0.14), shade(c, -0.16), shade(c, 0.07), shade(c, -0.26), shade(c, -0.08)];
+  for (let i = 0; i < 240; i++) {
+    ctx.globalAlpha = 0.35 + rand() * 0.4;
+    ctx.fillStyle = shades[Math.floor(rand() * shades.length)];
+    const r = 4 + rand() * 16;
+    ctx.beginPath();
+    ctx.arc(rand() * size, rand() * size, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Motas/grietas finas.
+  ctx.globalAlpha = 0.5;
+  for (let i = 0; i < 500; i++) {
+    ctx.fillStyle = rand() < 0.5 ? shade(c, -0.35) : shade(c, 0.2);
+    ctx.fillRect(rand() * size, rand() * size, 1 + rand(), 1 + rand());
+  }
+  ctx.globalAlpha = 1;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = 4;
+  return tex;
+}
+
+const SKY_ZENITH = 0x101a33;
+const SKY_HORIZON = 0xe0a457;
+// Dirección del sol (rasante, bajo en el horizonte) → luz de hora dorada + sombras largas.
+const SUN_DIR = new THREE.Vector3(0.55, 0.42, 0.72).normalize();
 
 /** Intensidad del sol por zona (más oscuro cuanto más profundo/peligroso). */
 const SUN_INTENSITY: Record<string, number> = {
-  pueblo: 1.0,
-  bosque: 0.8,
-  ruinas: 0.55,
-  yermo: 0.7,
-  trono: 0.38,
+  pueblo: 1.15,
+  bosque: 0.9,
+  ruinas: 0.6,
+  yermo: 0.8,
+  trono: 0.42,
 };
 
 /**
@@ -38,6 +90,12 @@ export class Environment {
   private embers: THREE.Points | null = null;
   private skyMesh: THREE.Mesh | null = null;
   private readonly sunTarget = new THREE.Object3D();
+  // Vegetación que se mece con el viento (árboles, matas) — animada en updateMood.
+  private readonly swayers: { o: THREE.Object3D; phase: number; amt: number }[] = [];
+  private swayT = 0;
+  // Motas ambientales (polvo/cenizas) que siguen al jugador, tintadas por bioma.
+  private motes: THREE.Points | null = null;
+  private readonly motesGroup = new THREE.Group();
   // Objetivos de mood (se interpolan suavemente frame a frame).
   private curFogNear: number;
   private curFogFar: number;
@@ -46,21 +104,25 @@ export class Environment {
   constructor(private readonly scene: THREE.Scene) {
     const pueblo = getZone("pueblo").biome;
     this.addSky();
-    this.hemi = new THREE.HemisphereLight(0x9fc4e8, 0x4a5a3a, 0.9);
+    // Luz de relleno hemisférica: cielo cálido dorado arriba, rebote tierra abajo.
+    this.hemi = new THREE.HemisphereLight(0xcdb68e, 0x3a2c1e, 0.75);
     this.scene.add(this.hemi);
-    this.sun = new THREE.DirectionalLight(0xfff2d9, SUN_INTENSITY.pueblo);
-    this.sun.position.set(30, 60, 20);
+    // Sol de "hora dorada": clave cálida rasante que talla sombras largas.
+    this.sun = new THREE.DirectionalLight(0xffcf8a, SUN_INTENSITY.pueblo);
+    this.sun.position.copy(SUN_DIR).multiplyScalar(90);
     // Etapa 18: el sol proyecta sombras. La cámara de sombra es ortográfica y sigue
     // al jugador (updateMood) para mantener el frustum acotado alrededor de él.
     this.sun.castShadow = true;
     this.sun.shadow.mapSize.set(2048, 2048);
     const sc = this.sun.shadow.camera;
-    sc.near = 1; sc.far = 220; sc.left = -55; sc.right = 55; sc.top = 55; sc.bottom = -55;
+    sc.near = 1; sc.far = 260; sc.left = -60; sc.right = 60; sc.top = 60; sc.bottom = -60;
     this.sun.shadow.bias = -0.0004;
+    this.sun.shadow.normalBias = 0.02;
     this.scene.add(this.sun);
     this.scene.add(this.sunTarget);
     this.sun.target = this.sunTarget;
-    this.scene.add(new THREE.AmbientLight(0xffffff, 0.22));
+    // Ambiente cálido tenue (no lavar los negros del dusk).
+    this.scene.add(new THREE.AmbientLight(0xffe6c2, 0.2));
 
     this.fog = new THREE.Fog(pueblo.fog, pueblo.fogNear, pueblo.fogFar);
     this.scene.fog = this.fog;
@@ -73,57 +135,105 @@ export class Environment {
     this.paintBiomes();
     this.structures();
     this.populate();
+    this.addMotes();
     this.enableShadows();
+  }
+
+  /**
+   * Nube de motas ambientales (polvo en suspensión / cenizas) que sigue al jugador
+   * y se tinta con el acento del bioma actual. Da "aire" y profundidad a la escena
+   * a bajísimo costo (un solo Points). Se recolocan alrededor del jugador cada frame.
+   */
+  private addMotes(): void {
+    const N = 140;
+    const positions = new Float32Array(N * 3);
+    const rng = mulberry32(4242);
+    for (let i = 0; i < N; i++) {
+      positions[i * 3] = (rng() * 2 - 1) * 28;
+      positions[i * 3 + 1] = rng() * 14;
+      positions[i * 3 + 2] = (rng() * 2 - 1) * 28;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({
+      color: 0xe9dcc2, size: 0.16, transparent: true, opacity: 0.5,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    this.motes = new THREE.Points(geo, mat);
+    this.motes.frustumCulled = false;
+    this.motesGroup.add(this.motes);
+    this.scene.add(this.motesGroup);
   }
 
   /** Etapa 18: activa proyección/recepción de sombras en todas las mallas (menos el cielo). */
   private enableShadows(): void {
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
-      if (m.isMesh && m !== this.skyMesh) { m.castShadow = true; m.receiveShadow = true; }
+      if (!m.isMesh || m === this.skyMesh) return;
+      // Los suelos sólo RECIBEN sombra (no la proyectan): evita auto-sombra y ahorra.
+      if (m.userData.ground) { m.castShadow = false; m.receiveShadow = true; return; }
+      m.castShadow = true; m.receiveShadow = true;
     });
   }
 
   private addSky() {
-    const geo = new THREE.SphereGeometry(400, 32, 16);
+    const geo = new THREE.SphereGeometry(400, 48, 24);
     const mat = new THREE.ShaderMaterial({
       side: THREE.BackSide,
       depthWrite: false,
       uniforms: {
-        top: { value: new THREE.Color(SKY_TOP) },
-        bottom: { value: new THREE.Color(0xbcd9f0) },
-        exponent: { value: 0.6 },
+        zenith: { value: new THREE.Color(SKY_ZENITH) },
+        horizon: { value: new THREE.Color(SKY_HORIZON) },
+        sunDir: { value: SUN_DIR.clone() },
+        sunColor: { value: new THREE.Color(0xffe0a0) },
+        exponent: { value: 0.72 },
       },
       vertexShader: `
-        varying vec3 vWorld;
+        varying vec3 vDir;
         void main() {
-          vec4 w = modelMatrix * vec4(position, 1.0);
-          vWorld = w.xyz;
+          vDir = normalize(position);
           gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
         }`,
+      // Gradiente cenit→horizonte + resplandor del sol (halo dorado) + un disco tenue.
       fragmentShader: `
-        uniform vec3 top; uniform vec3 bottom; uniform float exponent;
-        varying vec3 vWorld;
+        uniform vec3 zenith; uniform vec3 horizon; uniform vec3 sunDir; uniform vec3 sunColor; uniform float exponent;
+        varying vec3 vDir;
         void main() {
-          float h = normalize(vWorld + vec3(0.0, 30.0, 0.0)).y;
-          float t = pow(max(h, 0.0), exponent);
-          gl_FragColor = vec4(mix(bottom, top, t), 1.0);
+          vec3 d = normalize(vDir);
+          float h = pow(max(d.y, 0.0), exponent);
+          vec3 col = mix(horizon, zenith, h);
+          // Halo del sol: crece cerca de la dirección del sol.
+          float sd = max(dot(d, normalize(sunDir)), 0.0);
+          col += sunColor * pow(sd, 8.0) * 0.5;       // halo amplio
+          col += sunColor * pow(sd, 220.0) * 1.6;     // disco brillante
+          // Bruma cálida sobre el horizonte.
+          float haze = smoothstep(0.16, -0.05, d.y);
+          col = mix(col, horizon * 1.05, haze * 0.5);
+          gl_FragColor = vec4(col, 1.0);
         }`,
     });
     this.skyMesh = new THREE.Mesh(geo, mat);
+    this.skyMesh.renderOrder = -1;
     this.scene.add(this.skyMesh);
   }
 
-  /** Suelo coloreado por cada MAPA (Etapa 15): una placa rectangular sobre su región. */
+  /**
+   * Suelo por cada MAPA (Etapa 15): una placa rectangular sobre su región. Ahora
+   * con TEXTURA procedural (canvas) derivada del color del bioma —moteado + motas—
+   * para que el piso no se vea plano/chato. Se repite para dar detalle fino.
+   */
   private paintBiomes() {
     for (const z of ZONES) {
       const w = z.bounds.maxX - z.bounds.minX;
       const d = z.bounds.maxZ - z.bounds.minZ;
-      const geo = new THREE.PlaneGeometry(w, d);
-      const mat = new THREE.MeshStandardMaterial({ color: z.biome.ground, flatShading: true });
+      const geo = new THREE.PlaneGeometry(w, d, 1, 1);
+      const tex = makeBiomeTexture(z.biome.ground);
+      tex.repeat.set(Math.max(2, Math.round(w / 22)), Math.max(2, Math.round(d / 22)));
+      const mat = new THREE.MeshStandardMaterial({ map: tex, color: 0xffffff, roughness: 0.95, metalness: 0.0 });
       const plate = new THREE.Mesh(geo, mat);
       plate.rotation.x = -Math.PI / 2;
       plate.position.set(z.center.x, 0.02, z.center.z);
+      plate.userData.ground = true;
       this.scene.add(plate);
     }
   }
@@ -369,6 +479,7 @@ export class Environment {
       g.position.set(x, 0.3, zz);
       g.rotation.y = rng() * Math.PI;
       this.scene.add(g);
+      this.swayers.push({ o: g, phase: rng() * Math.PI * 2, amt: 0.06 + rng() * 0.06 });
     }
   }
 
@@ -429,6 +540,7 @@ export class Environment {
       }
       tree.position.set(x, 0, zz);
       this.scene.add(tree);
+      this.swayers.push({ o: tree, phase: rng() * Math.PI * 2, amt: 0.012 + rng() * 0.016 });
     }
     for (let i = 0; i < 16; i++) {
       const [x, zz] = this.spot(z, rng);
@@ -509,6 +621,7 @@ export class Environment {
     tree.position.set(x, 0, z);
     tree.rotation.y = rng() * Math.PI * 2;
     this.scene.add(tree);
+    this.swayers.push({ o: tree, phase: rng() * Math.PI * 2, amt: 0.018 + rng() * 0.022 });
   }
 
   /** Esfera emissiva + point light para fogatas/braseros/cristales de acento. */
@@ -553,14 +666,36 @@ export class Environment {
    */
   updateMood(x: number, z: number, dt: number): void {
     // Etapa 18: el sol (y su cámara de sombra) siguen al jugador para mantener el
-    // frustum de sombras acotado a su alrededor.
-    this.sun.position.set(x + 40, 75, z + 28);
+    // frustum de sombras acotado a su alrededor. Ángulo de "hora dorada" (SUN_DIR).
+    this.sun.position.set(x + SUN_DIR.x * 90, SUN_DIR.y * 90, z + SUN_DIR.z * 90);
     this.sunTarget.position.set(x, 0, z);
     this.sunTarget.updateMatrixWorld();
 
     const zone = zoneAt(x, z);
     const b = zone.biome;
     const k = Math.min(1, dt * 1.5); // rapidez de transición
+
+    // Viento: mece suavemente árboles y matas (dos armónicos → ráfagas irregulares).
+    this.swayT += dt;
+    for (const s of this.swayers) {
+      s.o.rotation.z = (Math.sin(this.swayT * 1.1 + s.phase) + 0.4 * Math.sin(this.swayT * 2.3 + s.phase)) * s.amt;
+    }
+
+    // Motas ambientales: siguen al jugador, ascienden/derivan y se tintan por bioma.
+    this.motesGroup.position.set(x, 0, z);
+    if (this.motes) {
+      const pos = this.motes.geometry.getAttribute("position") as THREE.BufferAttribute;
+      for (let i = 0; i < pos.count; i++) {
+        let y = pos.getY(i) + dt * 0.35;
+        let mx = pos.getX(i) + Math.sin(this.swayT * 0.5 + i) * dt * 0.25;
+        if (y > 14) { y = 0; mx = (Math.sin(i * 12.9898) * 43758.5) % 1 * 56 - 28; }
+        pos.setY(i, y);
+        pos.setX(i, mx);
+      }
+      pos.needsUpdate = true;
+      const mat = this.motes.material as THREE.PointsMaterial;
+      mat.color.lerp(new THREE.Color(b.accent).lerp(new THREE.Color(0xffffff), 0.45), k * 0.5);
+    }
 
     this.fog.color.lerp(new THREE.Color(b.fog), k);
     this.bgColor.copy(this.fog.color);

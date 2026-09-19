@@ -1,4 +1,5 @@
 import { type Zone, getZone } from "@aden/shared";
+import { COLORS, FONT_DISPLAY } from "./theme.js";
 
 export type MinimapEntity = { x: number; z: number; kind: "self" | "player" | "mob" | "boss" };
 
@@ -28,14 +29,16 @@ export class Minimap {
 
     this.nameEl = document.createElement("div");
     this.nameEl.style.cssText =
-      "font:bold 11px sans-serif;color:#fff;text-shadow:0 0 3px #000;margin-bottom:3px;";
+      `font-family:${FONT_DISPLAY};font-weight:700;font-size:12px;color:${COLORS.goldBright};` +
+      "letter-spacing:1px;text-shadow:0 1px 3px #000;margin-bottom:4px;";
     wrap.appendChild(this.nameEl);
 
     this.canvas = document.createElement("canvas");
     this.canvas.width = SIZE;
     this.canvas.height = SIZE;
     this.canvas.style.cssText =
-      "border:2px solid #555;border-radius:6px;background:rgba(10,14,10,0.72);box-shadow:0 2px 8px rgba(0,0,0,0.5);";
+      "border:2px solid #4a380f;border-radius:8px;background:rgba(10,8,5,0.78);" +
+      "box-shadow:0 6px 18px rgba(0,0,0,0.6), inset 0 0 0 1px rgba(201,162,75,0.35);";
     wrap.appendChild(this.canvas);
     parent.appendChild(wrap);
     this.ctx = this.canvas.getContext("2d")!;

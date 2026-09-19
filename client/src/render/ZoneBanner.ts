@@ -1,4 +1,5 @@
 import { getZone } from "@aden/shared";
+import { COLORS, FONT_DISPLAY, FONT_BODY } from "./theme.js";
 
 /**
  * Cartel cinemático de zona (Etapa 11). Cuando el jugador cruza a una zona nueva,
@@ -23,17 +24,24 @@ export class ZoneBanner {
 
     this.levelEl = document.createElement("div");
     this.levelEl.style.cssText =
-      "font:bold 12px sans-serif;letter-spacing:2px;color:#ffd54f;margin-bottom:6px;text-transform:uppercase;";
+      `font-family:${FONT_DISPLAY};font-weight:600;font-size:12px;letter-spacing:3px;color:${COLORS.gold};margin-bottom:8px;text-transform:uppercase;`;
 
     this.titleEl = document.createElement("div");
     this.titleEl.style.cssText =
-      "font:bold 40px 'Georgia',serif;color:#fff;letter-spacing:1px;line-height:1.1;";
+      `font-family:${FONT_DISPLAY};font-weight:700;font-size:46px;color:#fff;letter-spacing:2px;line-height:1.05;` +
+      "text-shadow:0 2px 12px rgba(0,0,0,0.9),0 0 30px rgba(201,162,75,0.35);";
+
+    // Filete dorado decorativo bajo el título.
+    const rule = document.createElement("div");
+    rule.style.cssText =
+      "height:2px;width:min(60%,320px);margin:12px auto 0;" +
+      `background:linear-gradient(90deg,transparent,${COLORS.gold},transparent);`;
 
     this.subEl = document.createElement("div");
     this.subEl.style.cssText =
-      "font:italic 16px 'Georgia',serif;color:#d8d2c4;margin-top:8px;";
+      `font-family:${FONT_BODY};font-style:italic;font-size:17px;color:${COLORS.parchment};margin-top:10px;`;
 
-    this.root.append(this.levelEl, this.titleEl, this.subEl);
+    this.root.append(this.levelEl, this.titleEl, rule, this.subEl);
   }
 
   mount(parent: HTMLElement = document.body): void {

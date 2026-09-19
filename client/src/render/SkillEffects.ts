@@ -43,12 +43,20 @@ export class SkillEffects {
     }
     const to = target ? new THREE.Vector3(target.x, 1.2, target.z) : from;
     if (skill.projectile && target) {
-      this.push(this.projectile(from, to, color, () => this.push(this.impact(target, color))));
+      this.push(this.projectile(from, to, color, () => this.hitBurst(target, color)));
     } else if (skill.type === "dot" && target) {
       this.push(this.impact(target, color, 1.3));
+      this.push(this.burst(target, color, 8));
     } else if (target) {
-      this.push(this.impact(target, color));
+      this.hitBurst(target, color);
     }
+  }
+
+  /** Impacto completo de un golpe: destello + onda de choque + chispas hacia afuera. */
+  private hitBurst(pos: Vec3, color: number): void {
+    this.push(this.impact(pos, color));
+    this.push(this.ring(pos, color, 0.3, 2.0, 0.35, 0.7)); // onda de choque
+    this.push(this.burst(pos, color, 12));
   }
 
   update(dt: number): void {
@@ -82,22 +90,64 @@ export class SkillEffects {
     };
   }
 
-  /** Proyectil emissivo que viaja del caster al objetivo; al llegar llama onArrive. */
+  /** Proyectil emissivo (núcleo + halo) que viaja del caster al objetivo; al llegar llama onArrive. */
   private projectile(from: THREE.Vector3, to: THREE.Vector3, color: number, onArrive: () => void): Effect {
+    const group = new THREE.Group();
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false });
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.4, 12, 12), mat);
-    mesh.position.copy(from);
-    this.scene.add(mesh);
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 12), mat);
+    // Halo tenue alrededor del núcleo → se siente "energético" con el bloom.
+    const haloMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
+    const halo = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 12), haloMat);
+    group.add(mesh, halo);
+    group.position.copy(from);
+    this.scene.add(group);
     const dist = from.distanceTo(to);
     const dur = Math.max(0.12, dist / 34); let t = 0; let arrived = false;
+    let pulse = 0;
     return {
       update: (dt) => {
         t += dt; const k = Math.min(1, t / dur);
-        mesh.position.lerpVectors(from, to, k);
+        group.position.lerpVectors(from, to, k);
+        pulse += dt * 12;
+        halo.scale.setScalar(1 + Math.sin(pulse) * 0.15);
         if (k >= 1 && !arrived) { arrived = true; onArrive(); }
         return t < dur;
       },
-      dispose: () => { this.scene.remove(mesh); mesh.geometry.dispose(); mat.dispose(); },
+      dispose: () => { this.scene.remove(group); mesh.geometry.dispose(); mat.dispose(); halo.geometry.dispose(); haloMat.dispose(); },
+    };
+  }
+
+  /** Chispas que salen disparadas hacia afuera con gravedad (impacto de golpe). */
+  private burst(pos: Vec3, color: number, n: number): Effect {
+    const positions = new Float32Array(n * 3);
+    const vx = new Float32Array(n), vy = new Float32Array(n), vz = new Float32Array(n);
+    const cy = pos.y ?? 1.2;
+    for (let i = 0; i < n; i++) {
+      positions[i * 3] = pos.x; positions[i * 3 + 1] = cy; positions[i * 3 + 2] = pos.z;
+      const a = Math.random() * Math.PI * 2; const sp = 2.5 + Math.random() * 3;
+      vx[i] = Math.cos(a) * sp; vy[i] = 1.5 + Math.random() * 3; vz[i] = Math.sin(a) * sp;
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+    const mat = new THREE.PointsMaterial({ color, size: 0.22, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false });
+    const pts = new THREE.Points(geo, mat);
+    this.scene.add(pts);
+    const dur = 0.45; let t = 0;
+    const attr = geo.getAttribute("position") as THREE.BufferAttribute;
+    return {
+      update: (dt) => {
+        t += dt;
+        for (let i = 0; i < n; i++) {
+          vy[i] -= 9 * dt; // gravedad
+          attr.setX(i, attr.getX(i) + vx[i] * dt);
+          attr.setY(i, Math.max(0.05, attr.getY(i) + vy[i] * dt));
+          attr.setZ(i, attr.getZ(i) + vz[i] * dt);
+        }
+        attr.needsUpdate = true;
+        mat.opacity = Math.max(0, 1 - t / dur);
+        return t < dur;
+      },
+      dispose: () => { this.scene.remove(pts); geo.dispose(); mat.dispose(); },
     };
   }
 

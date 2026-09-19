@@ -5,6 +5,7 @@ import {
   RARITY_COLORS,
   type EquipSlot,
 } from "@aden/shared";
+import { COLORS, FONT_DISPLAY, FONT_BODY } from "./theme.js";
 
 export interface InventoryPanelCallbacks {
   onUseItem?: (itemTemplateId: string) => void;
@@ -38,15 +39,16 @@ export class InventoryPanel {
   constructor(parent: HTMLElement = document.body, cb: InventoryPanelCallbacks = {}) {
     this.cb = cb;
     this.root = document.createElement("div");
+    this.root.className = "aden-panel aden-scroll aden-fadein";
     this.root.style.cssText =
-      // top:192 → debajo del minimapa (168px + margen) para no superponerse.
-      "position:fixed;right:12px;top:192px;display:none;pointer-events:none;z-index:1000;" +
-      "min-width:210px;max-width:240px;font:12px sans-serif;text-shadow:0 0 3px #000;color:#fff;" +
-      "background:rgba(0,0,0,0.6);border-radius:6px;padding:8px 10px;user-select:none;";
+      // top:200 → debajo del minimapa para no superponerse.
+      "position:fixed;right:14px;top:200px;display:none;pointer-events:none;z-index:1000;" +
+      `min-width:222px;max-width:250px;max-height:60vh;overflow-y:auto;font-family:${FONT_BODY};` +
+      `font-size:13px;color:${COLORS.text};padding:12px 14px;user-select:none;`;
 
     const title = document.createElement("div");
-    title.textContent = "Inventario y Equipo";
-    title.style.cssText = "font-weight:bold;margin-bottom:6px;";
+    title.textContent = "⚔ Inventario y Equipo";
+    title.style.cssText = `font-family:${FONT_DISPLAY};font-weight:700;font-size:16px;color:${COLORS.goldBright};margin-bottom:8px;letter-spacing:0.5px;`;
     this.root.appendChild(title);
 
     this.body = document.createElement("div");
@@ -71,8 +73,12 @@ export class InventoryPanel {
     const btn = document.createElement("button");
     btn.textContent = label;
     btn.style.cssText =
-      `padding:2px 7px;background:${color};color:#000;border:none;border-radius:3px;` +
-      "font:10px bold sans-serif;cursor:pointer;pointer-events:auto;";
+      `padding:3px 9px;background:linear-gradient(180deg,${color},${color}bb);color:#0d0a05;` +
+      "border:1px solid rgba(0,0,0,0.5);border-radius:4px;font-weight:700;font-size:11px;" +
+      "cursor:pointer;pointer-events:auto;box-shadow:0 2px 5px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.35);" +
+      "transition:filter 0.12s;";
+    btn.addEventListener("mouseenter", () => { btn.style.filter = "brightness(1.12)"; });
+    btn.addEventListener("mouseleave", () => { btn.style.filter = "none"; });
     btn.addEventListener("click", onClick);
     return btn;
   }
@@ -99,7 +105,7 @@ export class InventoryPanel {
     // ── Paperdoll: 3 slots de equipo ───────────────────────────────────
     const equipHeader = document.createElement("div");
     equipHeader.textContent = "Equipo";
-    equipHeader.style.cssText = "font-weight:bold;opacity:0.8;margin-top:2px;";
+    equipHeader.style.cssText = `font-family:${FONT_DISPLAY};font-weight:600;color:${COLORS.gold};margin-top:4px;letter-spacing:1px;font-size:12px;`;
     this.body.appendChild(equipHeader);
 
     for (const slot of EQUIP_SLOTS) {
@@ -127,7 +133,7 @@ export class InventoryPanel {
 
     // ── Divisor ────────────────────────────────────────────────────────
     const hr = document.createElement("div");
-    hr.style.cssText = "height:1px;background:rgba(255,255,255,0.15);margin:4px 0;";
+    hr.style.cssText = `height:1px;background:linear-gradient(90deg,transparent,${COLORS.goldDeep},transparent);margin:6px 0;`;
     this.body.appendChild(hr);
 
     // ── Inventario ─────────────────────────────────────────────────────

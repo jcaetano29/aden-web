@@ -1,3 +1,5 @@
+import { COLORS, FONT_DISPLAY } from "./theme.js";
+
 export interface BossState {
   name: string;
   hp: number;
@@ -24,28 +26,40 @@ export class BossBar {
   constructor(parent: HTMLElement = document.body) {
     this.root = document.createElement("div");
     this.root.style.cssText =
-      "position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:1100;" +
-      "display:none;pointer-events:none;text-align:center;width:min(46vw,420px);" +
-      "font:12px sans-serif;color:#fff;text-shadow:0 0 4px #000;";
+      "position:fixed;top:16px;left:50%;transform:translateX(-50%);z-index:1100;" +
+      "display:none;pointer-events:none;text-align:center;width:min(52vw,480px);" +
+      `font-family:${FONT_DISPLAY};color:#fff;`;
 
     this.nameEl = document.createElement("div");
-    this.nameEl.style.cssText = "font:bold 15px 'Georgia',serif;color:#ff6b6b;letter-spacing:1px;margin-bottom:3px;";
+    this.nameEl.style.cssText =
+      "font-weight:700;font-size:17px;color:#ff6b6b;letter-spacing:3px;margin-bottom:5px;" +
+      "text-transform:uppercase;text-shadow:0 0 8px #000,0 0 16px rgba(163,35,28,0.8);";
     this.root.appendChild(this.nameEl);
 
     this.barWrap = document.createElement("div");
     this.barWrap.style.cssText =
-      "position:relative;height:16px;background:#3a0d0d;border:1px solid #000;border-radius:4px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.6);";
+      "position:relative;height:20px;border-radius:5px;overflow:hidden;" +
+      "background:linear-gradient(180deg,#1a0605,#2c0a0a);" +
+      "border:1px solid #5a1512;box-shadow:0 4px 16px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(201,162,75,0.25);";
     this.fill = document.createElement("div");
-    this.fill.style.cssText = "height:100%;width:100%;background:linear-gradient(#ff5252,#a31212);transition:width 0.15s;";
+    this.fill.style.cssText =
+      "height:100%;width:100%;transition:width 0.18s ease;position:relative;" +
+      "background:linear-gradient(180deg,#ff6b52,#c0201a 60%,#7a1210);" +
+      "box-shadow:0 0 14px rgba(255,80,60,0.6);";
+    // Brillo superior en el relleno.
+    const sheen = document.createElement("div");
+    sheen.style.cssText = "position:absolute;inset:0 0 auto 0;height:45%;background:linear-gradient(180deg,rgba(255,255,255,0.35),rgba(255,255,255,0));";
+    this.fill.appendChild(sheen);
     this.barWrap.appendChild(this.fill);
     this.hpText = document.createElement("div");
     this.hpText.style.cssText =
-      "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font:bold 11px sans-serif;";
+      "position:absolute;inset:0;display:flex;align-items:center;justify-content:center;" +
+      "font-weight:700;font-size:12px;letter-spacing:0.5px;text-shadow:0 1px 3px #000,0 0 4px #000;";
     this.barWrap.appendChild(this.hpText);
     this.root.appendChild(this.barWrap);
 
     this.subText = document.createElement("div");
-    this.subText.style.cssText = "margin-top:3px;font-size:12px;color:#ffd54f;";
+    this.subText.style.cssText = `margin-top:5px;font-size:13px;color:${COLORS.exp1};letter-spacing:1px;text-shadow:0 1px 3px #000;`;
     this.root.appendChild(this.subText);
 
     parent.appendChild(this.root);
@@ -72,7 +86,7 @@ export class BossBar {
       if (this.deadSince === null) this.deadSince = performance.now();
       const remaining = respawnTotalMs - (performance.now() - this.deadSince);
       this.root.style.display = "";
-      this.nameEl.textContent = boss.name;
+      this.nameEl.textContent = `☠ ${boss.name}`;
       this.barWrap.style.display = "none";
       this.subText.textContent = `Renace en ${BossBar.fmt(remaining)}`;
       return;
@@ -86,7 +100,7 @@ export class BossBar {
     }
     this.root.style.display = "";
     this.barWrap.style.display = "";
-    this.nameEl.textContent = boss.name;
+    this.nameEl.textContent = `☠ ${boss.name} ☠`;
     const ratio = boss.maxHp > 0 ? Math.max(0, Math.min(1, boss.hp / boss.maxHp)) : 0;
     this.fill.style.width = `${ratio * 100}%`;
     this.hpText.textContent = `${Math.max(0, Math.round(boss.hp))} / ${Math.round(boss.maxHp)}`;

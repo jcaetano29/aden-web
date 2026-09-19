@@ -16,6 +16,7 @@ const DEFAULT_COLOR = 0xffffff;
 interface ActiveItem {
   mesh: THREE.Mesh;
   light: THREE.PointLight;
+  beam: THREE.Mesh | null;
   bornAt: number;
 }
 
@@ -34,26 +35,42 @@ export class GroundItems {
   add(id: string, itemTemplateId: string, x: number, z: number) {
     if (this.items.has(id)) return;
     let color = DEFAULT_COLOR;
+    let isEquip = false;
     try {
       const item = getItem(itemTemplateId);
       // Etapa 12: el equipo brilla con el color de su rareza (un legendario "canta"
       // desde el piso) — refuerza la emoción del loot; el resto usa color por tipo.
-      color = item.type === "equipment"
+      isEquip = item.type === "equipment";
+      color = isEquip
         ? parseInt(RARITY_COLORS[item.rarity ?? "common"].slice(1), 16)
         : COLOR_BY_TYPE[item.type] ?? DEFAULT_COLOR;
     } catch {
       // itemTemplateId desconocido (no debería pasar si server/shared están en sync):
       // usar color default en vez de romper el render.
     }
-    const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.7 });
+    const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.9 });
     const mesh = new THREE.Mesh(this.geometry, material);
     mesh.position.set(x, ITEM_Y, z);
     // lucecita del color del ítem para que "brille" en el piso
-    const light = new THREE.PointLight(color, 1.2, 4);
+    const light = new THREE.PointLight(color, 1.4, 5);
     light.position.set(0, 0, 0);
     mesh.add(light);
     this.scene.add(mesh);
-    this.items.set(id, { mesh, light, bornAt: performance.now() });
+
+    // Haz de luz vertical para el EQUIPO: un pilar tenue del color de la rareza que
+    // se ve de lejos y hace que el loot importante llame la atención (con el bloom canta).
+    let beam: THREE.Mesh | null = null;
+    if (isEquip) {
+      const beamMat = new THREE.MeshBasicMaterial({
+        color, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending,
+        depthWrite: false, side: THREE.DoubleSide,
+      });
+      beam = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.42, 3.4, 12, 1, true), beamMat);
+      beam.position.set(x, 1.7, z);
+      this.scene.add(beam);
+    }
+
+    this.items.set(id, { mesh, light, beam, bornAt: performance.now() });
   }
 
   remove(id: string) {
@@ -62,6 +79,11 @@ export class GroundItems {
     entry.mesh.remove(entry.light);
     this.scene.remove(entry.mesh);
     if (entry.mesh.material instanceof THREE.Material) entry.mesh.material.dispose();
+    if (entry.beam) {
+      this.scene.remove(entry.beam);
+      entry.beam.geometry.dispose();
+      (entry.beam.material as THREE.Material).dispose();
+    }
     this.items.delete(id);
   }
 

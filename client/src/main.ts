@@ -25,6 +25,7 @@ import { StoryCard } from "./render/StoryCard.js";
 import { DialogPanel } from "./render/DialogPanel.js";
 import { ZoneIndicator } from "./render/ZoneIndicator.js";
 import { ZoneBanner } from "./render/ZoneBanner.js";
+import { injectTheme } from "./render/theme.js";
 import { NetworkClient } from "./net/NetworkClient.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
@@ -34,6 +35,7 @@ import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from ".
 import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE } from "@aden/shared";
 
 async function main() {
+  injectTheme(); // sistema de diseño (fuentes, tokens, clases) — antes de crear cualquier panel
   const app = document.getElementById("app")!;
   const renderer = new Renderer(app);
   const environment = new Environment(renderer.scene); // biomas por zona, niebla dinámica, props
@@ -102,16 +104,8 @@ async function main() {
   // se usa para saber cuándo limpiar el resaltado visual).
   let currentTargetId: string | null = null;
 
-  let name: string;
-  try {
-    name = prompt("Nombre de tu personaje:") ?? "Adventurer";
-  } catch {
-    // prompt() puede no estar disponible en algunos contextos (p.ej. embebido); fallback seguro.
-    name = "Adventurer";
-  }
-
-  // Esperar la selección de clase antes de conectar
-  const className = await classSelect.select();
+  // Pantalla de creación de personaje (nombre + clase) — reemplaza al prompt() nativo.
+  const { name, className } = await classSelect.create();
 
   // Mostrar la premisa narrativa una sola vez
   await storyCard.show();
@@ -538,13 +532,15 @@ function showServerOffline(): void {
   const div = document.createElement("div");
   div.style.cssText =
     "position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;" +
-    "background:rgba(8,10,16,0.95);color:#fff;font:16px sans-serif;text-align:center;padding:24px;gap:10px;";
+    "background:radial-gradient(120% 90% at 50% -10%, #1a1206 0%, #0c0a07 55%, #050403 100%);" +
+    "color:#ddceb0;font-family:'EB Garamond','Georgia',serif;text-align:center;padding:24px;gap:12px;";
   div.innerHTML =
-    `<div style="font:bold 26px 'Georgia',serif;color:#ffd54f;">Aden está dormida</div>` +
-    `<div style="max-width:520px;opacity:0.9;line-height:1.5;">No se pudo conectar al servidor del juego.<br>` +
+    `<div style="font-family:'Cinzel','Georgia',serif;font-weight:700;font-size:34px;letter-spacing:3px;color:#f2d896;text-shadow:0 0 18px rgba(201,162,75,0.4);">Aden está dormida</div>` +
+    `<div style="height:2px;width:160px;background:linear-gradient(90deg,transparent,#c9a24b,transparent);"></div>` +
+    `<div style="max-width:520px;opacity:0.92;line-height:1.6;font-size:17px;">No se pudo conectar al servidor del juego.<br>` +
     `El mundo de Aden necesita su servidor en línea para jugar.</div>` +
-    `<div style="opacity:0.5;font-size:12px;margin-top:8px;">Servidor: ${url}</div>` +
-    `<button onclick="location.reload()" style="margin-top:14px;padding:8px 18px;background:#ffd54f;color:#000;border:none;border-radius:6px;font:bold 14px sans-serif;cursor:pointer;">Reintentar</button>`;
+    `<div style="opacity:0.45;font-size:12px;margin-top:6px;">Servidor: ${url}</div>` +
+    `<button onclick="location.reload()" class="aden-btn" style="margin-top:16px;">Reintentar</button>`;
   document.body.appendChild(div);
 }
 

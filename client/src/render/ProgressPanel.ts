@@ -1,4 +1,5 @@
 import { ACHIEVEMENTS, getDailyQuest, type Achievement } from "@aden/shared";
+import { COLORS, FONT_DISPLAY, FONT_BODY } from "./theme.js";
 
 export interface ProgressView {
   loginStreak: number;
@@ -27,15 +28,15 @@ export class ProgressPanel {
   constructor(onSetTitle: (title: string) => void) {
     this.onSetTitle = onSetTitle;
     this.root = document.createElement("div");
+    this.root.className = "aden-panel aden-scroll";
     this.root.style.cssText =
       "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:none;z-index:1200;" +
-      "min-width:320px;max-width:420px;max-height:80vh;overflow-y:auto;pointer-events:auto;" +
-      "font:13px sans-serif;color:#fff;background:rgba(12,14,20,0.94);border:1px solid #3a3f52;" +
-      "border-radius:8px;padding:16px 18px;box-shadow:0 8px 32px rgba(0,0,0,0.6);";
+      `min-width:340px;max-width:440px;max-height:80vh;overflow-y:auto;pointer-events:auto;` +
+      `font-family:${FONT_BODY};font-size:13px;color:${COLORS.text};padding:18px 20px;`;
 
     const title = document.createElement("div");
-    title.textContent = "Progreso";
-    title.style.cssText = "font:bold 18px serif;margin-bottom:10px;color:#ffd54f;";
+    title.textContent = "📜 Crónica del Héroe";
+    title.style.cssText = `font-family:${FONT_DISPLAY};font-weight:700;font-size:19px;margin-bottom:12px;color:${COLORS.goldBright};letter-spacing:0.5px;`;
     this.root.appendChild(title);
 
     this.body = document.createElement("div");
@@ -43,7 +44,7 @@ export class ProgressPanel {
 
     const hint = document.createElement("div");
     hint.textContent = "Tecla T para cerrar";
-    hint.style.cssText = "margin-top:10px;opacity:0.5;font-size:11px;text-align:center;";
+    hint.style.cssText = `margin-top:12px;opacity:0.5;font-size:11px;text-align:center;letter-spacing:1px;color:${COLORS.textDim};`;
     this.root.appendChild(hint);
   }
 
@@ -64,7 +65,9 @@ export class ProgressPanel {
   private section(titleText: string): HTMLDivElement {
     const h = document.createElement("div");
     h.textContent = titleText;
-    h.style.cssText = "font-weight:bold;margin:12px 0 4px;color:#9fb4ff;";
+    h.style.cssText =
+      `font-family:${FONT_DISPLAY};font-weight:600;margin:14px 0 6px;color:${COLORS.gold};letter-spacing:1px;font-size:13px;` +
+      `border-bottom:1px solid rgba(201,162,75,0.2);padding-bottom:3px;`;
     this.body.appendChild(h);
     return h;
   }
@@ -146,8 +149,11 @@ export class ProgressPanel {
     const b = document.createElement("button");
     b.textContent = text;
     b.style.cssText =
-      `padding:3px 9px;background:${bg};color:#000;border:none;border-radius:4px;` +
-      "font:11px bold sans-serif;cursor:pointer;pointer-events:auto;white-space:nowrap;";
+      `padding:4px 11px;background:linear-gradient(180deg,${bg},${bg}bb);color:#0d0a05;` +
+      "border:1px solid rgba(0,0,0,0.5);border-radius:4px;font-weight:700;font-size:11px;" +
+      "cursor:pointer;pointer-events:auto;white-space:nowrap;box-shadow:0 2px 5px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.3);transition:filter 0.12s;";
+    b.addEventListener("mouseenter", () => { b.style.filter = "brightness(1.12)"; });
+    b.addEventListener("mouseleave", () => { b.style.filter = "none"; });
     return b;
   }
 }

@@ -25,10 +25,13 @@ export class HealthBar {
   constructor() {
     this.root = document.createElement("div");
     this.root.style.cssText =
-      `width:${WIDTH_PX}px;height:${HEIGHT_PX}px;background:#2a0d0d;border:1px solid rgba(0,0,0,0.8);` +
-      "border-radius:2px;overflow:hidden;pointer-events:none;";
+      `width:${WIDTH_PX}px;height:${HEIGHT_PX}px;background:#160707;` +
+      "border:1px solid rgba(0,0,0,0.9);border-radius:3px;overflow:hidden;pointer-events:none;" +
+      "box-shadow:inset 0 1px 2px rgba(0,0,0,0.8), 0 0 0 1px rgba(201,162,75,0.15);";
     this.fill = document.createElement("div");
-    this.fill.style.cssText = `height:100%;width:100%;background:${colorForRatio(1)};`;
+    this.fill.style.cssText =
+      `height:100%;width:100%;background:${colorForRatio(1)};transition:width 0.15s ease;` +
+      "box-shadow:inset 0 1px 0 rgba(255,255,255,0.35);";
     this.root.appendChild(this.fill);
   }
 

@@ -62,6 +62,7 @@ export class EntityViews {
   private readonly playerTitle = new Map<string, string>();
   private currentTargetId: string | null = null;
   private selfId: string | null = null;
+  private telegraphT = 0;
   /** Mapa actual del jugador local: sólo se renderizan/targetean entidades de este mapa (Etapa 15). */
   private currentMapId = "pueblo";
   private readonly playerMap = new Map<string, string>();
@@ -165,18 +166,21 @@ export class EntityViews {
     bar.setVisible(!snap.dead);
     this.mobHealthBars.set(id, bar);
 
-    // Telegraph ring (wind-up visual)
+    // Telegraph ring (wind-up visual): glow rojo aditivo que avisa el golpe inminente.
     const ring = new THREE.Mesh(
       TELEGRAPH_RING_GEOMETRY,
       new THREE.MeshBasicMaterial({
-        color: 0xff2a2a,
+        color: 0xff3020,
         transparent: true,
-        opacity: 0.5,
+        opacity: 0.6,
         side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
       }),
     );
     ring.rotation.x = -Math.PI / 2;
-    ring.position.y = 0.05;
+    ring.position.y = 0.06;
+    ring.renderOrder = 2;
     ring.visible = false;
     view.object.add(ring);
     this.mobTelegraphRings.set(id, ring);
@@ -391,6 +395,12 @@ export class EntityViews {
   updateAll(dt: number) {
     this.views.forEach((v) => v.update(dt));
     this.mobViews.forEach((v) => v.update(dt));
+    // Pulso de los anillos de telegraph visibles (aviso de ataque más "vivo").
+    this.telegraphT += dt;
+    const pulse = 0.45 + Math.abs(Math.sin(this.telegraphT * 6)) * 0.4;
+    this.mobTelegraphRings.forEach((ring) => {
+      if (ring.visible) (ring.material as THREE.MeshBasicMaterial).opacity = pulse;
+    });
   }
 
   selfPosition(): { x: number; z: number } | null {

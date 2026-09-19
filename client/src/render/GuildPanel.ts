@@ -1,3 +1,5 @@
+import { COLORS, FONT_DISPLAY, FONT_BODY, applyButton } from "./theme.js";
+
 export interface GuildRow {
   id: string;
   name: string;
@@ -33,11 +35,11 @@ export class GuildPanel {
 
   constructor(private readonly handlers: GuildPanelHandlers) {
     this.el = document.createElement("div");
+    this.el.className = "aden-panel aden-scroll";
     this.el.style.cssText =
       "position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);display:none;" +
-      "pointer-events:none;z-index:1000;min-width:260px;font:12px sans-serif;" +
-      "text-shadow:0 0 3px #000;color:#fff;background:rgba(0,0,0,0.75);" +
-      "border-radius:6px;padding:12px;user-select:none;border:2px solid #7ec8ff;";
+      `pointer-events:none;z-index:1000;min-width:290px;max-height:70vh;overflow-y:auto;` +
+      `font-family:${FONT_BODY};font-size:13px;color:${COLORS.text};padding:16px 18px;user-select:none;`;
     this.render();
   }
 
@@ -67,8 +69,8 @@ export class GuildPanel {
     this.el.innerHTML = "";
 
     const title = document.createElement("div");
-    title.textContent = "Guild";
-    title.style.cssText = "font-weight:bold;color:#7ec8ff;margin-bottom:10px;";
+    title.textContent = "⚑ Hermandad";
+    title.style.cssText = `font-family:${FONT_DISPLAY};font-weight:700;font-size:18px;color:${COLORS.goldBright};margin-bottom:12px;letter-spacing:0.5px;`;
     this.el.appendChild(title);
 
     if (data.myGuildId === "") {
@@ -83,26 +85,27 @@ export class GuildPanel {
     const form = document.createElement("div");
     form.style.cssText = "display:flex;gap:6px;margin-bottom:12px;";
 
+    const inputCss =
+      `pointer-events:auto;padding:6px 8px;border-radius:5px;border:1px solid #4a380f;` +
+      `background:#0f0b07;color:${COLORS.goldBright};font-family:${FONT_BODY};outline:none;`;
+
     const nameInput = document.createElement("input");
     nameInput.setAttribute("data-guild-name", "");
     nameInput.placeholder = "Nombre";
-    nameInput.style.cssText =
-      "flex:1;pointer-events:auto;padding:4px;border-radius:3px;border:none;";
+    nameInput.style.cssText = "flex:1;" + inputCss;
     form.appendChild(nameInput);
 
     const tagInput = document.createElement("input");
     tagInput.setAttribute("data-guild-tag", "");
     tagInput.placeholder = "TAG";
-    tagInput.style.cssText =
-      "width:60px;pointer-events:auto;padding:4px;border-radius:3px;border:none;";
+    tagInput.style.cssText = "width:64px;" + inputCss;
     form.appendChild(tagInput);
 
     const createBtn = document.createElement("button");
     createBtn.setAttribute("data-guild-create", "");
     createBtn.textContent = "Crear";
-    createBtn.style.cssText =
-      "padding:4px 10px;background:#7ec8ff;color:#000;border:none;border-radius:3px;" +
-      "font:11px bold sans-serif;cursor:pointer;pointer-events:auto;";
+    applyButton(createBtn);
+    createBtn.style.cssText += "padding:5px 12px;font-size:12px;";
     createBtn.addEventListener("click", () => {
       this.handlers.onCreate(nameInput.value, tagInput.value.toUpperCase());
     });
@@ -113,7 +116,7 @@ export class GuildPanel {
     // Lista de guilds vivas a las que unirse
     const listTitle = document.createElement("div");
     listTitle.textContent = "Guilds activas";
-    listTitle.style.cssText = "font-weight:bold;margin-bottom:6px;";
+    listTitle.style.cssText = `font-family:${FONT_DISPLAY};font-weight:600;color:${COLORS.gold};margin-bottom:8px;letter-spacing:1px;font-size:13px;`;
     this.el.appendChild(listTitle);
 
     const list = document.createElement("div");
@@ -128,18 +131,19 @@ export class GuildPanel {
         const row = document.createElement("div");
         row.style.cssText =
           "display:flex;justify-content:space-between;align-items:center;gap:8px;" +
-          "padding:4px 6px;background:rgba(126,200,255,0.1);border-radius:4px;";
+          "padding:6px 8px;background:linear-gradient(180deg,rgba(201,162,75,0.10),rgba(0,0,0,0.15));" +
+          "border:1px solid rgba(201,162,75,0.2);border-radius:6px;";
 
         const info = document.createElement("div");
-        info.textContent = `[${g.tag}] ${g.name}`;
+        info.innerHTML = `<span style="color:${COLORS.gold};font-weight:600;">[${g.tag}]</span> ${g.name}`;
         row.appendChild(info);
 
         const joinBtn = document.createElement("button");
         joinBtn.setAttribute("data-guild-join", g.id);
         joinBtn.textContent = "Unirse";
         joinBtn.style.cssText =
-          "padding:2px 8px;background:#2ecc40;color:#000;border:none;border-radius:3px;" +
-          "font:10px bold sans-serif;cursor:pointer;pointer-events:auto;";
+          "padding:3px 10px;background:linear-gradient(180deg,#6fd06a,#3a9c3a);color:#0d0a05;" +
+          "border:1px solid rgba(0,0,0,0.5);border-radius:4px;font-weight:700;font-size:11px;cursor:pointer;pointer-events:auto;";
         joinBtn.addEventListener("click", () => this.handlers.onJoin(g.id));
         row.appendChild(joinBtn);
 
@@ -156,14 +160,14 @@ export class GuildPanel {
     info.style.cssText = "margin-bottom:10px;";
     if (guild) {
       info.innerHTML =
-        `<div style="font-weight:bold;color:#7ec8ff;">[${guild.tag}] ${guild.name}</div>` +
-        `<div style="font-size:11px;color:#aaa;">Líder: ${guild.leaderName} · Jefes derrotados: ${guild.bossKills}</div>`;
+        `<div style="font-family:${FONT_DISPLAY};font-weight:700;font-size:16px;color:${COLORS.goldBright};">[${guild.tag}] ${guild.name}</div>` +
+        `<div style="font-size:12px;color:${COLORS.textDim};margin-top:2px;">Líder: ${guild.leaderName} · ☠ Jefes derrotados: ${guild.bossKills}</div>`;
     }
     this.el.appendChild(info);
 
     const rosterTitle = document.createElement("div");
     rosterTitle.textContent = "Miembros";
-    rosterTitle.style.cssText = "font-weight:bold;margin-bottom:6px;";
+    rosterTitle.style.cssText = `font-family:${FONT_DISPLAY};font-weight:600;color:${COLORS.gold};margin-bottom:8px;letter-spacing:1px;font-size:13px;`;
     this.el.appendChild(rosterTitle);
 
     const roster = document.createElement("div");
@@ -178,9 +182,8 @@ export class GuildPanel {
     const leaveBtn = document.createElement("button");
     leaveBtn.setAttribute("data-guild-leave", "");
     leaveBtn.textContent = "Salir de la guild";
-    leaveBtn.style.cssText =
-      "padding:4px 10px;background:#ff5252;color:#000;border:none;border-radius:3px;" +
-      "font:11px bold sans-serif;cursor:pointer;pointer-events:auto;";
+    applyButton(leaveBtn, "danger");
+    leaveBtn.style.cssText += "padding:5px 12px;font-size:12px;";
     leaveBtn.addEventListener("click", () => this.handlers.onLeave());
     this.el.appendChild(leaveBtn);
   }

@@ -1,4 +1,5 @@
-import { getItem, getShopPrice, SHOP_STOCK } from "@aden/shared";
+import { getItem, getShopPrice, SHOP_STOCK, isEquipment, getRarity, RARITY_COLORS } from "@aden/shared";
+import { COLORS, FONT_DISPLAY, FONT_BODY, applyButton } from "./theme.js";
 
 /**
  * Panel HTML de tienda (fijo, oculto por defecto) que lista los ítems a la venta:
@@ -19,32 +20,34 @@ export class ShopPanel {
     this.onBuy = onBuy;
 
     this.root = document.createElement("div");
+    this.root.className = "aden-panel aden-fadein";
     this.root.style.cssText =
-      "position:fixed;left:12px;top:12px;display:none;pointer-events:none;z-index:1000;" +
-      "min-width:220px;font:12px sans-serif;text-shadow:0 0 3px #000;color:#fff;" +
-      "background:rgba(0,0,0,0.7);border-radius:6px;padding:12px;user-select:none;" +
-      "border:2px solid #ffd700;";
+      "position:fixed;left:14px;top:14px;display:none;pointer-events:none;z-index:1000;" +
+      `min-width:250px;font-family:${FONT_BODY};color:${COLORS.text};padding:14px 16px;user-select:none;`;
 
     const header = document.createElement("div");
     header.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;";
 
     const title = document.createElement("div");
-    title.textContent = "Tienda";
-    title.style.cssText = "font-weight:bold;color:#ffd700;";
+    title.textContent = "⚒ Mercado de Aden";
+    title.style.cssText = `font-family:${FONT_DISPLAY};font-weight:700;font-size:17px;color:${COLORS.goldBright};letter-spacing:0.5px;`;
     header.appendChild(title);
 
     const closeBtn = document.createElement("div");
     closeBtn.textContent = "✕";
     closeBtn.style.cssText =
-      "cursor:pointer;color:#ffd700;font-weight:bold;font-size:16px;" +
-      "padding:0 4px;pointer-events:auto;";
+      `cursor:pointer;color:${COLORS.gold};font-weight:bold;font-size:16px;` +
+      "padding:0 4px;pointer-events:auto;transition:color 0.15s;";
+    closeBtn.addEventListener("mouseenter", () => { closeBtn.style.color = COLORS.goldBright; });
+    closeBtn.addEventListener("mouseleave", () => { closeBtn.style.color = COLORS.gold; });
     closeBtn.addEventListener("click", () => this.close());
     header.appendChild(closeBtn);
     this.root.appendChild(header);
 
     this.goldLabel = document.createElement("div");
-    this.goldLabel.style.cssText = "margin-bottom:10px;color:#ffd700;font-weight:bold;";
-    this.goldLabel.textContent = "Oro: 0";
+    this.goldLabel.style.cssText =
+      `margin-bottom:12px;color:${COLORS.parchment};font-weight:600;display:flex;align-items:center;gap:6px;`;
+    this.goldLabel.innerHTML = `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe9a6,#c9a24b 60%,#7a5c22);"></span>Oro: <span data-gold>0</span>`;
     this.root.appendChild(this.goldLabel);
 
     this.itemsList = document.createElement("div");
@@ -65,22 +68,25 @@ export class ShopPanel {
         const item = getItem(itemId);
         const price = getShopPrice(itemId);
 
+        const nameColor = isEquipment(itemId) ? RARITY_COLORS[getRarity(itemId)] : COLORS.parchment;
+
         const row = document.createElement("div");
         row.style.cssText =
-          "display:flex;justify-content:space-between;align-items:center;gap:8px;" +
-          "padding:6px;background:rgba(255,215,0,0.1);border-radius:4px;";
+          "display:flex;justify-content:space-between;align-items:center;gap:10px;" +
+          "padding:8px 9px;background:linear-gradient(180deg,rgba(201,162,75,0.10),rgba(0,0,0,0.15));" +
+          "border:1px solid rgba(201,162,75,0.2);border-radius:6px;";
 
         const info = document.createElement("div");
         info.style.cssText = "flex:1;";
-        info.innerHTML = `<div style="font-weight:bold;">${item.name}</div>` +
-                         `<div style="font-size:11px;color:#aaa;">${price} oro</div>`;
+        info.innerHTML =
+          `<div style="font-weight:600;color:${nameColor};">${item.name}</div>` +
+          `<div style="font-size:12px;color:${COLORS.textDim};margin-top:1px;">✦ ${price} oro</div>`;
         row.appendChild(info);
 
         const buyBtn = document.createElement("button");
         buyBtn.textContent = "Comprar";
-        buyBtn.style.cssText =
-          "padding:4px 10px;background:#ffd700;color:#000;border:none;border-radius:3px;" +
-          "font:11px bold sans-serif;cursor:pointer;pointer-events:auto;";
+        applyButton(buyBtn);
+        buyBtn.style.cssText += "padding:5px 12px;font-size:12px;";
         buyBtn.addEventListener("click", () => this.onBuy(itemId));
         row.appendChild(buyBtn);
 
@@ -93,7 +99,8 @@ export class ShopPanel {
 
   /** Actualiza el oro mostrado. */
   updateGold(gold: number): void {
-    this.goldLabel.textContent = `Oro: ${Math.round(gold)}`;
+    const span = this.goldLabel.querySelector("[data-gold]");
+    if (span) span.textContent = String(Math.round(gold));
   }
 
   /** Abre el panel. */
