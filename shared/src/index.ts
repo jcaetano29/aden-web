@@ -15,6 +15,7 @@ export * from "./worldobjects.js";
 export * from "./retention.js";
 export * from "./quests.js";
 export * from "./adventure.js";
+export * from "./dungeon.js";
 export * from "./classes.js";
 export * from "./pvp.js";
 export * from "./story.js";

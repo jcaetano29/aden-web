@@ -1,5 +1,5 @@
 import type { ObjectiveMarker } from "./AdventureTracker.js";
-import { type Zone, getZone } from "@aden/shared";
+import { type Zone, getZone, CRYPT_ROOMS, CRYPT_ROUTE } from "@aden/shared";
 import { COLORS, FONT_DISPLAY } from "./theme.js";
 
 export type MinimapEntity = { x: number; z: number; kind: "self" | "player" | "mob" | "boss" };
@@ -82,6 +82,17 @@ export class Minimap {
     ctx.fillStyle = hexColor(this.zone.biome.ground, 0.55);
     ctx.fillRect(Math.min(x0, x1), Math.min(y0, y1), Math.abs(x1 - x0), Math.abs(y1 - y0));
 
+    if (this.zone.id === "cripta") {
+      ctx.strokeStyle = "#b2a083"; ctx.lineWidth = 6; ctx.lineJoin = "round"; ctx.beginPath();
+      CRYPT_ROUTE.forEach((point, index) => { const [px, pz] = this.toPx(point.x, point.z); if (!index) ctx.moveTo(px, pz); else ctx.lineTo(px, pz); });
+      ctx.stroke();
+      for (const room of CRYPT_ROOMS) {
+        const [left, top] = this.toPx(room.x - room.width / 2, room.z - room.depth / 2);
+        const [right, bottom] = this.toPx(room.x + room.width / 2, room.z + room.depth / 2);
+        ctx.fillStyle = "#656d7b"; ctx.fillRect(left, top, right - left, bottom - top);
+        ctx.strokeStyle = "#c7b48f"; ctx.lineWidth = 1; ctx.strokeRect(left, top, right - left, bottom - top);
+      }
+    }
     for (const e of entities) {
       if (e.kind === "self") continue;
       if (e.kind === "boss") this.dot(e.x, e.z, 4, "#ff3b3b");
@@ -106,7 +117,7 @@ export class Minimap {
       ctx.strokeStyle = "#ffd779"; ctx.lineWidth = 2;
       ctx.strokeRect(ox - 5, oy - 5, 10, 10);
       ctx.fillStyle = "#ffe4a4"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
-      ctx.fillText(objective.label, Math.max(36, Math.min(SIZE - 36, ox)), Math.max(16, oy - 10));
+      ctx.fillText(objective.label, SIZE / 2, Math.max(16, oy - 10), SIZE - PAD * 2);
     }
     ctx.fillStyle = "#ddd";
     ctx.font = "bold 10px sans-serif";

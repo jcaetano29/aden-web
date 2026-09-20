@@ -17,10 +17,17 @@ describe("adventure guidance", () => {
   });
   it("tracks each seal, warns how to evade and clears the marker on completion", () => {
     const base = { questId: "q_crypt", questProgress: 0, mapId: "cripta", dungeonKills: 0 };
-    expect(adventureGuide({ ...base, dungeonStage: 1 }).marker).toMatchObject({ x: 890, z: 15 });
-    expect(adventureGuide({ ...base, dungeonStage: 3 }).marker).toMatchObject({ x: 910, z: -12 });
+    expect(adventureGuide({ ...base, dungeonStage: 1 }).marker).toMatchObject({ x: 845, z: 8 });
+    expect(adventureGuide({ ...base, dungeonStage: 3 }).marker).toMatchObject({ x: 960, z: -72 });
     expect(adventureGuide({ ...base, dungeonStage: 4 }).hint).toContain("círculo rojo");
     expect(adventureGuide({ ...base, dungeonStage: 5 }).marker).toBeUndefined();
     expect(adventureGuide({ ...base, dungeonStage: 5 }).title).toBe("Cripta conquistada");
+    const hint = adventureGuide({ ...base, dungeonStage: 0 }).hint;
+    expect(hint).toContain("no reaparecen");
+    expect(hint).toContain("cuando no queda nadie");
+    expect(hint).toContain("reingresar");
+    expect(hint).not.toContain("Salir o morir reinicia");
+    expect(adventureGuide({ ...base, dungeonStage: 5 }).hint).toContain("cuando todos salen");
+    expect(adventureGuide({ ...base, dungeonStage: 2 }).hint).toContain("círculo rojo");
   });
 });

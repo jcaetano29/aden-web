@@ -1,3 +1,4 @@
+import { CRYPT_BOSS } from './dungeon.js';
 export const MOB_MOVE_SPEED = 3.5; // unidades/seg (más lento que el jugador)
 
 export interface MobTemplate {
@@ -25,7 +26,10 @@ export const MOB_TEMPLATES: Record<string, MobTemplate> = {
   umbra_alpha: { id: "umbra_alpha", name: "Alfa de Umbra", model: "ForestTroll", miniBoss: true, scale: 1.35, respawnMs: 45000, tint: 0x91b969 },
   crypt_acolyte: { id: "crypt_acolyte", name: "Acólito de la Primera Llama", model: "DeathWraith", tint: 0xb89ae0 },
   crypt_flameguard: { id: "crypt_flameguard", name: "Guardia de la Segunda Llama", model: "BoneWarden", tint: 0xecb47b },
-  crypt_warden: { id: "crypt_warden", name: "Custodio de las Dos Llamas", model: "DreadKnight", miniBoss: true, scale: 1.65, respawnMs: 45000, tint: 0xf1bc65 },
+  crypt_stalker: { id: "crypt_stalker", name: "Acechador del Despertar", model: "DreadStalker", tint: 0x87a9bd, scale: 1.1 },
+  crypt_emberbeast: { id: "crypt_emberbeast", name: "Bestia de la Brasa", model: "InfernalDemon", tint: 0xe89962, scale: .85 },
+  crypt_behemoth: { id: "crypt_behemoth", name: "Behemoth de la Fragua", model: "ForestTroll", miniBoss: true, tint: 0xb0a18d, scale: 1.4 },
+  crypt_warden: { id: "crypt_warden", name: "Custodio de las Dos Llamas", model: "AncientDrake", miniBoss: true, scale: 1.35, tint: 0xf1bc65 },
   umbra_orc: { id: "umbra_orc", name: "Orco de Umbra", model: "OrcBrute" },
   forest_troll: { id: "forest_troll", name: "Bestia del Bosque", model: "ForestTroll", tint: 0xa7b6a0 },
   crypt_wraith: { id: "crypt_wraith", name: "Espectro de la Cripta", model: "DeathWraith", tint: 0xb9c8eb },
@@ -73,9 +77,12 @@ export interface SpawnZone {
 // viajan con M (no se camina entre ellos); la dificultad sigue escalando por mapa.
 export const SPAWN_ZONES: SpawnZone[] = [
   { id: "bosque_alpha", mapId: "bosque", templateId: "umbra_alpha", centerX: 260, centerZ: -42, radius: 2, count: 1 },
-  { id: "crypt_acolytes", mapId: "cripta", templateId: "crypt_acolyte", centerX: 900, centerZ: 26, radius: 7, count: 3 },
-  { id: "crypt_flameguards", mapId: "cripta", templateId: "crypt_flameguard", centerX: 900, centerZ: 0, radius: 7, count: 3 },
-  { id: "crypt_boss", mapId: "cripta", templateId: "crypt_warden", centerX: 900, centerZ: -37, radius: 0, count: 1 },
+  { id: "crypt_acolytes", mapId: "cripta", templateId: "crypt_acolyte", centerX: 850, centerZ: 32, radius: 8, count: 3 },
+  { id: "crypt_stalkers", mapId: "cripta", templateId: "crypt_stalker", centerX: 874, centerZ: 17, radius: 7, count: 3 },
+  { id: "crypt_flameguards", mapId: "cripta", templateId: "crypt_flameguard", centerX: 925, centerZ: -44, radius: 8, count: 3 },
+  { id: "crypt_emberbeasts", mapId: "cripta", templateId: "crypt_emberbeast", centerX: 951, centerZ: -48, radius: 6, count: 2 },
+  { id: "crypt_behemoth", mapId: "cripta", templateId: "crypt_behemoth", centerX: 939, centerZ: -71, radius: 0, count: 1 },
+  { id: "crypt_boss", mapId: "cripta", templateId: "crypt_warden", centerX: CRYPT_BOSS.x, centerZ: CRYPT_BOSS.z, radius: 0, count: 1 },
   { id: "bosque_orcs", mapId: "bosque", templateId: "umbra_orc", centerX: 335, centerZ: -5, radius: 8, count: 4 },
   { id: "bosque_beasts", mapId: "bosque", templateId: "forest_troll", centerX: 270, centerZ: -43, radius: 6, count: 2 },
   { id: "ruinas_wraiths", mapId: "ruinas", templateId: "crypt_wraith", centerX: -38, centerZ: 302, radius: 7, count: 3 },

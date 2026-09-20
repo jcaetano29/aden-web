@@ -1,4 +1,5 @@
 import { distance2D } from "./math.js";
+import { CRYPT_BOUNDS, CRYPT_SPAWN } from './dungeon.js';
 
 /**
  * El Mundo de Aden como MAPAS DISCRETOS (Etapa 15, estilo Mu Online). En vez de
@@ -120,8 +121,8 @@ export const ZONES: Zone[] = [
   },
   {
     id: "cripta", name: "Cripta de las Dos Llamas", subtitle: "Dos sellos protegen al Custodio",
-    center: { x: 900, z: 0 }, bounds: { minX: 870, maxX: 930, minZ: -50, maxZ: 50 },
-    spawn: { x: 900, z: 43 }, levelReq: 5, levelMin: 5, levelMax: 7, safe: false,
+    center: { x: 900, z: -40 }, bounds: CRYPT_BOUNDS,
+    spawn: CRYPT_SPAWN, levelReq: 5, levelMin: 5, levelMax: 7, safe: false,
     biome: { ground: 0x302a3c, fog: 0x181423, fogNear: 25, fogFar: 90, accent: 0xe8a85b },
   },
 ];

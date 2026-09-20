@@ -19,8 +19,11 @@ export const PLAYER_COMBAT: CombatStats = { maxHp: 100, maxMp: 50, pAtk: 15, pDe
 // de dificultad entre zonas es lo que gatea la progresión sin muros.
 export const MOB_COMBAT: Record<string, CombatStats> = {
   umbra_alpha: { maxHp: 200, pAtk: 18, pDef: 14, attackCooldownMs: 2500 },
-  crypt_acolyte: { maxHp: 105, pAtk: 21, pDef: 13, attackCooldownMs: 2100 },
-  crypt_flameguard: { maxHp: 160, pAtk: 24, pDef: 19, attackCooldownMs: 2200 },
+  crypt_acolyte: { maxHp: 65, pAtk: 18, pDef: 10, attackCooldownMs: 2400 },
+  crypt_stalker: { maxHp: 70, pAtk: 19, pDef: 11, attackCooldownMs: 1800 },
+  crypt_flameguard: { maxHp: 100, pAtk: 22, pDef: 17, attackCooldownMs: 2200 },
+  crypt_emberbeast: { maxHp: 85, pAtk: 16, pDef: 12, attackCooldownMs: 1400 },
+  crypt_behemoth: { maxHp: 180, pAtk: 25, pDef: 20, attackCooldownMs: 3000 },
   crypt_warden: { maxHp: 520, pAtk: 27, pDef: 24, attackCooldownMs: 2400 },
   umbra_orc: { maxHp: 55, pAtk: 12, pDef: 10, attackCooldownMs: 2000 },
   forest_troll: { maxHp: 95, pAtk: 17, pDef: 14, attackCooldownMs: 2600 },

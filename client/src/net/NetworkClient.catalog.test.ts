@@ -35,12 +35,18 @@ describe("NetworkClient catalog messages", () => {
           ["other-map", { templateId: "crypt_acolyte", mapId: "bosque", x: 900, z: 25, dead: false }],
           ["far", { templateId: "crypt_acolyte", mapId: "cripta", x: 890, z: 20, dead: false }],
           ["near", { templateId: "crypt_acolyte", mapId: "cripta", x: 902, z: 25, dead: false }],
+          ["beast", { templateId: "crypt_stalker", mapId: "cripta", x: 901, z: 25, dead: false }],
+          ["future", { templateId: "crypt_emberbeast", mapId: "cripta", x: 900, z: 25, dead: false }],
         ]),
       },
     };
     expect(net.getSelf()).toMatchObject({ dungeonStage: 0, dungeonKills: 2 });
-    expect(net.getAdventureTarget()).toMatchObject({ x: 902, z: 25 });
+    expect(net.getAdventureTarget()).toMatchObject({ x: 901, z: 25 });
     player.dungeonStage = 1;
+    expect(net.getAdventureTarget()).toBeUndefined();
+    player.dungeonStage = 2;
+    expect(net.getAdventureTarget()).toMatchObject({ x: 900, z: 25 });
+    player.dungeonStage = 5;
     expect(net.getAdventureTarget()).toBeUndefined();
   });
 });

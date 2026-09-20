@@ -25,15 +25,19 @@ Las puertas se mantienen: Ruinas nivel 3, Cripta nivel 5, Yermo nivel 6, Trono n
 
 ## Cripta de las Dos Llamas
 
-Mapa público nuevo, recomendado nivel 5–7, en x870–930 / z−50–50. Llegada al sur, en 900/43. Secuencia individual:
+Mapa público recomendado nivel 5–7, ampliado a x815–985 / z−180–100 (170 × 280 unidades, casi ocho veces el área anterior). Llegada al sur en 900/90. Cuatro espacios conectados por una ruta quebrada: entrada, Sala del Despertar al oeste, Fragua al este y Corazón al norte. Secuencia compartida de la expedición:
 
-1. Vencer a tres acólitos en la sala sur.
-2. Activar el primer sello en 890/15.
-3. Vencer a tres guardias en la sala central.
-4. Activar el segundo sello en 910/−12.
-5. Derrotar al Custodio en 900/−37 y esquivar su área anunciada.
+1. Vencer a tres acólitos y tres acechadores en el Despertar.
+2. Activar el primer sello en 845/8.
+3. Vencer a tres guardias, dos bestias de brasa y un Behemoth en la Fragua.
+4. Activar el segundo sello en 960/−72.
+5. Derrotar al Custodio alado en 900/−140 y esquivar su área anunciada.
 
-El servidor valida combate, distancia y etapas. Los sellos no se consumen globalmente. Salir, morir o reconectar reinicia la incursión. El premio de cada recorrido es un arma Mágica +5 con Skill de la clase, con identificador único; una vez entregado, no vuelve a otorgarse hasta comenzar otro recorrido completo. La misión se entrega una sola vez.
+El servidor valida combate, distancia y etapas. Los enemigos vencidos permanecen muertos durante la expedición; no reaparecen por temporizador. El progreso de salas es compartido. Los jugadores que entren tarde se suman a la etapa actual. La expedición se reinicia cuando no queda nadie dentro, también después del jefe. Morir devuelve al pueblo; no reinicia las salas mientras sigan otros jugadores dentro. El premio del jefe es un arma Mágica +5 con Skill de la clase y un identificador único, una sola vez por recorrido para participantes vivos, cercanos y elegibles. La misión se entrega una sola vez.
+
+Las criaturas reutilizan seis modelos animados existentes: DeathWraith, DreadStalker, BoneWarden, InfernalDemon, ForestTroll y AncientDrake. No son modelos nuevos. El Behemoth tiene un ataque de área lento anunciado; la bestia de brasa ataca con más frecuencia y menos daño. El Custodio mantiene su círculo de peligro fijo.
+
+La EXP obligatoria permanece en 1090: 3×45 acólitos + 3×45 acechadores + 3×60 guardias + 2×70 bestias + 100 Behemoth + 400 Custodio. La tabla de progresión de campaña anterior sigue vigente.
 
 ## Distribución de ítems
 
@@ -62,14 +66,14 @@ La restricción de tienda también se aplica en `getShopPrice`: enviar directame
 ## Compatibilidad y límites
 
 - Personajes con q1–q6 conservan su misión; se insertan los pasos nuevos que estén por delante de su posición actual. No se borra inventario ni equipo.
-- La mazmorra es pública: comparte enemigos y respawns, con progreso individual. No es una instancia privada por grupo.
+- La mazmorra es pública y comparte progreso y enemigos, sin respawns durante una expedición. No es una instancia privada por grupo. Un jugador inactivo dentro mantiene abierta la expedición.
 - Recuperar provisiones es una interacción con un cofre, no un sistema de escolta de NPC.
 - Se reutilizan modelos existentes para enemigos. Esta entrega prioriza recorrido y objetivos, sin crear 208 modelos de equipamiento.
 - Los materiales históricos conservan sus usos previos; no se agrega un nuevo sistema de crafting de materiales.
 
 ## Validación de datos
 
-`quests.test.ts` simula todas las bajas y entregas obligatorias y verifica acceso a cada mapa y nivel final 10. `adventure.test.ts` verifica pools, restricciones de compra, compatibilidad de armas por clase, objetivos y poblaciones de mazmorra. Verificación de esta parte: 164 pruebas compartidas aprobadas y TypeScript compartido sin errores. Las verificaciones integradas de servidor y cliente se registran al finalizar la entrega completa.
+`quests.test.ts` simula todas las bajas y entregas obligatorias y verifica acceso a cada mapa y nivel final 10. `adventure.test.ts` verifica pools, restricciones de compra, compatibilidad de armas por clase, objetivos y poblaciones de mazmorra. `dungeon.test.ts` verifica dos olas de seis criaturas, seis modelos, EXP conservada, salas y estructuras dentro de límites, camino alcanzable hacia cada sello/sala/encuentro y todos los segmentos de la ruta con holgura de cuerpo. Datos y geometría de la ampliación: 177 pruebas compartidas aprobadas y TypeScript compartido sin errores. Las verificaciones integradas de servidor y cliente se registran al finalizar la entrega completa.
 
 ## Verificación integrada final
 

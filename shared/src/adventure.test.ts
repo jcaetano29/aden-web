@@ -60,10 +60,10 @@ describe('Cripta de las Dos Llamas',()=>{
     expect(WORLD_OBJECTS.filter(s=>s.mapId==='cripta'&&s.kind==='shrine').map(s=>s.id)).toEqual(['crypt_seal_1','crypt_seal_2']);
   });
   it('describe cada etapa y limita contador',()=>{
-    expect(dungeonObjective(0,1)).toContain('1/3');
-    expect(dungeonObjective(0,99)).toContain('3/3');
+    expect(dungeonObjective(0,1)).toContain('1/6');
+    expect(dungeonObjective(0,99)).toContain('6/6');
     expect(dungeonObjective(1,0)).toContain('primer sello');
-    expect(dungeonObjective(2,2)).toContain('2/3');
+    expect(dungeonObjective(2,2)).toContain('2/6');
     expect(dungeonObjective(3,0)).toContain('segundo sello');
     expect(dungeonObjective(4,0)).toContain('círculo');
     expect(dungeonObjective(5,0)).toContain('completada');

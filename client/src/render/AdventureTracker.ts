@@ -1,4 +1,4 @@
-import { dungeonObjective, getQuest, getZone, getWorldObject, getNpc } from "@aden/shared";
+import { dungeonObjective, getQuest, getZone, getWorldObject, getNpc, CRYPT_ROOMS, CRYPT_SEALS, CRYPT_BOSS } from "@aden/shared";
 
 export interface AdventureState {
   questId: string; questProgress: number; mapId: string;
@@ -10,14 +10,14 @@ export function adventureGuide(state: AdventureState): { title: string; hint: st
   if (state.mapId === "cripta") {
     const stage = state.dungeonStage ?? 0;
     const locations = [
-      { x: 900, z: 28, label: "Acólitos" }, { x: 890, z: 15, label: "Primera llama" },
-      { x: 900, z: 0, label: "Guardias" }, { x: 910, z: -12, label: "Segunda llama" },
-      { x: 900, z: -37, label: "Custodio" },
+      { ...CRYPT_ROOMS[1], label: "Cámara del Despertar" }, { ...CRYPT_SEALS[0], label: "Primera llama" },
+      { ...CRYPT_ROOMS[2], label: "Fragua de las Bestias" }, { ...CRYPT_SEALS[1], label: "Segunda llama" },
+      { ...CRYPT_BOSS, label: "Custodio" },
     ];
     return {
       title: stage >= 5 ? "Cripta conquistada" : `Cripta · paso ${stage + 1} de 5`,
-      hint: dungeonObjective(stage, state.dungeonKills ?? 0) + (stage === 4 ? " Salí del círculo rojo antes del impacto." : "") +
-        (stage >= 5 ? " Abrí M para volver al pueblo. Salir reinicia la expedición." : " Salir o morir reinicia la expedición."),
+      hint: dungeonObjective(stage, state.dungeonKills ?? 0) + (stage === 2 || stage === 4 ? " Salí del círculo rojo antes del impacto." : "") +
+        (stage >= 5 ? " Abrí M para volver al pueblo. Se abre una nueva expedición cuando todos salen." : " Los enemigos derrotados no reaparecen. El avance es compartido; sólo se reinicia cuando no queda nadie dentro. Al morir volvés al pueblo; podés reingresar y sumarte al avance actual."),
       marker: locations[stage],
     };
   }

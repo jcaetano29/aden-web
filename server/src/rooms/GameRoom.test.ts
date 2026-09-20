@@ -8,6 +8,7 @@ import { InventoryItemState } from "../state/InventoryItemState.js";
 import { CATALOG_ITEMS, createItemInstance } from '@aden/shared';
 import { grantItem } from '../systems/ItemSystem.js';
 import { toCharacterSave } from '../persistence/CharacterSave.js';
+import { CRYPT_BOSS, CRYPT_SEALS, getMobExp } from '@aden/shared';
 import { isWalkable } from '@aden/shared';
 
 describe("GameRoom", () => {
@@ -21,6 +22,52 @@ describe("GameRoom", () => {
   });
   beforeEach(async () => {
     await colyseus.cleanup();
+  });
+
+  it('mantiene la cripta despejada, comparte avance al entrar y sólo reinicia al quedar vacía',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'RunLeader'});
+    const d=await colyseus.connectTo(room,{name:'RunLate'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!,ally=room.state.players.get(d.sessionId)!;
+    p.level=6;ally.level=6;
+    c.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    const wave=[...room.state.mobs.entries()].filter(([,m])=>m.mapId==='cripta'&&['crypt_acolyte','crypt_stalker'].includes(m.templateId));
+    expect(wave).toHaveLength(6);
+    for(const [id,m] of wave)room['killMob'](m,id,c.sessionId);
+    expect(p.dungeonStage).toBe(1);
+    for(const [,m] of wave)m.respawnMs=1;
+    await room.waitForNextSimulationTick();expect(wave.every(([,m])=>m.dead)).toBe(true);
+    d.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    expect(ally.dungeonStage).toBe(1);
+    room['killPlayer'](p,c.sessionId);
+    expect(p.mapId).toBe('pueblo');expect(ally.dungeonStage).toBe(1);
+    expect(wave.every(([,m])=>m.dead)).toBe(true);
+    d.send(MessageType.WarpTo,{mapId:'pueblo'});await room.waitForNextPatch();
+    expect(wave.every(([,m])=>!m.dead)).toBe(true);
+    d.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    expect(ally.dungeonStage).toBe(0);expect(ally.dungeonKills).toBe(0);
+  });
+
+  it('cierra una expedición completada a nuevas entradas y la reinicia al desconectarse el último participante',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'RunFinished'});
+    const d=await colyseus.connectTo(room,{name:'RunWaiting'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!,ally=room.state.players.get(d.sessionId)!;
+    p.level=6;ally.level=6;
+    c.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    room['dungeonRun'].dungeonStage=4;
+    const [id,boss]=[...room.state.mobs.entries()].find(([,m])=>m.templateId==='crypt_warden')!;
+    room['killMob'](boss,id,c.sessionId);
+    expect(p.dungeonStage).toBe(5);
+    await room['persistence'].save('RunReconnect',toCharacterSave(p));
+    const returning=await colyseus.connectTo(room,{name:'RunReconnect'});await room.waitForNextPatch();
+    expect(room.state.players.get(returning.sessionId)!.mapId).toBe('pueblo');
+    d.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    expect(ally.mapId).toBe('pueblo');expect(boss.dead).toBe(true);
+    await c.leave();await room.waitForNextPatch();
+    expect(boss.dead).toBe(false);
+    d.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    expect(ally.mapId).toBe('cripta');expect(ally.dungeonStage).toBe(0);
   });
 
   it('el movimiento por red rodea la fuente y nunca entra en su volumen', async () => {
@@ -101,27 +148,27 @@ describe("GameRoom", () => {
     expect(p.gold).toBe(gold);
   });
 
-  it('la cripta exige sellos personales, rechaza ataque prematuro y paga una sola vez por recorrido', async () => {
+  it('la cripta exige sellos de expedición, rechaza ataque prematuro y paga una sola vez por recorrido', async () => {
     const room=(await colyseus.createRoom('game',{})) as GameRoom;
     const c=await colyseus.connectTo(room,{name:'AdventureDungeon'});await room.waitForNextPatch();
     const p=room.state.players.get(c.sessionId)!;
-    p.level=6;p.mapId='cripta';p.x=900;p.z=-37;p.targetX=p.x;p.targetZ=p.z;
+    p.level=6;p.mapId='cripta';p.x=CRYPT_BOSS.x;p.z=CRYPT_BOSS.z;p.targetX=p.x;p.targetZ=p.z;
     p.questId='q_crypt';p.questProgress=0;
-    const mob=room.spawnMob('dungeon-test','crypt_warden',900,-37,'cripta');
+    const mob=room.spawnMob('dungeon-test','crypt_warden',CRYPT_BOSS.x,CRYPT_BOSS.z,'cripta');
     mob.stunMs=999999;mob.hp=1;p.targetId='dungeon-test';p.attackCooldownMs=0;
     await room.waitForNextSimulationTick();expect(mob.dead).toBe(false);
-    p.dungeonStage=1;p.x=890;p.z=15;
+    room['dungeonRun'].dungeonStage=1;room['syncDungeonRun']();p.x=CRYPT_SEALS[0].x;p.z=CRYPT_SEALS[0].z;
     c.send(MessageType.InteractObject,{objectId:'crypt_seal_2'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(1);
     c.send(MessageType.InteractObject,{objectId:'crypt_seal_1'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(2);
     expect(room.state.worldObjects.get('crypt_seal_1')!.active).toBe(true);
-    p.dungeonStage=3;p.x=910;p.z=-12;
+    room['dungeonRun'].dungeonStage=3;p.x=CRYPT_SEALS[1].x;p.z=CRYPT_SEALS[1].z;
     c.send(MessageType.InteractObject,{objectId:'crypt_seal_2'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(4);
-    p.x=900;p.z=-37;p.attackCooldownMs=0;
+    p.x=CRYPT_BOSS.x;p.z=CRYPT_BOSS.z;p.attackCooldownMs=0;
     await room.waitForNextSimulationTick();
     expect(p.dungeonStage).toBe(5);expect(p.questProgress).toBe(1);
     const prizes=()=>[...p.inventory.keys()].filter(id=>getItem(id).options?.level===5);
     expect(prizes()).toHaveLength(1);
-    room.spawnMob('dungeon-test','crypt_warden',900,-37,'cripta').stunMs=999999;
+    room.spawnMob('dungeon-test','crypt_warden',CRYPT_BOSS.x,CRYPT_BOSS.z,'cripta').stunMs=999999;
     p.attackCooldownMs=0;await room.waitForNextSimulationTick();expect(prizes()).toHaveLength(1);
     c.send(MessageType.WarpTo,{mapId:'pueblo'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(0);
   });
@@ -132,17 +179,17 @@ describe("GameRoom", () => {
     const d=await colyseus.connectTo(room,{name:'CriptaGrupo'});await room.waitForNextPatch();
     const p=room.state.players.get(c.sessionId)!, ally=room.state.players.get(d.sessionId)!;
     for(const player of [p,ally]){player.mapId='cripta';player.x=900;player.z=30;player.pAtk=1000;player.hp=1000;player.maxHp=1000;}
-    for(let i=0;i<3;i++){
+    for(let i=0;i<6;i++){
       const m=room.spawnMob(`shared-${i}`,'crypt_acolyte',900,30,'cripta');m.stunMs=999999;m.hp=1;
       p.targetId=`shared-${i}`;p.attackCooldownMs=0;await room.waitForNextSimulationTick();
     }
     expect(p.dungeonStage).toBe(1);expect(ally.dungeonStage).toBe(1);
-    p.dungeonStage=4;p.x=900;p.z=-37;p.hp=1;p.targetId='';
-    const boss=room.spawnMob('hazard-death','crypt_warden',900,-37,'cripta');
+    room['dungeonRun'].dungeonStage=4;p.x=CRYPT_BOSS.x;p.z=CRYPT_BOSS.z;p.hp=1;p.targetId='';
+    const boss=room.spawnMob('hazard-death','crypt_warden',CRYPT_BOSS.x,CRYPT_BOSS.z,'cripta');
     boss.hazardMs=1;boss.hazardX=p.x;boss.hazardZ=p.z;boss.aggroTargetId=c.sessionId;
     await room.waitForNextSimulationTick();
     expect(p.dead).toBe(true);expect(p.dungeonStage).toBe(0);expect(p.dungeonKills).toBe(0);
-    expect(ally.dungeonStage).toBe(1);
+    expect(ally.dungeonStage).toBe(4);
   });
 
   it.each(['alive', 'dead', 'missing'] as const)('la cripta comparte crédito y EXP una sola vez cuando el autor está %s', async (ownerState) => {
@@ -165,11 +212,11 @@ describe("GameRoom", () => {
     room.tick(.05);
     expect(mob.dead).toBe(true);
     expect(ally.dungeonKills).toBe(1);
-    expect(ally.exp).toBe(90);
-    expect(author.exp).toBe(ownerState === 'alive' ? 90 : 0);
+    expect(ally.exp).toBe(getMobExp('crypt_acolyte'));
+    expect(author.exp).toBe(ownerState === 'alive' ? getMobExp('crypt_acolyte') : 0);
     room.tick(.05);
     expect(ally.dungeonKills).toBe(1);
-    expect(ally.exp).toBe(90);
+    expect(ally.exp).toBe(getMobExp('crypt_acolyte'));
   });
 
   it('el Custodio persigue y anuncia su área frente a un Explorador a nueve metros', async () => {
@@ -178,8 +225,8 @@ describe("GameRoom", () => {
     await room.waitForNextPatch();
     room.state.mobs.clear();
     const p = room.state.players.get(c.sessionId)!;
-    p.mapId = 'cripta'; p.x = 909; p.z = -37; p.moving = false; p.dungeonStage = 4;
-    const boss = room.spawnMob('ranged-guardian', 'crypt_warden', 900, -37, 'cripta');
+    p.mapId = 'cripta'; p.x = 909; p.z = CRYPT_BOSS.z; p.moving = false; room['dungeonRun'].dungeonStage = 4;
+    const boss = room.spawnMob('ranged-guardian', 'crypt_warden', CRYPT_BOSS.x, CRYPT_BOSS.z, 'cripta');
     p.targetId = 'ranged-guardian'; p.attackCooldownMs = 0;
     room.tick(.05);
     expect(boss.hp).toBeLessThan(boss.maxHp);

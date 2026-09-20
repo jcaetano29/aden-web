@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { getQuest, firstQuestId, nextQuestId, QUEST_ORDER, CAMPAIGN_COMPLETE } from './quests.js';
-import { MOB_TEMPLATES } from './mobs.js';
+import { MOB_TEMPLATES, SPAWN_ZONES } from './mobs.js';
 import { getWorldObject } from './worldobjects.js';
 import { getZone } from './world.js';
 import { expToNextLevel, getMobExp } from './progression.js';
@@ -40,7 +40,7 @@ describe('campaña inicial', () => {
       expect(level, `entrada a ${id} / ${q.mapId}`).toBeGreaterThanOrEqual(getZone(q.mapId!).levelReq);
       if(id==='q6') expect(level).toBe(9);
       if(q.objective==='kill') xp+=getMobExp(q.mobTemplateId)*q.amount;
-      if(q.objective==='dungeon') xp+=3*getMobExp('crypt_acolyte')+3*getMobExp('crypt_flameguard')+getMobExp('crypt_warden');
+      if(q.objective==='dungeon') xp+=SPAWN_ZONES.filter(s=>s.mapId==='cripta').reduce((sum,s)=>sum+s.count*getMobExp(s.templateId),0);
       xp+=q.rewardExp;
       while(xp>=expToNextLevel(level)){xp-=expToNextLevel(level);level++;}
       for(const cls of ['knight','mage','barbarian','rogue','ranger']){

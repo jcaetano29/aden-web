@@ -27,6 +27,7 @@ import {
   isBoss,
   getTemplate,
   getQuest,
+  CRYPT_WAVE_TEMPLATES,
 } from "@aden/shared";
 import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
 
@@ -363,22 +364,22 @@ export class NetworkClient {
   getAdventureTarget(): { x: number; z: number; label: string } | undefined {
     const p = this.room.state.players.get(this.room.sessionId);
     if (!p) return undefined;
-    let target = "";
+    let targets: readonly string[] = [];
     if (p.mapId === "cripta") {
-      target = ({ 0: "crypt_acolyte", 2: "crypt_flameguard", 4: "crypt_warden" } as Record<number, string>)[p.dungeonStage ?? 0] ?? "";
+      targets = p.dungeonStage === 4 ? ["crypt_warden"] : CRYPT_WAVE_TEMPLATES[p.dungeonStage ?? 0] ?? [];
     } else {
       try {
         const q = getQuest(p.questId);
-        if (p.questProgress < q.amount && (!q.objective || q.objective === "kill")) target = q.mobTemplateId;
+        if (p.questProgress < q.amount && (!q.objective || q.objective === "kill")) targets = [q.mobTemplateId];
       } catch { return undefined; }
     }
-    if (!target) return undefined;
+    if (!targets.length) return undefined;
     let nearest: { x: number; z: number; label: string } | undefined;
     let distance = Infinity;
     this.room.state.mobs.forEach((m: any) => {
-      if (m.dead || m.mapId !== p.mapId || m.templateId !== target) return;
+      if (m.dead || m.mapId !== p.mapId || !targets.includes(m.templateId)) return;
       const d = Math.hypot(m.x - p.x, m.z - p.z);
-      if (d < distance) { distance = d; nearest = { x: m.x, z: m.z, label: getTemplate(target).name }; }
+      if (d < distance) { distance = d; nearest = { x: m.x, z: m.z, label: getTemplate(m.templateId).name }; }
     });
     return nearest;
   }

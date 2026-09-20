@@ -1,6 +1,7 @@
 import { CATALOG_ITEMS } from './catalog.js';
 import { createItemInstance } from './itemOptions.js';
 import type { Quest } from './quests.js';
+import { CRYPT_SEALS, CRYPT_WAVE_SIZE } from './dungeon.js';
 
 const CLASS_WEAPONS: Record<string, string> = {
   knight: 'aden_punal_del_umbral', barbarian: 'aden_destral_del_lenador_gris', rogue: 'aden_punal_del_umbral',
@@ -19,14 +20,14 @@ export function questReward(q: Quest, className: string): string | undefined {
 }
 
 export function dungeonObjective(stage: number, kills: number): string {
-  const count = Math.max(0, Math.min(3, Math.floor(kills)));
+  const count = Math.max(0, Math.min(CRYPT_WAVE_SIZE, Math.floor(kills)));
   return [
-    `Derrotá a los acólitos de la sala sur: ${count}/3`,
-    'Activá el primer sello (oeste, 890 / 15)',
-    `Derrotá a los guardias de la sala central: ${count}/3`,
-    'Activá el segundo sello (este, 910 / -12)',
+    `Despejá la Sala del Despertar: ${count}/${CRYPT_WAVE_SIZE} criaturas`,
+    `Activá el primer sello (oeste, ${CRYPT_SEALS[0].x} / ${CRYPT_SEALS[0].z})`,
+    `Despejá la Fragua: ${count}/${CRYPT_WAVE_SIZE} criaturas. ¡Esquivá el golpe del Behemoth!`,
+    `Activá el segundo sello (este, ${CRYPT_SEALS[1].x} / ${CRYPT_SEALS[1].z})`,
     'Derrotá al Custodio al norte. ¡Salí del círculo anunciado!',
-    'Cripta completada. Recibiste tu arma; volvé con Rowan.',
+    'Cripta completada. Volvé al pueblo; la expedición reinicia cuando salgan todos.',
   ][stage] ?? 'Entrá en la Cripta para comenzar.';
 }
 
@@ -51,7 +52,10 @@ const POOLS: Record<string, Record<string, string[]>> = {
   },
   cripta: {
     crypt_acolyte: ['aden_tomo_de_la_esfera_ignea', 'aden_sello_del_eter'],
+    crypt_stalker: ['aden_anillo_del_vendaval'],
     crypt_flameguard: ['aden_aguja_de_la_frontera', 'aden_lanza_del_camino_largo'],
+    crypt_emberbeast: ['aden_sortija_de_brasa'],
+    crypt_behemoth: ['aden_medallon_de_la_pira'],
     crypt_warden: ['aden_gema_del_pacto', 'aden_medallon_de_la_pira', 'aden_sortija_de_brasa'],
   },
   yermo: {

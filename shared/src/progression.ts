@@ -17,8 +17,11 @@ export const LEVEL_GROWTH = { hp: 20, mp: 5, pAtk: 3, pDef: 2 } as const;
 // llega al Trono rondando el nivel recomendado (~9-10) cazando su camino al norte.
 export const MOB_EXP: Record<string, number> = {
   umbra_alpha: 200,
-  crypt_acolyte: 90,
-  crypt_flameguard: 140,
+  crypt_acolyte: 45,
+  crypt_stalker: 45,
+  crypt_flameguard: 60,
+  crypt_emberbeast: 70,
+  crypt_behemoth: 100,
   crypt_warden: 400,
   umbra_orc: 35,
   forest_troll: 65,

@@ -1,6 +1,7 @@
 import { TOWN } from "./combat.js";
 import { ZONES, type Zone } from "./world.js";
 import { WORLD_OBJECTS } from "./worldobjects.js";
+import { CRYPT_ROOMS } from './dungeon.js';
 export interface Point2 {
     readonly x: number;
     readonly z: number;
@@ -81,18 +82,19 @@ export interface StructureBox extends StructureObstacle {
 }
 const boxes: StructureBox[] = [];
 function box(mapId: string, id: string, x: number, y: number, z: number, width: number, height: number, depth: number, material: StructureBox['material'] = 'stone', solid = true) { boxes.push({ mapId, id, x, y, z, width, height, depth, rotation: 0, material, solid }); }
-for (const [index, z] of [28, -1, -34].entries())
-    for (const x of [879, 921]) {
-        box('cripta', `crypt-wall-${index}-${x}`, x, .35, z, .8, .7, 24);
-        for (const dz of [-10, 10]) {
-            const id = `crypt-pillar-${index}-${x}-${dz}`;
-            box('cripta', id, x, 2.1, z + dz, 1.3, 4.2, 1.3);
-            box('cripta', `${id}-capital`, x, 4.3, z + dz, 1.9, .3, 1.9, 'stone', false);
-            box('cripta', `${id}-light`, x, 4.65, z + dz, .6, .45, .6, index === 2 ? 'gold' : 'blue', false);
+// Partial side walls leave broad north/south and corner openings for the winding route.
+for (const room of CRYPT_ROOMS)
+    for (const x of [room.x-room.width/2, room.x+room.width/2]) {
+        box('cripta', `crypt-wall-${room.id}-${x}`, x, .5, room.z, 1.2, 1, room.depth*.6);
+        for (const dz of [-room.depth*.33, room.depth*.33]) {
+            const id = `crypt-pillar-${room.id}-${x}-${dz}`;
+            box('cripta', id, x, 2.1, room.z + dz, 1.3, 4.2, 1.3);
+            box('cripta', `${id}-capital`, x, 4.3, room.z + dz, 1.9, .3, 1.9, 'stone', false);
+            box('cripta', `${id}-light`, x, 4.65, room.z + dz, .6, .45, .6, room.id === 'heart' || room.id === 'forge' ? 'gold' : 'blue', false);
         }
     }
-for (const z of [14, -18])
-    for (const x of [895, 905]) {
+for (const [cx, z] of [[860, -7], [940, -91]])
+    for (const x of [cx-7, cx+7]) {
         box('cripta', `crypt-passage-${x}-${z}`, x, 1.4, z, .65, 2.8, .65);
         box('cripta', `crypt-passage-capital-${x}-${z}`, x, 2.9, z, .8, .35, .8, 'gold', false);
     }

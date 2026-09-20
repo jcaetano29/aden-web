@@ -122,6 +122,18 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemTemplateId: 'gold', chance: 1, qtyMin: 8, qtyMax: 15 },
     { itemTemplateId: 'aden_vial_de_niebla_menor', chance: .4, qtyMin: 1, qtyMax: 1 },
   ],
+  crypt_stalker: [
+    { itemTemplateId: 'gold', chance: 1, qtyMin: 5, qtyMax: 10 },
+    { itemTemplateId: 'health_potion', chance: .3, qtyMin: 1, qtyMax: 1 },
+  ],
+  crypt_emberbeast: [
+    { itemTemplateId: 'gold', chance: 1, qtyMin: 8, qtyMax: 15 },
+    { itemTemplateId: 'aden_vial_de_niebla_menor', chance: .4, qtyMin: 1, qtyMax: 1 },
+  ],
+  crypt_behemoth: [
+    { itemTemplateId: 'gold', chance: 1, qtyMin: 15, qtyMax: 25 },
+    { itemTemplateId: 'health_potion', chance: 1, qtyMin: 1, qtyMax: 2 },
+  ],
   crypt_flameguard: [
     { itemTemplateId: 'gold', chance: 1, qtyMin: 12, qtyMax: 22 },
     { itemTemplateId: 'health_potion', chance: .4, qtyMin: 1, qtyMax: 1 },

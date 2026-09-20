@@ -124,6 +124,30 @@ const SAVE_INTERVAL_MS = 15000;
 export class GameRoom extends Room<GameState> {
   /** Contador para generar ids únicos de ítems dropeados (R-E3b-3). */
   private dropSeq = 0;
+  private dungeonActive = false;
+  private readonly dungeonRun = { mapId: 'cripta', dead: false, dungeonStage: 0, dungeonKills: 0 };
+
+  private syncDungeonRun(): void {
+    this.state.players.forEach(p => {
+      if(p.mapId !== 'cripta')return;
+      p.dungeonStage=this.dungeonRun.dungeonStage;
+      p.dungeonKills=this.dungeonRun.dungeonKills;
+    });
+  }
+
+  /** A cleared wing stays cleared until the last participant leaves. */
+  private maintainDungeonRun(): void {
+    const occupied=[...this.state.players.values()].some(p=>p.mapId==='cripta' && !p.dead);
+    if(occupied){this.dungeonActive=true;this.syncDungeonRun();return;}
+    if(!this.dungeonActive)return;
+    this.dungeonActive=false;
+    resetDungeon(this.dungeonRun);
+    this.state.mobs.forEach((mob,id)=>{
+      if(mob.mapId==='cripta')this.spawnMob(id,mob.templateId,mob.homeX,mob.homeZ,mob.mapId);
+    });
+    for(const [id,item] of this.state.droppedItems)if(item.mapId==='cripta')this.state.droppedItems.delete(id);
+    this.state.worldObjects.forEach(o=>{if(o.mapId==='cripta'){o.active=true;o.respawnMs=0;}});
+  }
   /** Servicio de persistencia de personajes (Supabase si hay env, si no in-memory). */
   private persistence!: PersistenceService;
 
@@ -234,11 +258,18 @@ export class GameRoom extends Room<GameState> {
   /** Centraliza la muerte de un jugador (por mob o por PvP). Aplica penalidad si es PvP. */
   private killPlayer(victim: PlayerState, victimId: string, killerId?: string): void {
     resetDungeon(victim);
+    const leftDungeon=victim.mapId==='cripta';
     victim.dead = true;
     victim.moving = false;
     victim.respawnMs = PLAYER_RESPAWN_MS;
     victim.targetId = "";
     this.broadcast(MessageType.Death, { entityId: victimId });
+    if(leftDungeon){
+      victim.mapId=TOWN_ZONE_ID;
+      const arrival=nearestWalkable(TOWN_ZONE_ID,getZone(TOWN_ZONE_ID).spawn);
+      victim.x=victim.targetX=arrival.x;victim.z=victim.targetZ=arrival.z;
+      this.maintainDungeonRun();
+    }
     if (killerId) {
       const pen = applyPvpDeathPenalty(victim.gold, victim.exp, victim.level);
       victim.gold = pen.gold;
@@ -484,6 +515,7 @@ export class GameRoom extends Room<GameState> {
       if (!p || p.dead) return;
       const success=useInventoryItem(p,msg?.itemTemplateId,msg?.targetItemId);
       if(p.mapId!=='cripta')resetDungeon(p);
+      this.maintainDungeonRun();
       if(success)this.recomputeStats(p);
       client.send(MessageType.ItemResult,{success,text:success?'Objeto utilizado.':'No se puede usar: revisá requisitos, recursos y objetivo.'});
     });
@@ -569,6 +601,11 @@ export class GameRoom extends Room<GameState> {
       try { zone = getZone(msg?.mapId ?? ""); } catch { return; }
       if (zone.id === p.mapId) return; // ya estás ahí
       if (!canEnterZone(zone, p.level)) return; // nivel insuficiente
+      this.maintainDungeonRun();
+      if(zone.id==='cripta' && this.dungeonActive && this.dungeonRun.dungeonStage===5){
+        client.send(MessageType.ItemResult,{success:false,text:'Esta expedición terminó. La cripta reabre cuando salga el último aventurero.'});
+        return;
+      }
       resetDungeon(p);
       p.mapId = zone.id;
       const arrival = nearestWalkable(zone.id, zone.spawn);
@@ -577,6 +614,7 @@ export class GameRoom extends Room<GameState> {
       p.moving = false;
       p.targetId = "";
       advanceQuest(p,'visit',zone.id);
+      this.maintainDungeonRun();
     });
 
     // Etapa 16: interactuar con un objeto de mundo (cofre / barril / santuario).
@@ -589,8 +627,9 @@ export class GameRoom extends Room<GameState> {
       let def;
       try { def = getWorldObject(o.id); } catch { return; }
       if (o.id === 'crypt_seal_1' || o.id === 'crypt_seal_2') {
-        const success = activateSeal(p,o.id);
-        client.send(MessageType.ItemResult,{success,text:success?'Sello roto. Seguí hacia la próxima sala.':'Primero derrotá a los tres guardianes de esta sala.'});
+        const success = activateSeal(this.dungeonRun,o.id);
+        this.syncDungeonRun();
+        client.send(MessageType.ItemResult,{success,text:success?'Sello roto para la expedición. Seguí hacia la próxima ala.':'Primero despejá el ala: derrotá a sus seis criaturas.'});
         return;
       }
       advanceQuest(p,'interact',o.id);
@@ -753,6 +792,7 @@ export class GameRoom extends Room<GameState> {
     mob.stunMs = 0;
     mob.rootMs = 0;
     mob.dotMs = 0;
+    mob.dotDps=0;mob.dotAttackerId='';mob.dotAccumMs=0;
     mob.hazardMs = 0;
     mob.hazardCooldownMs = 0;
 
@@ -844,11 +884,13 @@ export class GameRoom extends Room<GameState> {
 
     // Los presentes comparten avance y EXP aunque el autor del veneno haya muerto
     // o salido. El último atacante vivo ya recibió su EXP en el bloque anterior.
+    const dungeonCleared=mob.mapId==='cripta' && advanceDungeonKill(this.dungeonRun,mob.templateId);
+    if(mob.mapId==='cripta')this.syncDungeonRun();
     if (mob.mapId === 'cripta') this.state.players.forEach((participant, id) => {
       if (participant.dead || participant.mapId !== mob.mapId || distance2D(participant.x, participant.z, mob.x, mob.z) > 25) return;
       const client = this.clients.find(c => c.sessionId === id);
       if (id !== killerId && client) this.grantExp(participant, client, getMobExp(mob.templateId));
-      if (advanceDungeonKill(participant, mob.templateId)) {
+      if (dungeonCleared) {
         const base = getItem(dungeonReward(participant.className));
         const reward = createItemInstance(base, { quality: 'magic', level: 5, skill: true }, randomUUID());
         this.addToInventory(participant, reward, 1);
@@ -889,6 +931,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   tick(dt: number) {
+    this.maintainDungeonRun();
     this.state.players.forEach((p) => {
       if (p.dead) return; // un jugador muerto no se mueve
       if (p.stunMs > 0 || p.rootMs > 0) { p.moving = false; return; } // Etapa 22: aturdido/enraizado no se mueve
@@ -912,8 +955,12 @@ export class GameRoom extends Room<GameState> {
         return; // Plantado mientras carga el ataque
       }
       if (mob.stunMs > 0) { mob.moving = false; return; } // Etapa 22: aturdido no actúa
-      const aiConfig = mob.templateId === 'crypt_warden' ? { ...AI_CONFIG, aggroRadius: 14 } : AI_CONFIG;
-      stepMobAI(mob, playersByMap.get(mob.mapId) ?? [], aiConfig, Math.random, dtMs);
+      const aiConfig = ['crypt_warden','crypt_behemoth'].includes(mob.templateId) ? { ...AI_CONFIG, aggroRadius: 14 } : AI_CONFIG;
+      const candidates=(playersByMap.get(mob.mapId) ?? []).filter(pos=>{
+        const p=this.state.players.get(pos.id);
+        return p && canFightDungeonMob(p,mob.templateId);
+      });
+      stepMobAI(mob, candidates, aiConfig, Math.random, dtMs);
       if (mob.rootMs > 0) mob.moving = false; else advanceMovable(mob, dt, MOB_MOVE_SPEED); // enraizado no se mueve
     });
 
@@ -1077,8 +1124,7 @@ export class GameRoom extends Room<GameState> {
     // DoT ticks: aplicar daño por veneno a mobs
     this.state.mobs.forEach((mob, mobId) => {
       if (mob.dead || mob.dotMs <= 0) return;
-      const source=this.state.players.get(mob.dotAttackerId);
-      if(mob.templateId==='crypt_warden' && (!source || source.dead || !canFightDungeonMob(source,mob.templateId))) {mob.dotMs=0;return;}
+      if(mob.mapId==='cripta' && !canFightDungeonMob(this.dungeonRun,mob.templateId)) {mob.dotMs=0;return;}
 
       mob.dotAccumMs += dtMs;
 
@@ -1156,6 +1202,7 @@ export class GameRoom extends Room<GameState> {
       if (mob.stunMs > 0) mob.stunMs = Math.max(0, mob.stunMs - dtMs);
       if (mob.rootMs > 0) mob.rootMs = Math.max(0, mob.rootMs - dtMs);
       if (mob.dead) {
+        if(mob.mapId==='cripta')return;
         mob.respawnMs -= dtMs;
         if (mob.respawnMs <= 0) {
           const wasBoss = isBoss(mob.templateId);
@@ -1170,6 +1217,7 @@ export class GameRoom extends Room<GameState> {
     // santuario sale de cooldown).
     this.state.worldObjects.forEach((o) => {
       if (o.active) return;
+      if(o.mapId==='cripta')return;
       o.respawnMs -= dtMs;
       if (o.respawnMs <= 0) o.active = true;
     });
@@ -1298,6 +1346,7 @@ export class GameRoom extends Room<GameState> {
       // Etapa 15: restaurar el mapa (si es válido) y aterrizar en su punto de spawn.
       let loadedMap = save.mapId ?? TOWN_ZONE_ID;
       try { getZone(loadedMap); } catch { loadedMap = TOWN_ZONE_ID; }
+      if(loadedMap==='cripta' && this.dungeonRun.dungeonStage===5)loadedMap=TOWN_ZONE_ID;
       player.mapId = loadedMap;
       const sp = nearestWalkable(loadedMap, getZone(loadedMap).spawn);
       player.x = player.targetX = sp.x;
@@ -1354,6 +1403,7 @@ export class GameRoom extends Room<GameState> {
     // aplicado por completo, el jugador es seguro de persistir. Antes de esta línea,
     // saveAll()/onLeave() deben ignorarlo para no pisar el registro real con defaults
     // de nivel 1 (ver guardas en saveAll y onLeave).
+    this.maintainDungeonRun();
     player.loaded = true;
     if(!save && className==='ranger') {
       const bow=Object.values(CATALOG_ITEMS).find(i=>i.category==='arma'&&i.ammo==='arrow'&&i.tier===1);
@@ -1407,6 +1457,7 @@ export class GameRoom extends Room<GameState> {
     }
     const gid = player?.guildId ?? "";
     this.state.players.delete(client.sessionId);
+    this.maintainDungeonRun();
     if (gid !== "") this.pruneGuildIfEmpty(gid);
   }
 }
