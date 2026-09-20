@@ -30,13 +30,20 @@ export class InputController {
     private readonly objectTargets?: () => { objects: THREE.Object3D[]; idOf: (o: THREE.Object3D) => string | null },
     /** NPCs clickeables (Anciano, Mercader, Sanadora, Herrero, Capitán). Se chequean primero. */
     private readonly npcTargets?: () => NpcInteractable[],
+    private readonly loot?: {targets:()=>{objects:THREE.Object3D[];idOf:(o:THREE.Object3D)=>string|null};pick:(id:string)=>void;hover:(ray:THREE.Raycaster)=>void},
   ) {}
 
   attach(dom: HTMLElement) {
+    dom.addEventListener('pointermove',e=>{
+      if(!this.loot)return;
+      this.renderer.raycaster.setFromCamera(new THREE.Vector2(e.clientX/window.innerWidth*2-1,1-e.clientY/window.innerHeight*2),this.renderer.camera);
+      this.loot?.hover(this.renderer.raycaster);
+    });
     dom.addEventListener("click", (e) => {
       if (isUiClick(e.target)) return;
       const ndcX = (e.clientX / window.innerWidth) * 2 - 1;
       const ndcY = -(e.clientY / window.innerHeight) * 2 + 1;
+      if(this.loot){const id=this.renderer.pickMobs(ndcX,ndcY,this.loot.targets());if(id){this.loot.pick(id);return;}}
 
       // Raycast a los NPCs primero (antes que mobs/objetos/suelo).
       if (this.npcTargets) {

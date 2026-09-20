@@ -25,3 +25,4 @@ export * from "./bounties.js";
 export * from "./stats.js";
 export * from "./structures.js";
 export * from "./navigation.js";
+export * from './itemVisuals.js';

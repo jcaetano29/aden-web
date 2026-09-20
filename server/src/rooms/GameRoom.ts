@@ -1,3 +1,4 @@
+import { tryPickup, dropPosition } from '../systems/LootSystem.js';
 // NOTA: import por default + destructuring en lugar de `import { Room, Client }`.
 // El paquete "colyseus" (CJS, bundle de esbuild) sólo anota estáticamente
 // RedisDriver/RedisPresence como named exports en su "0 && (module.exports = {...})";
@@ -346,6 +347,10 @@ export class GameRoom extends Room<GameState> {
       this.state.worldObjects.set(def.id, o);
     }
 
+    this.onMessage(MessageType.PickupItem, (client, msg: {dropId?: unknown}) => {
+      if (typeof msg?.dropId !== 'string' || msg.dropId.length > 512) return;
+      if (tryPickup(this.state, client.sessionId, msg.dropId)) this.checkAchievements(this.state.players.get(client.sessionId)!, client.sessionId);
+    });
     this.onMessage(MessageType.MoveTo, (client, msg: MoveToMessage) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.dead) return;
@@ -917,13 +922,14 @@ export class GameRoom extends Room<GameState> {
       const chosen=pool[Math.floor(Math.random()*pool.length)];
       if(chosen)drops.push({itemTemplateId:chosen,qty:getItem(chosen).category==='municion'?30:1});
     }
-    for (const d of drops) {
+    for (const [index, d] of drops.entries()) {
       const item = new DroppedItemState();
       item.itemTemplateId = instantiateItem(d.itemTemplateId,true,lootId==='skeleton_king'?6:2);
       item.qty = d.itemTemplateId==='gold'?Math.round(d.qty*(1+goldBonus)):d.qty;
       item.mapId = mapId;
-      item.x = x + (Math.random() - 0.5) * 1.5;
-      item.z = z + (Math.random() - 0.5) * 1.5;
+      const position = dropPosition(this.state,mapId,x,z,index);
+      item.x = position.x;
+      item.z = position.z;
       item.despawnMs = DROP_DESPAWN_MS;
       item.pickDelayMs = PICKUP_DELAY_MS; // visible al caer, no pickable hasta que expire
       this.state.droppedItems.set(`${lootId}_${d.itemTemplateId}_${this.dropSeq++}`, item);
@@ -1178,18 +1184,7 @@ export class GameRoom extends Room<GameState> {
       });
       let pickedItem = false;
       for (const id of pickupIds) {
-        const it = this.state.droppedItems.get(id);
-        if (!it) continue; // ya recogido/despawneado en este mismo tick
-
-        // Etapa 4b-1: oro como moneda (currency → gold, no al inventario)
-        const itemDef = getItem(it.itemTemplateId);
-        if (itemDef.type === "currency") {
-          p.gold += it.qty;
-        } else {
-          this.addToInventory(p, it.itemTemplateId, it.qty);
-          pickedItem = true;
-        }
-        this.state.droppedItems.delete(id);
+        if (tryPickup(this.state, sessionId, id)) pickedItem = true;
       }
       // Etapa 13: recoger un ítem (p.ej. un legendario) puede desbloquear un logro.
       if (pickedItem) this.checkAchievements(p, sessionId);

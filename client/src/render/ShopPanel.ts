@@ -1,5 +1,6 @@
 import { CLASSES, getItem, getShopPrice, SHOP_STOCK, isEquipment, getRarity, RARITY_COLORS } from "@aden/shared";
 import { COLORS, FONT_DISPLAY, FONT_BODY, applyButton } from "./theme.js";
+import {itemIcon} from './ItemModels.js';
 
 export interface ShopPanelOpts {
   /** Ítems a la venta (default: stock del Mercader). */
@@ -102,6 +103,7 @@ export class ShopPanel {
 
         const row = document.createElement("div");
         row.dataset.shopItem = itemId;
+        row.appendChild(itemIcon(itemId));
         row.title = item.description ?? item.name;
         row.style.cssText =
           "display:flex;justify-content:space-between;align-items:center;gap:10px;" +

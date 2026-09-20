@@ -1,100 +1,56 @@
-import * as THREE from "three";
-import { getItem, RARITY_COLORS } from "@aden/shared";
 
-const ITEM_Y = 0.7;
-const ROTATE_SPEED = 1.4; // rad/s
-const BOB_SPEED = 2.2; // rad/s del seno de bob
-const BOB_HEIGHT = 0.22; // amplitud del bob, unidades de mundo
+import * as THREE from 'three';
+import { getItem,itemVisual,RARITY_LABELS } from '@aden/shared';
+import { createItemModel } from './ItemModels.js';
 
-const COLOR_BY_TYPE: Record<string, number> = {
-  currency: 0xffd700,
-  material: 0xdddddd,
-  consumable: 0xff4444,
-};
-const DEFAULT_COLOR = 0xffffff;
-
-interface ActiveItem {
-  mesh: THREE.Mesh;
-  light: THREE.PointLight;
-  beam: THREE.Mesh | null;
-  bornAt: number;
-}
-
-/**
- * Ítems droppeados en el piso (loot), sincronizados desde `state.droppedItems`
- * (server-autoritativo: el cliente sólo renderiza lo que el server confirma).
- * Cada ítem es un mesh chico que rota y "bobea" suavemente para destacar del
- * suelo; el color depende del tipo de ítem (`getItem(itemTemplateId).type`).
- */
+interface ActiveItem { mesh:THREE.Group; halo:THREE.Mesh; mapId:string; itemId:string; qty:number; bornAt:number }
 export class GroundItems {
-  private readonly items = new Map<string, ActiveItem>();
-  private readonly geometry = new THREE.OctahedronGeometry(0.5);
-
-  constructor(private readonly scene: THREE.Scene) {}
-
-  add(id: string, itemTemplateId: string, x: number, z: number) {
-    if (this.items.has(id)) return;
-    let color = DEFAULT_COLOR;
-    let isEquip = false;
-    try {
-      const item = getItem(itemTemplateId);
-      // Etapa 12: el equipo brilla con el color de su rareza (un legendario "canta"
-      // desde el piso) — refuerza la emoción del loot; el resto usa color por tipo.
-      isEquip = item.type === "equipment";
-      color = isEquip
-        ? parseInt(RARITY_COLORS[item.rarity ?? "common"].slice(1), 16)
-        : COLOR_BY_TYPE[item.type] ?? DEFAULT_COLOR;
-    } catch {
-      // itemTemplateId desconocido (no debería pasar si server/shared están en sync):
-      // usar color default en vez de romper el render.
-    }
-    const material = new THREE.MeshStandardMaterial({ color, emissive: color, emissiveIntensity: 0.9 });
-    const mesh = new THREE.Mesh(this.geometry, material);
-    mesh.position.set(x, ITEM_Y, z);
-    // lucecita del color del ítem para que "brille" en el piso
-    const light = new THREE.PointLight(color, 1.4, 5);
-    light.position.set(0, 0, 0);
-    mesh.add(light);
-    this.scene.add(mesh);
-
-    // Haz de luz vertical para el EQUIPO: un pilar tenue del color de la rareza que
-    // se ve de lejos y hace que el loot importante llame la atención (con el bloom canta).
-    let beam: THREE.Mesh | null = null;
-    if (isEquip) {
-      const beamMat = new THREE.MeshBasicMaterial({
-        color, transparent: true, opacity: 0.28, blending: THREE.AdditiveBlending,
-        depthWrite: false, side: THREE.DoubleSide,
-      });
-      beam = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.42, 3.4, 12, 1, true), beamMat);
-      beam.position.set(x, 1.7, z);
-      this.scene.add(beam);
-    }
-
-    this.items.set(id, { mesh, light, beam, bornAt: performance.now() });
+  private readonly haloGeometry=new THREE.RingGeometry(.34,.49,24);
+  private readonly haloMaterials=new Map<string,THREE.MeshBasicMaterial>();
+  private readonly items=new Map<string,ActiveItem>();
+  private mapId='pueblo';
+  private selected:string|null=null;
+  private readonly label=document.createElement('div');
+  constructor(private readonly scene:THREE.Scene) {
+    this.label.style.cssText='position:fixed;display:none;pointer-events:none;z-index:900;background:#10151eee;border:1px solid;padding:7px 10px;border-radius:5px;font:13px Georgia;max-width:310px;white-space:pre-line;text-shadow:0 1px 2px black;';
+    document.body.append(this.label);
   }
-
-  remove(id: string) {
-    const entry = this.items.get(id);
-    if (!entry) return;
-    entry.mesh.remove(entry.light);
-    this.scene.remove(entry.mesh);
-    if (entry.mesh.material instanceof THREE.Material) entry.mesh.material.dispose();
-    if (entry.beam) {
-      this.scene.remove(entry.beam);
-      entry.beam.geometry.dispose();
-      (entry.beam.material as THREE.Material).dispose();
+  add(id:string,itemId:string,x:number,z:number,mapId='pueblo',qty=1) {
+    if(this.items.has(id))return;
+    const v=itemVisual(getItem(itemId)),mesh=createItemModel(itemId);
+    mesh.position.set(x,.7,z);mesh.userData.dropId=id;mesh.visible=mapId===this.mapId;
+    let material=this.haloMaterials.get(v.color);
+    if(!material){material=new THREE.MeshBasicMaterial({color:v.color,transparent:true,opacity:v.halo,depthWrite:false,side:THREE.DoubleSide});this.haloMaterials.set(v.color,material);}
+    const halo=new THREE.Mesh(this.haloGeometry,material);halo.rotation.x=-Math.PI/2;halo.position.set(x,.06,z);halo.visible=mesh.visible;
+    this.scene.add(mesh,halo);this.items.set(id,{mesh,halo,mapId,itemId,qty,bornAt:performance.now()});
+  }
+  remove(id:string) {const entry=this.items.get(id);if(!entry)return;this.scene.remove(entry.mesh,entry.halo);this.items.delete(id);if(this.selected===id)this.select(null);}
+  setMap(mapId:string) {if(mapId===this.mapId)return;this.mapId=mapId;this.select(null);for(const e of this.items.values())e.mesh.visible=e.halo.visible=e.mapId===mapId;}
+  position(id:string) {return this.items.get(id)?.mesh.position;}
+  raycastTargets() {return {objects:[...this.items.values()].filter(e=>e.mapId===this.mapId).map(e=>e.mesh),idOf:(o:THREE.Object3D):string|null=>{while(o.parent&&!o.userData.dropId)o=o.parent;return o.userData.dropId??null;}};}
+  select(id:string|null) {this.selected=id;this.label.style.display='none';}
+  hover(ray:THREE.Raycaster) {
+    const targets=this.raycastTargets(),hit=ray.intersectObjects(targets.objects,true)[0];
+    this.select(hit?targets.idOf(hit.object):null);
+  }
+  update(dt:number,camera?:THREE.Camera) {
+    const now=performance.now();
+    for(const entry of this.items.values()) {
+      if(!entry.mesh.visible)continue;
+      const t=(now-entry.bornAt)/1000;
+      entry.mesh.rotation.y+=dt*.45;
+      entry.mesh.position.y=.72+Math.sin(t*2.2)*.08+Math.sin(Math.min(1,t/.45)*Math.PI)*.4;
+      entry.mesh.scale.setScalar(Math.min(1,.25+t/.3));
     }
-    this.items.delete(id);
+    const e=this.selected?this.items.get(this.selected):undefined;
+    if(!e||!camera||e.mapId!==this.mapId){this.label.style.display='none';return;}
+    const p=e.mesh.position.clone().add(new THREE.Vector3(0,1,0)).project(camera);
+    if(Math.abs(p.z)>1){this.label.style.display='none';return;}
+    const item=getItem(e.itemId),v=itemVisual(item);
+    this.label.textContent=`${item.name}${e.qty>1?` ×${e.qty}`:''}\n${RARITY_LABELS[item.rarity??'common']} · Botín público\nClic para acercarte y recoger`;
+    this.label.style.color=v.color;this.label.style.display='block';
+    this.label.style.left=`${Math.max(8,Math.min(window.innerWidth-325,(p.x*.5+.5)*window.innerWidth))}px`;
+    this.label.style.top=`${Math.max(8,Math.min(window.innerHeight-95,(-p.y*.5+.5)*window.innerHeight))}px`;
   }
-
-  /** Rotación + bob suave de todos los ítems activos. Llamar en el render loop. */
-  update(dt: number) {
-    if (this.items.size === 0) return;
-    const now = performance.now();
-    this.items.forEach((entry) => {
-      entry.mesh.rotation.y += ROTATE_SPEED * dt;
-      const t = (now - entry.bornAt) / 1000;
-      entry.mesh.position.y = ITEM_Y + Math.sin(t * BOB_SPEED) * BOB_HEIGHT;
-    });
-  }
+  dispose(){for(const id of this.items.keys())this.remove(id);this.label.remove();this.haloGeometry.dispose();this.haloMaterials.forEach(m=>m.dispose());this.haloMaterials.clear();}
 }

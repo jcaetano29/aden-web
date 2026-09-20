@@ -46,6 +46,7 @@ export interface PlayerSnapshot {
   className?: string;
   /** Optional visual override supplied by equipment such as transformation rings. */
   appearanceModel?: string;
+  equipment?:Record<string,string>;
   /** Tag de guild ("" si no pertenece a ninguna); se sincroniza desde el server. Solo para jugadores. */
   guildTag?: string;
   /** Título lucido (Etapa 13, logros); "" si ninguno. Solo para jugadores. */
@@ -113,7 +114,7 @@ export interface RoomCallbacks {
   onMobChange: (id: string, snap: MobSnapshot) => void;
   onMobRemove: (id: string) => void;
   /** Ítem droppeado en el piso (sincronizado desde `state.droppedItems`). */
-  onItemAdd: (id: string, itemTemplateId: string, x: number, z: number) => void;
+  onItemAdd: (id: string, itemTemplateId: string, x: number, z: number, mapId:string, qty:number) => void;
   onItemRemove: (id: string) => void;
   onDamage: (ev: DamageEvent) => void;
   onDeath: (entityId: string) => void;
@@ -157,6 +158,7 @@ export class NetworkClient {
       dead: p.dead,
       className: p.className,
       appearanceModel: p.appearanceModel ?? "",
+      equipment:Object.fromEntries(p.equipment?.entries()??[]),
       guildTag: p.guildTag ?? "",
       title: p.title ?? "",
       mapId: p.mapId ?? "pueblo",
@@ -167,6 +169,9 @@ export class NetworkClient {
     this.room.state.players.onAdd((player: any, id: string) => {
       cb.onAdd(id, id === selfId, snap(player));
       player.onChange(() => cb.onChange(id, snap(player)));
+      player.equipment?.onAdd(()=>cb.onChange(id,snap(player)));
+      player.equipment?.onRemove(()=>cb.onChange(id,snap(player)));
+      player.equipment?.onChange(()=>cb.onChange(id,snap(player)));
     });
     this.room.state.players.onRemove((_player: any, id: string) => cb.onRemove(id));
 
@@ -195,7 +200,7 @@ export class NetworkClient {
     this.room.state.mobs.onRemove((_m: any, id: string) => cb.onMobRemove(id));
 
     this.room.state.droppedItems.onAdd((it: any, id: string) =>
-      cb.onItemAdd(id, it.itemTemplateId, it.x, it.z),
+      cb.onItemAdd(id, it.itemTemplateId, it.x, it.z, it.mapId, it.qty),
     );
     this.room.state.droppedItems.onRemove((_it: any, id: string) => cb.onItemRemove(id));
 
@@ -225,6 +230,7 @@ export class NetworkClient {
   sendMove(msg: MoveToMessage) {
     this.room.send(MessageType.MoveTo, msg);
   }
+  sendPickup(dropId:string) { this.room.send(MessageType.PickupItem,{dropId}); }
 
   sendSetTarget(targetId: string) {
     const msg: SetTargetMessage = { targetId };

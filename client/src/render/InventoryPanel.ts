@@ -12,6 +12,7 @@ import {
   type EquipSlot,
 } from "@aden/shared";
 import { COLORS, FONT_DISPLAY, FONT_BODY } from "./theme.js";
+import { itemIcon } from './ItemModels.js';
 
 export interface InventoryPanelCallbacks {
   onUseItem?: (itemTemplateId: string, targetItemId?: string) => void;
@@ -59,6 +60,10 @@ export class InventoryPanel {
     title.textContent = "⚔ Inventario y Equipo";
     title.style.cssText = `font-family:${FONT_DISPLAY};font-weight:700;font-size:16px;color:${COLORS.goldBright};margin-bottom:8px;letter-spacing:0.5px;`;
     this.root.appendChild(title);
+    const lootRule=document.createElement('div');
+    lootRule.textContent='Botín público: acercate o hacé clic. Lo obtiene el primer intento válido; cualquiera vivo y en alcance puede recogerlo. No afecta inventarios ajenos ni premios directos.';
+    lootRule.style.cssText='font-size:11px;line-height:1.4;color:#c3bbab;margin-bottom:8px';
+    this.root.appendChild(lootRule);
 
     this.body = document.createElement("div");
     this.body.style.cssText = "display:flex;flex-direction:column;gap:3px;";
@@ -201,6 +206,7 @@ export class InventoryPanel {
       if (equippedId) {
         try {
           const item = getItem(equippedId);
+          r.appendChild(itemIcon(equippedId));
           label.textContent = `${SLOT_LABELS[slot]}: ${item.name}`;
           label.style.color = RARITY_COLORS[item.rarity ?? "common"];
         } catch {
@@ -242,6 +248,7 @@ export class InventoryPanel {
       try {
         const item = getItem(e.itemTemplateId);
         const r = this.row();
+        r.appendChild(itemIcon(e.itemTemplateId));
         r.style.alignItems = "flex-start";
         const info = document.createElement("div");
         info.style.cssText = "min-width:0;flex:1;";

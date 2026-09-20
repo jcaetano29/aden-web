@@ -7,6 +7,7 @@ import { Environment } from "./render/Environment.js";
 import { AmbientLife } from "./render/AmbientLife.js";
 import { EntityViews } from "./render/EntityViews.js";
 import { GroundItems } from "./render/GroundItems.js";
+import { disposeItemModels } from './render/ItemModels.js';
 import { CharacterFactory } from "./render/CharacterFactory.js";
 import { Nameplates } from "./render/Nameplates.js";
 import { DamageNumbers } from "./render/DamageNumbers.js";
@@ -55,6 +56,7 @@ async function main() {
   const views = new EntityViews(renderer.scene, factory, nameplates);
   const damageNumbers = new DamageNumbers(renderer.scene);
   const groundItems = new GroundItems(renderer.scene);
+  window.addEventListener('pagehide',()=>{groundItems.dispose();disposeItemModels();},{once:true});
   const worldObjects = new WorldObjectViews(renderer.scene);
   const skillEffects = new SkillEffects(renderer.scene);
   const audio = new AudioEngine();
@@ -232,7 +234,7 @@ async function main() {
       screenShake.addTrauma(0.35);
     },
     onItemResult: (result) => hud.toast(result.text, result.success ? "#2ecc40" : "#ff6b6b", 3000),
-    onItemAdd: (id, itemTemplateId, x, z) => groundItems.add(id, itemTemplateId, x, z),
+    onItemAdd: (id, itemTemplateId, x, z, mapId, qty) => groundItems.add(id, itemTemplateId, x, z, mapId, qty),
     onItemRemove: (id) => groundItems.remove(id),
     onObjectAdd: (id, snap) => worldObjects.add(id, snap),
     onObjectChange: (id, snap) => worldObjects.update(id, snap),
@@ -472,6 +474,13 @@ async function main() {
       { object: smith.object, onInteract: interactSmith },
       { object: captain.object, onInteract: interactCaptain },
     ],
+    {targets:()=>groundItems.raycastTargets(),hover:ray=>groundItems.hover(ray),pick:id=>{
+      groundItems.select(id);
+      currentTargetId=null;net.sendSetTarget('');views.setTargetHighlight(null);
+      const pos=groundItems.position(id);
+      if(pos)net.sendMove({x:pos.x,z:pos.z});
+      net.sendPickup(id);
+    }},
   );
   input.attach(document.body);
 
@@ -584,7 +593,7 @@ async function main() {
     const dt = clock.getDelta();
     views.updateAll(dt);
     damageNumbers.update(dt);
-    groundItems.update(dt);
+    groundItems.update(dt, renderer.camera);
     skillEffects.update(dt);
     const self = views.selfPosition();
     const shake = screenShake.update(dt);
@@ -606,6 +615,7 @@ async function main() {
     }
     // Etapa 15: mapa actual del jugador → filtra el render y el minimapa; cambia al warpear.
     const myMapId = selfCombat?.mapId ?? "pueblo";
+    groundItems.setMap(myMapId);
     views.setCurrentMap(myMapId);
     worldObjects.setCurrentMap(myMapId);
     hazards.setCurrentMap(myMapId);

@@ -10,6 +10,7 @@ import { grantItem } from '../systems/ItemSystem.js';
 import { toCharacterSave } from '../persistence/CharacterSave.js';
 import { CRYPT_BOSS, CRYPT_SEALS, getMobExp } from '@aden/shared';
 import { isWalkable } from '@aden/shared';
+import { DroppedItemState } from '../state/DroppedItemState.js';
 
 describe("GameRoom", () => {
   let colyseus: ColyseusTestServer;
@@ -22,6 +23,48 @@ describe("GameRoom", () => {
   });
   beforeEach(async () => {
     await colyseus.cleanup();
+  });
+
+  it('dos clientes disputan loot real, preservan identidad y ven recogida, expiración y limpieza',async()=>{
+    const room=await colyseus.createRoom('game',{}) as GameRoom;
+    const killer=await colyseus.connectTo(room,{name:'LootKiller'}),thief=await colyseus.connectTo(room,{name:'LootThief'});
+    await room.waitForNextPatch();
+    // Freeze simulation, not transport: exercise real incoming messages in controlled order.
+    room.setSimulationInterval(()=>{},50);
+    const a=room.state.players.get(killer.sessionId)!,b=room.state.players.get(thief.sessionId)!;
+    const [mobId,mob]=[...room.state.mobs.entries()].find(([,m])=>m.templateId==='crypt_acolyte')!;
+    a.mapId=b.mapId=mob.mapId;
+    room['killMob'](mob,mobId,killer.sessionId);
+    await room.waitForNextPatch();
+    const [realId,real]=[...room.state.droppedItems.entries()].find(([,d])=>d.mapId===mob.mapId)!;
+    expect((killer.state as any).droppedItems.has(realId)).toBe(true);expect((thief.state as any).droppedItems.has(realId)).toBe(true);
+    a.x=real.x+20;a.z=real.z;b.x=real.x;b.z=real.z;
+    real.pickDelayMs=0;
+    const beforeGold=b.gold;
+    thief.send(MessageType.PickupItem,{dropId:realId});await room.waitForNextPatch();
+    expect(room.state.droppedItems.has(realId)).toBe(false);expect(b.gold).toBe(beforeGold+real.qty);
+    expect((killer.state as any).droppedItems.has(realId)).toBe(false);expect((thief.state as any).droppedItems.has(realId)).toBe(false);
+
+    const id=createItemInstance(getItem('aden_punal_del_umbral'),{quality:'magic',level:4,luck:true},'race');
+    const drop=new DroppedItemState();drop.itemTemplateId=id;drop.qty=1;drop.mapId=b.mapId;drop.x=b.x;drop.z=b.z;drop.despawnMs=5000;
+    room.state.droppedItems.set('race',drop);a.x=b.x;a.z=b.z;
+    killer.send(MessageType.PickupItem,{dropId:'race'});thief.send(MessageType.PickupItem,{dropId:'race'});await room.waitForNextPatch();
+    expect((a.inventory.get(id)?.qty??0)+(b.inventory.get(id)?.qty??0)).toBe(1);
+    expect((killer.state as any).droppedItems.has('race')).toBe(false);expect((thief.state as any).droppedItems.has('race')).toBe(false);
+
+    const blocked=new DroppedItemState();Object.assign(blocked,{itemTemplateId:'bone',qty:1,mapId:b.mapId,x:b.x,z:b.z,despawnMs:5000});room.state.droppedItems.set('blocked',blocked);
+    for(const reason of ['far','dead','map','delay']) {
+      b.x=blocked.x;b.mapId=blocked.mapId;b.dead=false;blocked.pickDelayMs=0;
+      if(reason==='far')b.x+=100;if(reason==='dead')b.dead=true;if(reason==='map')b.mapId='pueblo';if(reason==='delay')blocked.pickDelayMs=300;
+      thief.send(MessageType.PickupItem,{dropId:'blocked'});await room.waitForNextPatch();expect(room.state.droppedItems.has('blocked'),reason).toBe(true);
+    }
+    b.dead=false;b.mapId=blocked.mapId;b.x=blocked.x+100;a.x=blocked.x+100;blocked.despawnMs=1;
+    room.tick(.05);await room.waitForNextPatch();expect((killer.state as any).droppedItems.has('blocked')).toBe(false);expect((thief.state as any).droppedItems.has('blocked')).toBe(false);
+    room['dropLoot']('crypt_warden',mob.x,mob.z,'cripta');
+    expect(room.state.droppedItems.size).toBeGreaterThan(0);
+    a.mapId=b.mapId='pueblo';room.tick(.05);await room.waitForNextPatch();
+    expect([...room.state.droppedItems.values()].filter(d=>d.mapId==='cripta')).toHaveLength(0);
+    expect((killer.state as any).droppedItems.size).toBe(0);expect((thief.state as any).droppedItems.size).toBe(0);
   });
 
   it('mantiene la cripta despejada, comparte avance al entrar y sólo reinicia al quedar vacía',async()=>{

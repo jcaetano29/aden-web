@@ -7,6 +7,7 @@ export const MessageType = {
   LevelUp: "levelUp",
   InteractNpc: "interactNpc",
   UseItem: "useItem",
+  PickupItem: "pickupItem",
   ItemResult: "itemResult",
   BuyItem: "buyItem",
   CreateGuild: "createGuild",

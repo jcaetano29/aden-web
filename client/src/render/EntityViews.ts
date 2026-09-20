@@ -82,6 +82,7 @@ export class EntityViews {
     const view = new CharacterView(this.factory.create(visualModel));
     view.snapTo(snap.x, snap.z);
     view.setServerState(snap);
+    view.setEquipment(snap.equipment??{});
     this.scene.add(view.object);
     this.views.set(id, view);
     this.playerRootToId.set(view.object, id);
@@ -103,6 +104,7 @@ export class EntityViews {
     const desiredModel = state.appearanceModel || this.playerBaseModel.get(id);
     if (desiredModel && desiredModel !== this.playerVisualModel.get(id)) this.replacePlayerVisual(id, desiredModel, state);
     this.views.get(id)?.setServerState(state);
+    this.views.get(id)?.setEquipment(state.equipment??{});
     // Respawn (dead vuelve a false): restaurar la pose de idle/walk clavada
     // por playOnce("death") (mismo enfoque que updateMob para los mobs).
     const wasDead = this.playerDead.get(id) ?? false;
