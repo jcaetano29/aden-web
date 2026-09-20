@@ -4,8 +4,9 @@ export class ZoneIndicator {
   readonly el: HTMLDivElement;
   constructor() {
     this.el = document.createElement("div");
+    // Por encima de la barra de skills, incluyendo su scrollbar horizontal.
     this.el.style.cssText =
-      "position:absolute;bottom:14px;left:50%;transform:translateX(-50%);" +
+      "position:fixed;bottom:130px;left:50%;transform:translateX(-50%);" +
       `padding:5px 14px;border-radius:20px;font-family:${FONT_DISPLAY};font-weight:600;font-size:12px;` +
       "letter-spacing:1px;color:#fff;pointer-events:none;user-select:none;text-shadow:0 1px 3px #000;" +
       "box-shadow:0 3px 12px rgba(0,0,0,0.5);";
