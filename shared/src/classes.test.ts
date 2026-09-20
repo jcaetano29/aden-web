@@ -34,8 +34,10 @@ describe("isValidClass", () => {
 });
 
 describe("CLASSES", () => {
-  it("tiene 4 clases", () => {
-    expect(Object.keys(CLASSES)).toHaveLength(4);
+  it("tiene cinco clases incluyendo Explorador sin cambiar las anteriores", () => {
+    expect(Object.keys(CLASSES)).toHaveLength(5);
+    expect(getClass('ranger').name).toBe('Explorador');
+    expect(getSkill(getClass('ranger').skillId).range).toBe(10);
   });
 
   it("cada clase tiene los campos requeridos", () => {

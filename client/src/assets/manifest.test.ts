@@ -1,9 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { MODEL_NAMES, modelUrl, pickModelForSession, MOB_MODEL_NAMES, modelForTemplate } from "./manifest.js";
+import { MODEL_HEIGHTS, MODEL_NAMES, modelUrl, pickModelForSession, MOB_MODEL_NAMES, modelForTemplate } from "./manifest.js";
 
 describe("modelUrl", () => {
   it("resuelve la ruta pública del GLB", () => {
     expect(modelUrl("Knight")).toBe("/models/Knight.glb");
+  });
+
+  it("reutiliza el GLB de Rogue para el modelo lógico Ranger", () => {
+    expect(MODEL_NAMES).toContain("Ranger");
+    expect(modelUrl("Ranger")).toBe("/models/Rogue.glb");
+    expect(MODEL_HEIGHTS.Ranger).toBe(2.4);
   });
 });
 

@@ -83,8 +83,8 @@ describe("shop config", () => {
   });
 
   it("SMITH_STOCK vende equipo y todo tiene precio", () => {
-    expect(SMITH_STOCK).toContain("iron_sword");
-    expect(getShopPrice("iron_sword")).toBeGreaterThan(0);
+    expect(SMITH_STOCK).toContain("aden_arco_de_la_senda");
+    expect(getShopPrice("aden_arco_de_la_senda")).toBeGreaterThan(0);
     for (const id of SMITH_STOCK) {
       expect(() => getShopPrice(id)).not.toThrow();
       expect(getItem(id).type).toBe("equipment");

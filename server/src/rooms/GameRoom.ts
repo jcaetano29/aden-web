@@ -8,6 +8,9 @@
 // Client es sólo un tipo (no existe en runtime), por eso se importa aparte con `import type`.
 import colyseusPkg from "colyseus";
 import type { Client } from "colyseus";
+import { randomUUID } from 'node:crypto';
+import { catalogDropPool, dungeonReward, questReward, createItemInstance } from '@aden/shared';
+import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, resetDungeon, stepGuardianHazard } from '../systems/AdventureSystem.js';
 const { Room } = colyseusPkg;
 import {
   MessageType,
@@ -93,7 +96,9 @@ import {
   applyPvpDeathPenalty,
   isBoss,
   getTemplate,
+  loadoutEffects, availableSkills, weaponRange, CATALOG_ITEMS, MOVE_SPEED, skillElement,
 } from "@aden/shared";
+import { grantItem, equipItem, useInventoryItem, consumeAmmo, playerLoadout, instantiateItem } from '../systems/ItemSystem.js';
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
 import { MobState } from "../state/MobState.js";
@@ -122,15 +127,7 @@ export class GameRoom extends Room<GameState> {
 
   /** Agrega ítems al inventario del jugador (reutilizable en compra y pickup). */
   private addToInventory(player: PlayerState, itemTemplateId: string, qty: number): void {
-    const existing = player.inventory.get(itemTemplateId);
-    if (existing) {
-      existing.qty += qty;
-    } else {
-      const inv = new InventoryItemState();
-      inv.itemTemplateId = itemTemplateId;
-      inv.qty = qty;
-      player.inventory.set(itemTemplateId, inv);
-    }
+    grantItem(player,itemTemplateId,qty);
   }
 
   /**
@@ -143,11 +140,14 @@ export class GameRoom extends Room<GameState> {
     const equipped: Partial<Record<EquipSlot, string>> = {};
     p.equipment.forEach((id, slot) => { equipped[slot as EquipSlot] = id; });
     const bonus = equipmentBonuses(equipped);
+    const effects = loadoutEffects(equipped);
+    p.itemEffects = effects;
+    p.appearanceModel=equipped.ring && getItem(equipped.ring).ref_origen==='transformation_ring'?'DeathWraith':'';
     // Etapa 21: bonus de atributos primarios asignados (str/agi/vit/ene).
     const attr = attributeBonuses({ str: p.str, agi: p.agi, vit: p.vit, ene: p.ene });
-    p.maxHp = base.maxHp + bonus.maxHp + attr.maxHp;
-    p.maxMp = base.maxMp + bonus.maxMp + attr.maxMp;
-    p.pAtk = base.pAtk + bonus.pAtk + attr.pAtk;
+    p.maxHp = Math.round((base.maxHp + bonus.maxHp + attr.maxHp) * (1+effects.hpPct));
+    p.maxMp = Math.round((base.maxMp + bonus.maxMp + attr.maxMp) * (1+effects.mpPct));
+    p.pAtk = Math.round((base.pAtk + bonus.pAtk + attr.pAtk + p.level*effects.levelAttack)*(1+effects.attackPct));
     p.pDef = base.pDef + bonus.pDef + attr.pDef;
     if (p.hp > p.maxHp) p.hp = p.maxHp;
     if (p.mp > p.maxMp) p.mp = p.maxMp;
@@ -231,6 +231,7 @@ export class GameRoom extends Room<GameState> {
 
   /** Centraliza la muerte de un jugador (por mob o por PvP). Aplica penalidad si es PvP. */
   private killPlayer(victim: PlayerState, victimId: string, killerId?: string): void {
+    resetDungeon(victim);
     victim.dead = true;
     victim.moving = false;
     victim.respawnMs = PLAYER_RESPAWN_MS;
@@ -340,7 +341,7 @@ export class GameRoom extends Room<GameState> {
       if (p.stunMs > 0) return; // Etapa 22: aturdido no puede castear
 
       // Etapa 22: sólo se puede castear un skill YA APRENDIDO al nivel actual.
-      if (!isSkillLearned(p.className, p.level, msg.skillId)) return;
+      if (!msg || !availableSkills(p.className,p.level,[...p.learnedTomes],p.equipment.get('weapon')).includes(msg.skillId)) return;
 
       let skill;
       try {
@@ -353,7 +354,7 @@ export class GameRoom extends Room<GameState> {
       if (p.mp < skill.mpCost) return;
       if ((p.skillCooldowns.get(skill.id) ?? 0) > 0) return;
 
-      const atkCd = getClass(p.className).base.attackCooldownMs;
+      const atkCd = getClass(p.className).base.attackCooldownMs / (1+p.itemEffects.attackSpeed);
       const spend = () => { p.mp -= skill.mpCost; p.skillCooldowns.set(skill.id, skill.cooldownMs); };
       const applyCleanse = () => { if (skill.cleanse) { p.stunMs = 0; p.rootMs = 0; } };
 
@@ -361,9 +362,10 @@ export class GameRoom extends Room<GameState> {
       if (skill.type === "damage") {
         const t = p.targetId ? this.resolveTarget(p.targetId, p.mapId) : null;
         if (!t) return;
+        if (t.kind === 'mob' && !canFightDungeonMob(p,t.entity.templateId)) return;
         const gapCloser = skill.dash === "toTarget";
         // Enganche: requiere ataque listo pero NO rango (el dash acerca); si no, canAttack normal.
-        const ready = gapCloser ? (p.attackCooldownMs <= 0 && t.entity.hp > 0) : canAttack(p, t.entity, ATTACK_RANGE);
+        const ready = gapCloser ? (p.attackCooldownMs <= 0 && t.entity.hp > 0 && distance2D(p.x,p.z,t.entity.x,t.entity.z)<=12) : canAttack(p, t.entity, skill.range ?? (p.className==='mage'?10:ATTACK_RANGE));
         if (!ready) return;
         if (t.kind === "player") {
           const victim = t.entity;
@@ -371,13 +373,16 @@ export class GameRoom extends Room<GameState> {
           if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
         }
         if (gapCloser) this.dashToTarget(p, t.entity.x, t.entity.z);
+        if(['aimed_shot','snaring_shot','piercing_shot','item_volley'].includes(skill.id)) {
+          const weapon=p.equipment.get('weapon');if(!weapon || !getItem(weapon).ammo || !consumeAmmo(p))return;
+        }
         spend();
         const variance = 0.9 + Math.random() * 0.2;
-        const dmg = resolveAttack(p, t.entity, skill.factor ?? 1, variance, atkCd);
+        const dmg = resolveAttack(p, t.entity, skill.factor ?? 1, variance, atkCd,Math.random,skillElement(skill.id));
         // Modificadores de counterplay sobre el objetivo.
         if (skill.stunMs) t.entity.stunMs = Math.max(t.entity.stunMs, skill.stunMs);
-        if (skill.rootMs) t.entity.rootMs = Math.max(t.entity.rootMs, skill.rootMs);
-        if (skill.lifestealPct) p.hp = Math.min(p.maxHp, p.hp + Math.round(dmg * skill.lifestealPct));
+        if (skill.rootMs) t.entity.rootMs = Math.max(t.entity.rootMs, Math.round(skill.rootMs*(1-(t.kind==='player'&&skillElement(skill.id)==='ice'?t.entity.itemEffects.iceResist:0))));
+        if (skill.lifestealPct && p.hp>0) p.hp = Math.min(p.maxHp, p.hp + Math.round(dmg * skill.lifestealPct));
         this.markCombat(p);
         if (t.kind === "player") this.markCombat(t.entity);
         this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId, amount: dmg });
@@ -386,6 +391,7 @@ export class GameRoom extends Room<GameState> {
           if (t.kind === "mob") this.killMob(t.entity, p.targetId, client.sessionId);
           else this.killPlayer(t.entity, p.targetId, client.sessionId);
         }
+        if(p.hp<=0) this.killPlayer(p,client.sessionId,t.kind==='player'?t.sessionId:undefined);
       } else if (skill.type === "heal") {
         spend();
         const healAmount = Math.round(p.maxHp * (skill.healPct ?? 0));
@@ -414,15 +420,13 @@ export class GameRoom extends Room<GameState> {
         applyCleanse();
         this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: "" });
       } else if (skill.type === "dot") {
-        // DoT skill: requires mob target in range (mismo mapa)
-        const mob = p.targetId ? this.state.mobs.get(p.targetId) : undefined;
-        if (!mob || mob.dead || mob.mapId !== p.mapId) return;
-        if (!canAttack(p, mob, ATTACK_RANGE)) return;
+        const target=p.targetId?this.resolveTarget(p.targetId,p.mapId):null;
+        if(!target || !canAttack(p,target.entity,skill.range??ATTACK_RANGE))return;
+        if(target.kind==='mob' && !canFightDungeonMob(p,target.entity.templateId))return;
+        if(target.kind==='player' && (!this.inPvpZone(p)||!this.inPvpZone(target.entity)||(p.guildId!==''&&p.guildId===target.entity.guildId)))return;
         spend();
-        mob.dotMs = skill.dotMs ?? 0;
-        mob.dotDps = skill.dotDps ?? 0;
-        mob.dotAttackerId = client.sessionId;
-        mob.dotAccumMs = 0;
+        if(target.kind==='mob') { const mob=target.entity; mob.dotMs=skill.dotMs??0;mob.dotDps=skill.dotDps??0;mob.dotAttackerId=client.sessionId;mob.dotAccumMs=0; }
+        else { const victim=target.entity;victim.poisonMs=skill.dotMs??0;victim.poisonDps=skill.dotDps??0;victim.poisonAttackerId=client.sessionId;victim.poisonAccumMs=0; }
         this.markCombat(p);
         this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId });
       }
@@ -451,7 +455,8 @@ export class GameRoom extends Room<GameState> {
       if (distance2D(p.x, p.z, TOWN.x, TOWN.z) > TOWN_SERVICE_RADIUS) return;
 
       // Validar cantidad
-      const qty = Math.max(1, Math.floor(msg?.qty ?? 1));
+      const qty = msg?.qty ?? 1;
+      if(!Number.isSafeInteger(qty)||qty<1||qty>100)return;
 
       // Obtener precio (si no está a la venta, getShopPrice lanza, así que no-op)
       let price: number;
@@ -467,41 +472,17 @@ export class GameRoom extends Room<GameState> {
       // Deducir oro y agregar al inventario
       p.gold -= price;
       this.addToInventory(p, msg.itemTemplateId, qty);
+      client.send(MessageType.ItemResult,{success:true,text:`Compraste ${getItem(msg.itemTemplateId).name}.`});
     });
 
     // Etapa 4b-2: handler de uso de ítems (pociones)
     this.onMessage(MessageType.UseItem, (client, msg: UseItemMessage) => {
       const p = this.state.players.get(client.sessionId);
       if (!p || p.dead) return;
-
-      // Obtener definición del ítem
-      let template;
-      try {
-        template = getItem(msg.itemTemplateId);
-      } catch {
-        return; // ítem desconocido
-      }
-
-      // Verificar que sea consumible y tenga curación
-      if (template.type !== "consumable" || !template.heal) return;
-
-      // Buscar en el inventario
-      const invEntry = p.inventory.get(msg.itemTemplateId);
-      if (!invEntry || invEntry.qty < 1) return; // no tiene el ítem
-
-      // Si está a full HP, no hacer nada
-      if (p.hp >= p.maxHp) return;
-
-      // Curar hasta maxHp
-      p.hp = Math.min(p.maxHp, p.hp + template.heal);
-
-      // Decrementar cantidad
-      invEntry.qty -= 1;
-
-      // Si llega a 0, eliminar la entrada
-      if (invEntry.qty <= 0) {
-        p.inventory.delete(msg.itemTemplateId);
-      }
+      const success=useInventoryItem(p,msg?.itemTemplateId,msg?.targetItemId);
+      if(p.mapId!=='cripta')resetDungeon(p);
+      if(success)this.recomputeStats(p);
+      client.send(MessageType.ItemResult,{success,text:success?'Objeto utilizado.':'No se puede usar: revisá requisitos, recursos y objetivo.'});
     });
 
     // Etapa 9b: handlers de guild (crear/unirse/salir)
@@ -545,26 +526,16 @@ export class GameRoom extends Room<GameState> {
       if (!p || p.dead) return;
       const id = msg?.itemTemplateId;
       if (!id) return;
-      let item;
-      try { item = getItem(id); } catch { return; }
-      if (item.type !== "equipment" || !item.slot) return;
-      const inv = p.inventory.get(id);
-      if (!inv || inv.qty < 1) return;
-      // Sacar uno del inventario.
-      inv.qty -= 1;
-      if (inv.qty <= 0) p.inventory.delete(id);
-      // Si el slot ya tenía algo, vuelve al inventario (swap).
-      const prev = p.equipment.get(item.slot);
-      if (prev) this.addToInventory(p, prev, 1);
-      p.equipment.set(item.slot, id);
+      if(!equipItem(p,id)){client.send(MessageType.ItemResult,{success:false,text:'No podés equiparlo: verificá clase, nivel y manos libres.'});return;}
       this.recomputeStats(p);
+      client.send(MessageType.ItemResult,{success:true,text:`Equipaste ${getItem(id).name}.`});
       this.checkAchievements(p, client.sessionId); // p.ej. equipar un legendario
     });
 
     // Etapa 12: desequipar el slot dado → el ítem vuelve al inventario.
     this.onMessage(MessageType.UnequipItem, (client, msg: UnequipItemMessage) => {
       const p = this.state.players.get(client.sessionId);
-      if (!p) return;
+      if (!p || p.dead) return;
       const slot = msg?.slot;
       if (!slot) return;
       const cur = p.equipment.get(slot);
@@ -595,11 +566,13 @@ export class GameRoom extends Room<GameState> {
       try { zone = getZone(msg?.mapId ?? ""); } catch { return; }
       if (zone.id === p.mapId) return; // ya estás ahí
       if (!canEnterZone(zone, p.level)) return; // nivel insuficiente
+      resetDungeon(p);
       p.mapId = zone.id;
       p.x = p.targetX = zone.spawn.x;
       p.z = p.targetZ = zone.spawn.z;
       p.moving = false;
       p.targetId = "";
+      advanceQuest(p,'visit',zone.id);
     });
 
     // Etapa 16: interactuar con un objeto de mundo (cofre / barril / santuario).
@@ -611,6 +584,12 @@ export class GameRoom extends Room<GameState> {
       if (distance2D(p.x, p.z, o.x, o.z) > OBJECT_INTERACT_RANGE) return;
       let def;
       try { def = getWorldObject(o.id); } catch { return; }
+      if (o.id === 'crypt_seal_1' || o.id === 'crypt_seal_2') {
+        const success = activateSeal(p,o.id);
+        client.send(MessageType.ItemResult,{success,text:success?'Sello roto. Seguí hacia la próxima sala.':'Primero derrotá a los tres guardianes de esta sala.'});
+        return;
+      }
+      advanceQuest(p,'interact',o.id);
       if (o.kind === "shrine") {
         // Bendición temporal (reusa el sistema de buffs de skills).
         if (def.buff === "atk") { p.atkBuffMs = SHRINE_BUFF_MS; p.atkBuffMult = SHRINE_BUFF_MULT; }
@@ -672,6 +651,7 @@ export class GameRoom extends Room<GameState> {
 
   /** Anciano Rowan: campaña principal (asignar / entregar / avanzar). */
   private serveElder(p: PlayerState, client: Client): void {
+    if(p.questId==='campaign_complete')return;
     if (p.questId === "") {
       p.questId = firstQuestId();
       p.questProgress = 0;
@@ -683,12 +663,14 @@ export class GameRoom extends Room<GameState> {
         this.grantExp(p, client, q.rewardExp);
         p.gold += q.rewardGold;
         // Etapa 21: la misión puede entregar una pieza de equipo.
-        if (q.rewardItemId) {
-          this.addToInventory(p, q.rewardItemId, 1);
+        const reward = questReward(q,p.className);
+        if (reward) {
+          this.addToInventory(p, reward, q.rewardItemQty ?? 1);
           this.checkAchievements(p, client.sessionId);
         }
         p.questId = nextQuestId(p.questId);
         p.questProgress = 0;
+        client.send(MessageType.ItemResult,{success:true,text:`Misión completada: ${q.title}. +${q.rewardExp} EXP, +${q.rewardGold} oro${reward?`, ${getItem(reward).name}`:''}.`});
       }
     } catch { /* quest desconocida: ignorar */ }
   }
@@ -759,6 +741,8 @@ export class GameRoom extends Room<GameState> {
     mob.stunMs = 0;
     mob.rootMs = 0;
     mob.dotMs = 0;
+    mob.hazardMs = 0;
+    mob.hazardCooldownMs = 0;
 
     const c = getMobCombat(templateId);
     mob.hp = c.maxHp;
@@ -778,30 +762,23 @@ export class GameRoom extends Room<GameState> {
    * de nivel, le envía LevelUp SOLO a él (R-E3a-1: mensaje dirigido, no broadcast).
    */
   private killMob(mob: MobState, mobId: string, killerId?: string) {
+    if(mob.dead)return;
     mob.dead = true;
+    mob.hazardMs = 0;
     mob.moving = false;
     mob.respawnMs = respawnForTemplate(mob.templateId) ?? MOB_RESPAWN_MS;
     this.broadcast(MessageType.Death, { entityId: mobId });
 
     const killer = killerId ? this.state.players.get(killerId) : undefined;
     if (killer && !killer.dead) {
+      killer.hp=Math.min(killer.maxHp,killer.hp+Math.floor(killer.maxHp*killer.itemEffects.hpOnKill));
+      killer.mp=Math.min(killer.maxMp,killer.mp+Math.floor(killer.maxMp*killer.itemEffects.mpOnKill));
       const client = this.clients.find((c) => c.sessionId === killerId);
       if (client) {
         this.grantExp(killer, client, getMobExp(mob.templateId));
       }
 
-      // Etapa 4b-1: progreso de misión al matar mob
-      if (killer.questId !== "") {
-        try {
-          const q = getQuest(killer.questId);
-          if (q.mobTemplateId === mob.templateId && killer.questProgress < q.amount) {
-            killer.questProgress++;
-          }
-        } catch {
-          // Quest no encontrada, ignorar
-        }
-      }
-
+      advanceQuest(killer,'kill',mob.templateId);
       // Etapa 20: progreso del contrato del Capitán (se entrega hablando con él).
       if (killer.bountyId !== "") {
         try {
@@ -853,21 +830,43 @@ export class GameRoom extends Room<GameState> {
       if (killerId) this.checkAchievements(killer, killerId);
     }
 
+    // Los presentes comparten avance y EXP aunque el autor del veneno haya muerto
+    // o salido. El último atacante vivo ya recibió su EXP en el bloque anterior.
+    if (mob.mapId === 'cripta') this.state.players.forEach((participant, id) => {
+      if (participant.dead || participant.mapId !== mob.mapId || distance2D(participant.x, participant.z, mob.x, mob.z) > 25) return;
+      const client = this.clients.find(c => c.sessionId === id);
+      if (id !== killerId && client) this.grantExp(participant, client, getMobExp(mob.templateId));
+      if (advanceDungeonKill(participant, mob.templateId)) {
+        const base = getItem(dungeonReward(participant.className));
+        const reward = createItemInstance(base, { quality: 'magic', level: 5, skill: true }, randomUUID());
+        this.addToInventory(participant, reward, 1);
+        advanceQuest(participant, 'dungeon', 'cripta');
+        client?.send(MessageType.ItemResult, { success: true, text: `¡Cripta completada! Recibiste ${getItem(reward).name}. Volvé a Aden con M.` });
+      }
+    });
+
     // Etapa 14: evento de mundo — el jefe cae (anuncio server-wide, cualquiera lo haya matado).
     if (isBoss(mob.templateId)) {
-      this.broadcast(MessageType.WorldAnnounce, { text: "💀 ¡El Rey Nihil ha caído!" });
+      this.broadcast(MessageType.WorldAnnounce, { text: `¡${getTemplate(mob.templateId).name} ha caído!` });
     }
 
     // Loot (R-E3b-2): rodar drop table del mob y crear ítems en el piso con scatter.
-    this.dropLoot(mob.templateId, mob.x, mob.z, mob.mapId);
+    this.dropLoot(mob.templateId, mob.x, mob.z, mob.mapId, killer?.itemEffects.goldPct ?? 0);
   }
 
   /** Rueda una tabla de loot y deja los ítems en el piso (mobs y objetos de mundo). */
-  private dropLoot(lootId: string, x: number, z: number, mapId: string): void {
-    for (const d of rollDrops(lootId, Math.random)) {
+  private dropLoot(lootId: string, x: number, z: number, mapId: string, goldBonus=0): void {
+    const drops=rollDrops(lootId, Math.random);
+    // Un roll adicional por muerte/cofre, acotado a la profundidad del mapa.
+    if(lootId!=='breakable' && Math.random() < (lootId==='skeleton_king'?.9:.25)) {
+      const pool=catalogDropPool(mapId,lootId);
+      const chosen=pool[Math.floor(Math.random()*pool.length)];
+      if(chosen)drops.push({itemTemplateId:chosen,qty:getItem(chosen).category==='municion'?30:1});
+    }
+    for (const d of drops) {
       const item = new DroppedItemState();
-      item.itemTemplateId = d.itemTemplateId;
-      item.qty = d.qty;
+      item.itemTemplateId = instantiateItem(d.itemTemplateId,true,lootId==='skeleton_king'?6:2);
+      item.qty = d.itemTemplateId==='gold'?Math.round(d.qty*(1+goldBonus)):d.qty;
       item.mapId = mapId;
       item.x = x + (Math.random() - 0.5) * 1.5;
       item.z = z + (Math.random() - 0.5) * 1.5;
@@ -881,7 +880,7 @@ export class GameRoom extends Room<GameState> {
     this.state.players.forEach((p) => {
       if (p.dead) return; // un jugador muerto no se mueve
       if (p.stunMs > 0 || p.rootMs > 0) { p.moving = false; return; } // Etapa 22: aturdido/enraizado no se mueve
-      advanceMovable(p, dt);
+      advanceMovable(p, dt, MOVE_SPEED*(1+p.itemEffects.moveSpeed));
     });
 
     // Etapa 15: aggro por MAPA — un mob sólo persigue jugadores vivos de su mismo mapa.
@@ -901,7 +900,8 @@ export class GameRoom extends Room<GameState> {
         return; // Plantado mientras carga el ataque
       }
       if (mob.stunMs > 0) { mob.moving = false; return; } // Etapa 22: aturdido no actúa
-      stepMobAI(mob, playersByMap.get(mob.mapId) ?? [], AI_CONFIG, Math.random, dtMs);
+      const aiConfig = mob.templateId === 'crypt_warden' ? { ...AI_CONFIG, aggroRadius: 14 } : AI_CONFIG;
+      stepMobAI(mob, playersByMap.get(mob.mapId) ?? [], aiConfig, Math.random, dtMs);
       if (mob.rootMs > 0) mob.moving = false; else advanceMovable(mob, dt, MOB_MOVE_SPEED); // enraizado no se mueve
     });
 
@@ -944,18 +944,28 @@ export class GameRoom extends Room<GameState> {
       // Etapa 22: regeneración de recursos (mantiene HP/MP enteros con acumuladores).
       p.msSinceCombat += dtMs;
       if (!p.dead) {
+        if(p.poisonMs>0) {
+          const source=this.state.players.get(p.poisonAttackerId);
+          if(!source || source.dead || source.mapId!==p.mapId || !this.inPvpZone(p)||!this.inPvpZone(source)) {p.poisonMs=0;p.poisonAccumMs=0;}
+          else {
+            p.poisonAccumMs+=Math.min(dtMs,p.poisonMs);p.poisonMs=Math.max(0,p.poisonMs-dtMs);
+            while(p.poisonAccumMs>=500&&!p.dead){p.poisonAccumMs-=500;const dmg=Math.max(1,Math.round(p.poisonDps*.5*(1-p.itemEffects.reduction)*(1-p.itemEffects.poisonResist)));p.hp=Math.max(0,p.hp-dmg);this.markCombat(p);if(p.hp<=0){const id=[...this.state.players.entries()].find(([,v])=>v===p)?.[0];if(id)this.killPlayer(p,id,p.poisonAttackerId);}}
+          }
+        }
+        if(p.dead)return;
         if (p.mp < p.maxMp) {
-          p.mpRegenAcc += Math.max(2, p.maxMp * 0.04) * dt;
+          p.mpRegenAcc += (Math.max(2, p.maxMp * 0.04)+p.maxMp*p.itemEffects.manaRegen) * dt;
           const add = Math.floor(p.mpRegenAcc);
           if (add > 0) { p.mp = Math.min(p.maxMp, p.mp + add); p.mpRegenAcc -= add; }
         } else {
           p.mpRegenAcc = 0;
         }
-        // HP regenera sólo fuera de combate reciente (5 s sin dar/recibir daño).
-        if (p.hp < p.maxHp && p.msSinceCombat >= 5000) {
-          p.hpRegenAcc += Math.max(1, p.maxHp * 0.015) * dt;
-          const add = Math.floor(p.hpRegenAcc);
-          if (add > 0) { p.hp = Math.min(p.maxHp, p.hp + add); p.hpRegenAcc -= add; }
+        // La recuperación natural requiere 5 s sin combate; el guardián cura siempre.
+        if (p.hp < p.maxHp && (p.msSinceCombat >= 5000 || p.itemEffects.regen>0)) {
+          const natural=p.msSinceCombat>=5000?Math.max(1,p.maxHp*.015):0;
+          p.hpRegenAcc += (natural+p.maxHp*p.itemEffects.regen) * dt;
+          const add = Math.floor(p.hpRegenAcc+1e-9);
+          if (add > 0) { p.hp = Math.min(p.maxHp, p.hp + add); p.hpRegenAcc = Math.max(0,p.hpRegenAcc-add); }
         } else {
           p.hpRegenAcc = 0;
         }
@@ -969,9 +979,12 @@ export class GameRoom extends Room<GameState> {
       if (!t) { p.targetId = ""; return; }
       if (t.kind === "mob") {
         const mob = t.entity;
-        if (canAttack(p, mob, ATTACK_RANGE)) {
+        if(!canFightDungeonMob(p,mob.templateId))return;
+        if (canAttack(p, mob, weaponRange(playerLoadout(p)))) {
+          if(!consumeAmmo(p))return;
           const variance = 0.9 + Math.random() * 0.2;
-          const dmg = resolveAttack(p, mob, 1, variance, getClass(p.className).base.attackCooldownMs);
+          const dmg = resolveAttack(p, mob, 1, variance, getClass(p.className).base.attackCooldownMs/(1+p.itemEffects.attackSpeed));
+          if(getItem(p.equipment.get('weapon')??'worn_sword').ammo)this.broadcast(MessageType.SkillCast,{casterId:sessionId,skillId:'aimed_shot',targetId:p.targetId});
           this.markCombat(p);
           this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
           if (mob.hp <= 0) this.killMob(mob, p.targetId, sessionId);
@@ -981,13 +994,15 @@ export class GameRoom extends Room<GameState> {
         const victim = t.entity;
         if (p.guildId !== "" && p.guildId === victim.guildId) return; // aliados no se pegan
         if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
-        if (canAttack(p, victim, ATTACK_RANGE)) {
+        if (canAttack(p, victim, weaponRange(playerLoadout(p)))) {
+          if(!consumeAmmo(p))return;
           const variance = 0.9 + Math.random() * 0.2;
-          const dmg = resolveAttack(p, victim, 1, variance, getClass(p.className).base.attackCooldownMs);
+          const dmg = resolveAttack(p, victim, 1, variance, getClass(p.className).base.attackCooldownMs/(1+p.itemEffects.attackSpeed));
           this.markCombat(p);
           this.markCombat(victim);
           this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: victim.hp });
           if (victim.hp <= 0) this.killPlayer(victim, p.targetId, sessionId);
+          if(p.hp<=0)this.killPlayer(p,sessionId,t.sessionId);
         }
       }
     });
@@ -995,6 +1010,17 @@ export class GameRoom extends Room<GameState> {
     // ataque de mobs sobre el jugador que persiguen — dos fases: wind-up + impacto
     this.state.mobs.forEach((mob, mobId) => {
       if (mob.dead) return;
+      const impacted=stepGuardianHazard(mob,this.state.players.entries(),dtMs);
+      for(const id of impacted) {
+        const p=this.state.players.get(id)!;
+        const def=p.pDef*(p.defBuffMs>0?p.defBuffMult:1);
+        const dmg=Math.max(1,Math.round(computeDamage(mob.pAtk,def,1.8,1)*(1-p.itemEffects.reduction)));
+        p.hp=Math.max(0,p.hp-dmg);
+        this.markCombat(p);
+        this.broadcast(MessageType.Damage,{attackerId:mobId,targetId:id,amount:dmg,hp:p.hp});
+        if(p.hp<=0)this.killPlayer(p,id);
+      }
+      if(mob.hazardMs>0){mob.windupMs=0;mob.windupTargetId='';return;}
       // Etapa 22: un mob aturdido no ataca y se le cancela el wind-up en curso.
       if (mob.stunMs > 0) { mob.windupMs = 0; mob.windupTargetId = ""; return; }
 
@@ -1015,17 +1041,14 @@ export class GameRoom extends Room<GameState> {
         const variance = 0.9 + Math.random() * 0.2;
         // daño con def efectiva del jugador (buff): reusar computeDamage
         const defMult = (target.defBuffMs > 0) ? target.defBuffMult : 1;
-        const dmg = computeDamage(mob.pAtk, target.pDef * defMult, 1, variance);
+        const fireMob=['infernal_demon','ancient_drake'].includes(mob.templateId);
+        const dmg = Math.random()<target.itemEffects.dodge?0:Math.max(1,Math.round(computeDamage(mob.pAtk, target.pDef * defMult, 1, variance)*(1-target.itemEffects.reduction)*(1-(fireMob?target.itemEffects.fireResist:0))));
+        const reflected=Math.floor(Math.min(target.hp,dmg)*target.itemEffects.reflect);
         target.hp = Math.max(0, target.hp - dmg);
         this.markCombat(target);
         this.broadcast(MessageType.Damage, { attackerId: mobId, targetId, amount: dmg, hp: target.hp });
-        if (target.hp <= 0) {
-          target.dead = true;
-          target.moving = false;
-          target.respawnMs = PLAYER_RESPAWN_MS;
-          target.targetId = "";
-          this.broadcast(MessageType.Death, { entityId: targetId });
-        }
+        if (target.hp <= 0) this.killPlayer(target,targetId);
+        if(reflected && canFightDungeonMob(target,mob.templateId)){mob.hp=Math.max(0,mob.hp-reflected);if(mob.hp<=0)this.killMob(mob,mobId,targetId);}
         return;
       }
 
@@ -1042,6 +1065,8 @@ export class GameRoom extends Room<GameState> {
     // DoT ticks: aplicar daño por veneno a mobs
     this.state.mobs.forEach((mob, mobId) => {
       if (mob.dead || mob.dotMs <= 0) return;
+      const source=this.state.players.get(mob.dotAttackerId);
+      if(mob.templateId==='crypt_warden' && (!source || source.dead || !canFightDungeonMob(source,mob.templateId))) {mob.dotMs=0;return;}
 
       mob.dotAccumMs += dtMs;
 
@@ -1285,6 +1310,7 @@ export class GameRoom extends Room<GameState> {
       // Etapa 13: restaurar el estado de retención (racha/diaria/logros/título).
       const pr = save.progress;
       if (pr) {
+        for(const id of availableSkills(player.className,1,pr.learnedTomes??[]).filter(id=>id.startsWith('tome_')))player.learnedTomes.push(id);
         player.loginStreak = pr.loginStreak ?? 0;
         player.lastLoginDay = pr.lastLoginDay ?? "";
         player.dailyQuestId = pr.dailyQuestId ?? "";
@@ -1317,6 +1343,13 @@ export class GameRoom extends Room<GameState> {
     // saveAll()/onLeave() deben ignorarlo para no pisar el registro real con defaults
     // de nivel 1 (ver guardas en saveAll y onLeave).
     player.loaded = true;
+    if(!save && className==='ranger') {
+      const bow=Object.values(CATALOG_ITEMS).find(i=>i.category==='arma'&&i.ammo==='arrow'&&i.tier===1);
+      const arrows=Object.values(CATALOG_ITEMS).find(i=>i.category==='municion'&&i.ammo==='arrow');
+      if(bow){this.addToInventory(player,bow.id,1);const id=[...player.inventory.keys()].find(id=>getItem(id).ref_origen===bow.ref_origen);if(id)equipItem(player,id);}
+      if(arrows)this.addToInventory(player,arrows.id,100);
+      this.recomputeStats(player);
+    }
 
     // Etapa 9b: si el jugador tiene guild pero no hay ninguna instancia online (todos los
     // demás miembros están desconectados), reconstruir la GuildState viva desde el save.

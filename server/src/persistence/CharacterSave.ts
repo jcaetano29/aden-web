@@ -1,5 +1,6 @@
 /** Etapa 13: estado de retención (racha, diaria, logros) persistido como un solo blob. */
 export interface ProgressSave {
+  learnedTomes?: string[];
   loginStreak: number;
   lastLoginDay: string;
   dailyQuestId: string;
@@ -43,6 +44,7 @@ export interface CharacterSave {
 }
 
 export interface Persistable {
+  learnedTomes?: { forEach(cb: (v: string) => void): void };
   level: number;
   exp: number;
   x: number;
@@ -91,6 +93,8 @@ export function toCharacterSave(p: Persistable): CharacterSave {
   });
 
   const achievements: string[] = [];
+  const learnedTomes: string[] = [];
+  p.learnedTomes?.forEach(id=>learnedTomes.push(id));
   p.achievements.forEach((id) => achievements.push(id));
 
   return {
@@ -110,6 +114,7 @@ export function toCharacterSave(p: Persistable): CharacterSave {
     guildTag: p.guildTag,
     equipment,
     progress: {
+      ...(learnedTomes.length ? {learnedTomes} : {}),
       loginStreak: p.loginStreak,
       lastLoginDay: p.lastLoginDay,
       dailyQuestId: p.dailyQuestId,

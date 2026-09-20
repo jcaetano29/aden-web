@@ -1,3 +1,4 @@
+import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { woodMat, metalMat, crackedStoneMat } from "./textures.js";
 import * as THREE from "three";
 
@@ -38,6 +39,18 @@ export class WorldObjectViews {
   add(id: string, snap: WorldObjectSnapshot): void {
     if (this.views.has(id)) return;
     const v = this.build(snap);
+    if (id === "crypt_seal_1" || id === "crypt_seal_2") {
+      const first = id === "crypt_seal_1";
+      v.root.name = first ? "Sello de la Primera Llama" : "Sello de la Segunda Llama";
+      const color = first ? 0x77ccff : 0xffb84f;
+      if (v.glow) { const material = v.glow.material as THREE.MeshStandardMaterial; material.color.setHex(color); material.emissive.setHex(color); }
+      if (v.light) v.light.color.setHex(color);
+      if (typeof document !== "undefined") {
+        const label = document.createElement("div"); label.textContent = first ? "I · Primera llama" : "II · Segunda llama";
+        label.style.cssText = "color:#ffe0a0;font:bold 12px Georgia,serif;text-shadow:0 2px 4px #000;pointer-events:none;white-space:nowrap";
+        const plate = new CSS2DObject(label); plate.position.y = 3; v.root.add(plate);
+      }
+    }
     v.root.position.set(snap.x, 0, snap.z);
     v.root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.castShadow = true; });
     v.root.visible = snap.mapId === this.currentMapId;

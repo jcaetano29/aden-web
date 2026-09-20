@@ -30,6 +30,13 @@ function kit(ids: [string, string, string, string, string, string]): SkillUnlock
 }
 
 export const CLASSES: Record<string, ClassDef> = {
+  ranger: {
+    id: "ranger", name: "Explorador", model: "Ranger",
+    base: { maxHp: 90, maxMp: 55, pAtk: 15, pDef: 8, attackCooldownMs: 1450 },
+    growth: { hp: 17, mp: 5, pAtk: 4, pDef: 2 },
+    skills: kit(["aimed_shot", "trail_mend", "snaring_shot", "retreat", "eagle_focus", "piercing_shot"]),
+    skillId: "aimed_shot",
+  },
   knight: {
     id: "knight",
     name: "Caballero",
@@ -68,7 +75,7 @@ export const CLASSES: Record<string, ClassDef> = {
   },
 };
 
-export const CLASS_ORDER: string[] = ["knight", "mage", "barbarian", "rogue"];
+export const CLASS_ORDER: string[] = ["knight", "mage", "barbarian", "rogue", "ranger"];
 
 export function getClass(id: string): ClassDef {
   const cls = CLASSES[id];

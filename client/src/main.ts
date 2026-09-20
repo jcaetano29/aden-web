@@ -1,3 +1,5 @@
+import { AdventureTracker } from "./render/AdventureTracker.js";
+import { HazardViews } from "./render/HazardViews.js";
 import * as THREE from "three";
 import { preloadMaterialAtlas } from "./render/materialAtlas.js";
 import { Renderer } from "./render/Renderer.js";
@@ -36,7 +38,7 @@ import { SkillInput } from "./input/SkillInput.js";
 import { AudioEngine } from "./audio/AudioEngine.js";
 import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, learnedSkillIds, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE, SMITH_STOCK, getNpc, TOWN_SERVICE_RADIUS, HEAL_COST_GOLD, getBounty, firstBountyId, type Attribute } from "@aden/shared";
+import { availableSkills, getItem, getQuest, TOWN, distance2D, getClass, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE, SMITH_STOCK, getNpc, TOWN_SERVICE_RADIUS, HEAL_COST_GOLD, getBounty, firstBountyId, type Attribute } from "@aden/shared";
 
 async function main() {
   injectTheme(); // sistema de diseño (fuentes, tokens, clases) — antes de crear cualquier panel
@@ -63,6 +65,8 @@ async function main() {
   window.addEventListener("pointerdown", () => audio.resume(), { once: true });
   window.addEventListener("keydown", () => audio.resume(), { once: true });
   const hud = new Hud();
+  const adventure = new AdventureTracker();
+  const hazards = new HazardViews(renderer.scene);
   const skillBar = new SkillBar();
   const npc = new Npc(renderer.scene, renderer.css2d);
   const merchant = new Merchant(renderer.scene, renderer.css2d);
@@ -72,19 +76,14 @@ async function main() {
   const captain = new ServiceNpc(renderer.scene, renderer.css2d, "captain");
   const shopPanel = new ShopPanel((itemId) => {
     net.sendBuyItem(itemId);
-    hud.toast(`¡Compraste ${getItem(itemId).name}!`, "#2ecc40");
   });
   // Herrero: mismo panel de tienda pero con el stock de equipo.
   const smithPanel = new ShopPanel((itemId) => {
     net.sendBuyItem(itemId);
-    hud.toast(`¡Forjaste ${getItem(itemId).name}!`, "#ffb060");
   }, { stock: SMITH_STOCK, title: "⚔ Fragua de Dorne" });
   const inventoryPanel = new InventoryPanel(document.body, {
-    onUseItem: (itemId) => net.sendUseItem(itemId),
-    onEquip: (itemId) => {
-      net.sendEquipItem(itemId);
-      hud.toast(`Equipaste ${getItem(itemId).name}`, "#4da6ff");
-    },
+    onUseItem: (itemId, targetItemId) => net.sendUseItem(itemId, targetItemId),
+    onEquip: (itemId) => net.sendEquipItem(itemId),
     onUnequip: (slot) => net.sendUnequipItem(slot),
   });
   const guildPanel = new GuildPanel({
@@ -128,10 +127,11 @@ async function main() {
       views.add(id, isSelf, modelForClass(snap.className ?? "knight"), snap),
     onChange: (id, snap) => views.update(id, snap),
     onRemove: (id) => views.remove(id),
-    onMobAdd: (id, templateId, snap) => views.addMob(id, modelForTemplate(templateId), templateId, snap),
-    onMobChange: (id, snap) => views.updateMob(id, snap),
+    onMobAdd: (id, templateId, snap) => { views.addMob(id, modelForTemplate(templateId), templateId, snap); hazards.update(id, snap); },
+    onMobChange: (id, snap) => { views.updateMob(id, snap); hazards.update(id, snap); },
     onMobRemove: (id) => {
       views.removeMob(id);
+      hazards.remove(id);
       if (id === currentTargetId) currentTargetId = null;
     },
     onDamage: (ev) => {
@@ -199,11 +199,15 @@ async function main() {
       screenShake.addTrauma(0.5);
       hud.toast("✦ +3 puntos de atributo — repartilos con C", "#ffd54f", 3200);
       // Etapa 22: reconstruir la barra con las skills aprendidas y avisar las nuevas.
-      const learnedIds = learnedSkillIds(className, level);
+      const learnedIds = availableSkills(className, level, net.getLearnedTomes(), net.getEquipment().weapon);
       skillInput.setSkills(learnedIds);
       skillBar.setSkills(learnedIds);
       for (const id of learned) {
-        try { hud.toast(`✨ ¡Aprendiste ${getSkill(id).name}! (tecla ${learnedIds.indexOf(id) + 1})`, "#a0e0ff", 4000); } catch { /* skill desconocida */ }
+        try {
+          const slot = learnedIds.indexOf(id);
+          const control = slot >= 0 && slot < 6 ? `tecla ${slot + 1}` : "clic en la barra";
+          hud.toast(`✨ ¡Aprendiste ${getSkill(id).name}! (${control})`, "#a0e0ff", 4000);
+        } catch { /* skill desconocida */ }
       }
     },
     onBossKilled: (ev) => {
@@ -227,6 +231,7 @@ async function main() {
       audio.play("boss");
       screenShake.addTrauma(0.35);
     },
+    onItemResult: (result) => hud.toast(result.text, result.success ? "#2ecc40" : "#ff6b6b", 3000),
     onItemAdd: (id, itemTemplateId, x, z) => groundItems.add(id, itemTemplateId, x, z),
     onItemRemove: (id) => groundItems.remove(id),
     onObjectAdd: (id, snap) => worldObjects.add(id, snap),
@@ -309,6 +314,11 @@ async function main() {
         // No hay quests disponibles (no debería pasar)
         hud.toast("No hay misiones disponibles", "#ff6b6b");
       }
+      return;
+    }
+
+    if (self.questId === "campaign_complete") {
+      dialog.open({ speaker: ELDER_NAME, text: "Las dos llamas vuelven a arder y Aden tiene un nuevo guardián. Completaste la campaña inicial. La cripta sigue abierta para nuevas expediciones y recompensas.", actionLabel: "Seguir explorando", onAction: () => {} });
       return;
     }
 
@@ -439,6 +449,10 @@ async function main() {
       return;
     }
     net.sendInteractObject(id);
+    if (id === "crypt_seal_1" || id === "crypt_seal_2") {
+      // The stage tracker reflects acceptance from the server; no optimistic success toast.
+      return;
+    }
     if (def.kind === "chest") hud.toast("Abriste un cofre 🎁", "#ffd54f");
     else if (def.kind === "shrine") hud.toast("¡Bendición del santuario! ✨", "#66e0ff");
   };
@@ -462,7 +476,7 @@ async function main() {
   input.attach(document.body);
 
   // Configurar el kit de skills de la clase (sólo las APRENDIDAS al nivel actual).
-  let kit = learnedSkillIds(className, net.getSelf()?.level ?? 1);
+  let kit = availableSkills(className, net.getSelf()?.level ?? 1, net.getLearnedTomes(), net.getEquipment().weapon);
   // Cooldowns locales (feedback optimista; el server es la autoridad real).
   const cooldownUntil: Record<string, number> = {};
 
@@ -487,10 +501,11 @@ async function main() {
   };
 
   const skillInput = new SkillInput(useSkill);
+  skillBar.setOnUseSkill(useSkill);
   skillInput.setSkills(kit);
   skillInput.attach(document.body);
   skillBar.setSkills(kit);
-  // onLevelUp reconstruye kit vía learnedSkillIds; mantener `kit` en sync para el índice del cooldown.
+  // Mantener `kit` sincronizado para ubicar el veil de cooldown correcto.
   const origSetSkills = skillInput.setSkills.bind(skillInput);
   skillInput.setSkills = (ids: string[]) => { kit = ids; origSetSkills(ids); };
 
@@ -559,7 +574,6 @@ async function main() {
         return;
       }
       net.sendUseItem("health_potion");
-      hud.toast("Usaste una Poción de Vida", "#2ecc40");
     }
   });
 
@@ -575,6 +589,13 @@ async function main() {
     const self = views.selfPosition();
     const shake = screenShake.update(dt);
     const selfCombat = net.getSelf();
+    if (selfCombat) {
+      const nextKit = availableSkills(className, selfCombat.level, net.getLearnedTomes(), net.getEquipment().weapon);
+      if (nextKit.length !== kit.length || nextKit.some((id, index) => id !== kit[index])) {
+        skillInput.setSkills(nextKit);
+        skillBar.setSkills(nextKit);
+      }
+    }
     if (self) {
       renderer.followTarget(self.x, self.z, dt, shake.x, shake.y);
       // Bioma/niebla/luz del mapa actual + cartel al entrar a un mapa nuevo.
@@ -587,6 +608,7 @@ async function main() {
     const myMapId = selfCombat?.mapId ?? "pueblo";
     views.setCurrentMap(myMapId);
     worldObjects.setCurrentMap(myMapId);
+    hazards.setCurrentMap(myMapId);
     worldObjects.update3d(dt);
     ambient.update(dt, myMapId); // vida ambiental (decorativa) del mapa actual
     if (myMapId !== lastMapId) {
@@ -598,7 +620,8 @@ async function main() {
     healer.update(dt);
     smith.update(dt);
     captain.update(dt);
-    minimap.update(net.getMinimapEntities());
+    const objective = selfCombat ? adventure.update(selfCombat) : undefined;
+    minimap.update(net.getMinimapEntities(), net.getAdventureTarget() ?? objective);
     // Barra del jefe en pantalla + contador de reaparición (Etapa 14).
     bossBar.update(net.getBossState(), bossRespawnMs);
     if (selfCombat) {
@@ -639,6 +662,8 @@ async function main() {
       entries: net.getInventory().map((it) => ({ ...it, name: getItem(it.itemTemplateId).name })),
       equipment: net.getEquipment(),
       stats: { pAtk: selfCombat?.pAtk ?? 0, pDef: selfCombat?.pDef ?? 0 },
+      className: selfCombat?.className,
+      level: selfCombat?.level,
     });
     if (guildPanelVisible) {
       guildPanel.update(net.getGuildPanelData());

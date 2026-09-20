@@ -7,7 +7,7 @@ export const MOVE_SPEED = 5; // unidades por segundo
 // suelo base y sirve de fallback.
 export const MAP_BOUNDS = {
   minX: -80,
-  maxX: 690,
+  maxX: 950,
   minZ: -80,
   maxZ: 390,
 } as const;

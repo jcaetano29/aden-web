@@ -1,3 +1,4 @@
+import type { ObjectiveMarker } from "./AdventureTracker.js";
 import { type Zone, getZone } from "@aden/shared";
 import { COLORS, FONT_DISPLAY } from "./theme.js";
 
@@ -71,7 +72,7 @@ export class Minimap {
     this.ctx.fill();
   }
 
-  update(entities: MinimapEntity[]): void {
+  update(entities: MinimapEntity[], objective?: ObjectiveMarker): void {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, SIZE, SIZE);
 
@@ -100,6 +101,13 @@ export class Minimap {
       ctx.stroke();
     }
 
+    if (objective) {
+      const [ox, oy] = this.toPx(objective.x, objective.z);
+      ctx.strokeStyle = "#ffd779"; ctx.lineWidth = 2;
+      ctx.strokeRect(ox - 5, oy - 5, 10, 10);
+      ctx.fillStyle = "#ffe4a4"; ctx.font = "bold 10px sans-serif"; ctx.textAlign = "center";
+      ctx.fillText(objective.label, Math.max(36, Math.min(SIZE - 36, ox)), Math.max(16, oy - 10));
+    }
     ctx.fillStyle = "#ddd";
     ctx.font = "bold 10px sans-serif";
     ctx.textAlign = "center";

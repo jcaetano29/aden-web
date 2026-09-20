@@ -7,6 +7,7 @@ export const MessageType = {
   LevelUp: "levelUp",
   InteractNpc: "interactNpc",
   UseItem: "useItem",
+  ItemResult: "itemResult",
   BuyItem: "buyItem",
   CreateGuild: "createGuild",
   JoinGuild: "joinGuild",
@@ -63,6 +64,7 @@ export interface InteractNpcMessage {
 
 export interface UseItemMessage {
   itemTemplateId: string;
+  targetItemId?: string;
 }
 
 export interface BuyItemMessage {

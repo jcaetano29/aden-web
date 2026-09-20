@@ -7,6 +7,7 @@ const CLASS_STYLE: Record<string, { accent: string; glyph: string; role: string 
   mage: { accent: "#7fb0ff", glyph: "✷", role: "Daño mágico — mucho MP, frágil" },
   barbarian: { accent: "#e0563f", glyph: "⚔", role: "Daño físico bruto" },
   rogue: { accent: "#6fd06a", glyph: "🗡", role: "Rápido — ataca seguido" },
+  ranger: { accent: "#9bc85a", glyph: "➶", role: "Ataque a distancia — controla el terreno" },
 };
 
 export type LoginMode = "login" | "create";

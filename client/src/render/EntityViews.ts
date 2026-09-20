@@ -60,6 +60,9 @@ export class EntityViews {
   private readonly playerGuildTag = new Map<string, string>();
   /** playerId -> título lucido actual; detecta cambios para refrescar la línea de título. */
   private readonly playerTitle = new Map<string, string>();
+  /** Base class model and currently rendered model for equipment-driven appearances. */
+  private readonly playerBaseModel = new Map<string, string>();
+  private readonly playerVisualModel = new Map<string, string>();
   private currentTargetId: string | null = null;
   private selfId: string | null = null;
   private telegraphT = 0;
@@ -75,7 +78,8 @@ export class EntityViews {
   ) {}
 
   add(id: string, isSelf: boolean, modelName: string, snap: PlayerSnapshot) {
-    const view = new CharacterView(this.factory.create(modelName));
+    const visualModel = snap.appearanceModel || modelName;
+    const view = new CharacterView(this.factory.create(visualModel));
     view.snapTo(snap.x, snap.z);
     view.setServerState(snap);
     this.scene.add(view.object);
@@ -85,6 +89,8 @@ export class EntityViews {
     this.playerDead.set(id, snap.dead);
     this.playerGuildTag.set(id, snap.guildTag ?? "");
     this.playerTitle.set(id, snap.title ?? "");
+    this.playerBaseModel.set(id, modelName);
+    this.playerVisualModel.set(id, visualModel);
     this.playerMap.set(id, snap.mapId ?? "");
     view.object.visible = (snap.mapId ?? "") === this.currentMapId || isSelf;
     if (isSelf) {
@@ -94,6 +100,8 @@ export class EntityViews {
   }
 
   update(id: string, state: PlayerSnapshot) {
+    const desiredModel = state.appearanceModel || this.playerBaseModel.get(id);
+    if (desiredModel && desiredModel !== this.playerVisualModel.get(id)) this.replacePlayerVisual(id, desiredModel, state);
     this.views.get(id)?.setServerState(state);
     // Respawn (dead vuelve a false): restaurar la pose de idle/walk clavada
     // por playOnce("death") (mismo enfoque que updateMob para los mobs).
@@ -134,8 +142,35 @@ export class EntityViews {
     this.playerDead.delete(id);
     this.playerGuildTag.delete(id);
     this.playerTitle.delete(id);
+    this.playerBaseModel.delete(id);
+    this.playerVisualModel.delete(id);
     this.playerMap.delete(id);
     if (this.currentTargetId === id) this.currentTargetId = null;
+  }
+
+  private replacePlayerVisual(id: string, modelName: string, state: PlayerSnapshot): void {
+    const previous = this.views.get(id);
+    if (!previous) return;
+    const wasSelf = id === this.selfId;
+    const wasTarget = id === this.currentTargetId;
+    this.nameplates.remove(id);
+    this.scene.remove(previous.object);
+    this.playerRootToId.delete(previous.object);
+    previous.dispose();
+
+    const next = new CharacterView(this.factory.create(modelName));
+    next.snapTo(state.x, state.z);
+    next.setServerState(state);
+    next.object.rotation.copy(previous.object.rotation);
+    next.object.visible = (state.mapId ?? "") === this.currentMapId || wasSelf;
+    this.scene.add(next.object);
+    this.views.set(id, next);
+    this.playerRootToId.set(next.object, id);
+    if (wasSelf) next.addSelfRing();
+    if (wasTarget && !state.dead) next.addTargetRing();
+    if (state.dead) next.playOnce("death");
+    this.nameplates.add(id, nameplateText(state.name, state.guildTag), next.object, undefined, state.title ?? "");
+    this.playerVisualModel.set(id, modelName);
   }
 
   addMob(id: string, modelName: string, templateId: string, snap: MobSnapshot) {

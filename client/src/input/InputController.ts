@@ -10,6 +10,15 @@ export interface NpcInteractable {
   onInteract: () => void;
 }
 
+const UI_CLICK_SELECTOR = [
+  "button", "input", "select", "textarea", "a", "label",
+  '[role="button"]', '[contenteditable="true"]', ".aden-panel", "[data-skill-bar]",
+].join(",");
+
+function isUiClick(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(UI_CLICK_SELECTOR) !== null;
+}
+
 export class InputController {
   constructor(
     private readonly renderer: Renderer,
@@ -25,6 +34,7 @@ export class InputController {
 
   attach(dom: HTMLElement) {
     dom.addEventListener("click", (e) => {
+      if (isUiClick(e.target)) return;
       const ndcX = (e.clientX / window.innerWidth) * 2 - 1;
       const ndcY = -(e.clientY / window.innerHeight) * 2 + 1;
 

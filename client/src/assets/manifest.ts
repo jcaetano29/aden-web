@@ -1,19 +1,19 @@
 import { getTemplate, CLASSES } from "@aden/shared";
 
-export const MODEL_NAMES = ["Knight", "Mage", "Barbarian", "Rogue"] as const;
+export const MODEL_NAMES = ["Knight", "Mage", "Barbarian", "Rogue", "Ranger"] as const;
 
 export const MOB_MODEL_NAMES = ["DreadStalker", "DreadKnight", "OrcBrute", "ForestTroll", "BoneWarden", "InfernalDemon", "DeathWraith", "AncientDrake"] as const;
 
 /** Base heights before a template's elite/boss scale; feet remain at y=0. */
 export const MODEL_HEIGHTS: Record<string, number> = {
-  Knight: 2.5, Mage: 2.5, Barbarian: 2.7, Rogue: 2.4,
+  Knight: 2.5, Mage: 2.5, Barbarian: 2.7, Rogue: 2.4, Ranger: 2.4,
   DreadStalker: 2.5, DreadKnight: 2.8,
   OrcBrute: 2.9, ForestTroll: 3.8, BoneWarden: 3.2,
   InfernalDemon: 3.4, DeathWraith: 2.8, AncientDrake: 4.2,
 };
 
 export function modelUrl(name: string): string {
-  return `/models/${name}.glb`;
+  return `/models/${name === "Ranger" ? "Rogue" : name}.glb`;
 }
 
 export function modelForTemplate(templateId: string): string {

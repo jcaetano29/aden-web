@@ -118,6 +118,12 @@ export const ZONES: Zone[] = [
     safe: false,
     biome: { ground: 0x2b2733, fog: 0x3a2f45, fogNear: 26, fogFar: 108, accent: 0xff3b3b },
   },
+  {
+    id: "cripta", name: "Cripta de las Dos Llamas", subtitle: "Dos sellos protegen al Custodio",
+    center: { x: 900, z: 0 }, bounds: { minX: 870, maxX: 930, minZ: -50, maxZ: 50 },
+    spawn: { x: 900, z: 43 }, levelReq: 5, levelMin: 5, levelMax: 7, safe: false,
+    biome: { ground: 0x302a3c, fog: 0x181423, fogNear: 25, fogFar: 90, accent: 0xe8a85b },
+  },
 ];
 
 /** id del mapa seguro / punto de partida. */

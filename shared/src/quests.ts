@@ -1,4 +1,10 @@
 export interface Quest {
+  objective?: "kill" | "visit" | "interact" | "dungeon";
+  targetId?: string;
+  mapId?: string;
+  hint?: string;
+  rewardByClass?: Record<string, string>;
+  rewardItemQty?: number;
   id: string;
   title: string;
   intro: string;
@@ -83,7 +89,32 @@ export const QUESTS: Record<string, Quest> = {
   },
 };
 
-export const QUEST_ORDER: string[] = ["q1", "q2", "q3", "q4", "q5", "q6"];
+export const CAMPAIGN_COMPLETE = "campaign_complete";
+
+Object.assign(QUESTS, {
+  q_supplies: { id: "q_supplies", title: "Provisiones extraviadas", objective: "interact", targetId: "bosque_chest_1", mapId: "bosque", mobTemplateId: "", amount: 1, rewardExp: 80, rewardGold: 20, rewardItemId: "health_potion", rewardItemQty: 3, intro: "Una caravana dejó sus provisiones al oeste de la entrada del Bosque. Recuperalas del cofre y traé noticias.", done: "Estas provisiones salvarán vidas. Quedate con tres pociones para el viaje.", hint: "Cofre al oeste de la llegada del Bosque (250, 40). Acercate y hacé clic." },
+  q_shrine: { id: "q_shrine", title: "Una luz entre los árboles", objective: "interact", targetId: "bosque_shrine", mapId: "bosque", mobTemplateId: "", amount: 1, rewardExp: 100, rewardGold: 30, intro: "Encontrá el santuario del Bosque y recibí su bendición antes de avanzar.", done: "Su luz todavía nos protege. Usá esa fuerza contra la guardia musgosa.", hint: "Bosque de Umbra: santuario cerca de la llegada (300, 30). Acercate y hacé clic." },
+  q_alpha: { id: "q_alpha", title: "El rugido de Umbra", objective: "kill", mapId: "bosque", mobTemplateId: "umbra_alpha", amount: 1, rewardExp: 180, rewardGold: 70, rewardItemId: "aden_sello_del_veneno_antiguo", intro: "El Alfa de Umbra reúne a las bestias al noroeste. Prepará pociones y derrotalo.", done: "Sin su líder, las bestias se retiran. Ahora podemos investigar las Ruinas.", hint: "Buscá al Alfa al noroeste del Bosque (260, -42)." },
+  q_ruins: { id: "q_ruins", title: "Tras la piedra caída", objective: "visit", targetId: "ruinas", mapId: "ruinas", mobTemplateId: "", amount: 1, rewardExp: 200, rewardGold: 60, intro: "Viajá a las Ruinas de Nihil y reconocé el lugar. Abrí el mapa con M.", done: "Reconociste la entrada. Los guardianes custodian una antigua cripta bajo estas piedras.", hint: "Abrí M y viajá a Ruinas de Nihil (nivel 3)." },
+  q_crypt: { id: "q_crypt", title: "Las Dos Llamas", objective: "dungeon", targetId: "cripta", mapId: "cripta", mobTemplateId: "crypt_warden", amount: 1, rewardExp: 600, rewardGold: 250, intro: "Entrá en la Cripta de las Dos Llamas. Vencé a tres acólitos, activá el primer sello, vencé a tres guardias y activá el segundo. Después enfrentá al Custodio: salí del círculo antes de que estalle.", done: "Apagaste las dos llamas y rompiste el sello del Custodio. Su arma te ayudará a cruzar el Yermo.", hint: "M → Cripta de las Dos Llamas (nivel 5). Seguí los objetivos de la mazmorra; salir o morir reinicia el recorrido." },
+  q_ash_shrine: { id: "q_ash_shrine", title: "La última llama", objective: "interact", targetId: "yermo_shrine", mapId: "yermo", mobTemplateId: "", amount: 1, rewardExp: 300, rewardGold: 120, rewardItemId: "greater_potion", intro: "Activá el santuario de la entrada del Yermo. Su llama revelará el camino al Rey Nihil.", done: "El camino al Trono está abierto. Revisá tu equipo, reponé pociones y preparate para el último combate.", hint: "Santuario del Yermo (300, 335), cerca del punto de llegada." },
+} satisfies Record<string, Quest>);
+
+for (const [id, mapId] of Object.entries({ q1: "bosque", q2: "bosque", q3: "ruinas", q4: "ruinas", q5: "yermo", q6: "trono" })) {
+  QUESTS[id].mapId = mapId;
+  QUESTS[id].objective = "kill";
+  QUESTS[id].hint = `Viajá con M a ${mapId}; buscá los enemigos marcados y volvé con Rowan al completar el objetivo.`;
+}
+QUESTS.q2.rewardItemId = undefined;
+QUESTS.q2.rewardByClass = {
+  knight: "aden_punal_del_umbral", barbarian: "aden_destral_del_lenador_gris", rogue: "aden_punal_del_umbral",
+  mage: "aden_baston_del_huesero", ranger: "aden_arco_de_la_senda",
+};
+QUESTS.q4.rewardItemId = "crypt_plate";
+QUESTS.q4.done = "El Centinela cayó. Bajo sus ruinas se abre la Cripta de las Dos Llamas: cortá el poder que alimenta al ejército antes de cruzar al Yermo.";
+QUESTS.q6.done = "¡El Rey ha caído! Aden vuelve a respirar. La campaña está completa: podés seguir explorando y volver a la Cripta para buscar nuevas recompensas.";
+
+export const QUEST_ORDER: string[] = ["q1", "q_supplies", "q_shrine", "q2", "q_alpha", "q_ruins", "q3", "q4", "q_crypt", "q5", "q_ash_shrine", "q6"];
 
 export function getQuest(id: string): Quest {
   const quest = QUESTS[id];
@@ -98,10 +129,10 @@ export function firstQuestId(): string {
 }
 
 export function nextQuestId(current: string): string {
+  if (current === CAMPAIGN_COMPLETE) return CAMPAIGN_COMPLETE;
   const idx = QUEST_ORDER.indexOf(current);
   if (idx === -1) {
     return QUEST_ORDER[0];
   }
-  const nextIdx = (idx + 1) % QUEST_ORDER.length;
-  return QUEST_ORDER[nextIdx];
+  return QUEST_ORDER[idx + 1] ?? CAMPAIGN_COMPLETE;
 }

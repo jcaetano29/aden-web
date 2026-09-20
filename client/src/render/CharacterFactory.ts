@@ -53,7 +53,7 @@ export class CharacterFactory {
             if(!material){material=new THREE.MeshStandardMaterial({name:source.name,map:source.map,color:name==="DreadKnight"?0x858f9c:0x667989,roughness:.7,metalness:.25,side:source.side});materials.set(source,material);}
             return material;
           }
-          if (["Knight", "Mage", "Rogue", "Barbarian"].includes(name) && source instanceof THREE.MeshBasicMaterial) {
+          if (["Knight", "Mage", "Rogue", "Ranger", "Barbarian"].includes(name) && source instanceof THREE.MeshBasicMaterial) {
             let material = materials.get(source);
             if (!material) {
               material = new THREE.MeshStandardMaterial({ name: source.name, color: source.color, map: source.map, side: source.side, transparent: source.transparent, opacity: source.opacity, alphaTest: source.alphaTest, roughness: 0.78, metalness: 0.08 });

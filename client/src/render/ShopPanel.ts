@@ -1,4 +1,4 @@
-import { getItem, getShopPrice, SHOP_STOCK, isEquipment, getRarity, RARITY_COLORS } from "@aden/shared";
+import { CLASSES, getItem, getShopPrice, SHOP_STOCK, isEquipment, getRarity, RARITY_COLORS } from "@aden/shared";
 import { COLORS, FONT_DISPLAY, FONT_BODY, applyButton } from "./theme.js";
 
 export interface ShopPanelOpts {
@@ -19,6 +19,7 @@ export class ShopPanel {
   private readonly root: HTMLDivElement;
   private readonly itemsList: HTMLDivElement;
   private readonly goldLabel: HTMLDivElement;
+  private readonly searchInput: HTMLInputElement;
   private visible = false;
   private onBuy: (itemTemplateId: string) => void;
   private readonly stock: string[];
@@ -36,7 +37,8 @@ export class ShopPanel {
     this.root.className = "aden-panel aden-fadein";
     this.root.style.cssText =
       "position:fixed;left:14px;top:14px;display:none;pointer-events:none;z-index:1000;" +
-      `min-width:250px;font-family:${FONT_BODY};color:${COLORS.text};padding:14px 16px;user-select:none;`;
+      `width:min(440px,calc(100vw - 28px));max-height:calc(100vh - 28px);font-family:${FONT_BODY};` +
+      `color:${COLORS.text};padding:14px 16px;user-select:none;box-sizing:border-box;`;
 
     const header = document.createElement("div");
     header.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;";
@@ -63,8 +65,19 @@ export class ShopPanel {
     this.goldLabel.innerHTML = `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe9a6,#c9a24b 60%,#7a5c22);"></span>Oro: <span data-gold>0</span>`;
     this.root.appendChild(this.goldLabel);
 
+    this.searchInput = document.createElement("input");
+    this.searchInput.type = "search";
+    this.searchInput.placeholder = "Buscar por nombre, clase o descripción";
+    this.searchInput.setAttribute("aria-label", "Buscar objetos");
+    this.searchInput.style.cssText =
+      `width:100%;box-sizing:border-box;margin-bottom:10px;padding:7px 9px;background:#120c07;color:${COLORS.text};` +
+      "border:1px solid #4a380f;border-radius:5px;outline:none;pointer-events:auto;";
+    this.searchInput.addEventListener("input", () => this.renderItems());
+    this.root.appendChild(this.searchInput);
+
     this.itemsList = document.createElement("div");
-    this.itemsList.style.cssText = "display:flex;flex-direction:column;gap:8px;";
+    this.itemsList.dataset.shopList = "";
+    this.itemsList.style.cssText = "display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 175px);overflow-y:auto;padding-right:4px;";
     this.root.appendChild(this.itemsList);
 
     parent.appendChild(this.root);
@@ -76,14 +89,20 @@ export class ShopPanel {
   /** Renderiza cada ítem del stock con nombre, precio y botón Comprar. */
   private renderItems(): void {
     this.itemsList.innerHTML = "";
+    const query = this.searchInput?.value.trim().toLocaleLowerCase("es") ?? "";
     for (const itemId of this.stock) {
       try {
         const item = getItem(itemId);
         const price = getShopPrice(itemId);
+        const classNames = item.classes?.map((id) => CLASSES[id]?.name ?? id) ?? [];
+        const searchable = [item.name, item.description, item.category, ...classNames].filter(Boolean).join(" ").toLocaleLowerCase("es");
+        if (query && !searchable.includes(query)) continue;
 
         const nameColor = isEquipment(itemId) ? RARITY_COLORS[getRarity(itemId)] : COLORS.parchment;
 
         const row = document.createElement("div");
+        row.dataset.shopItem = itemId;
+        row.title = item.description ?? item.name;
         row.style.cssText =
           "display:flex;justify-content:space-between;align-items:center;gap:10px;" +
           "padding:8px 9px;background:linear-gradient(180deg,rgba(201,162,75,0.10),rgba(0,0,0,0.15));" +
@@ -91,9 +110,21 @@ export class ShopPanel {
 
         const info = document.createElement("div");
         info.style.cssText = "flex:1;";
-        info.innerHTML =
-          `<div style="font-weight:600;color:${nameColor};">${item.name}</div>` +
-          `<div style="font-size:12px;color:${COLORS.textDim};margin-top:1px;">✦ ${price} oro</div>`;
+        const name = document.createElement("div");
+        name.textContent = item.name;
+        name.style.cssText = `font-weight:600;color:${nameColor};`;
+        const priceLine = document.createElement("div");
+        priceLine.textContent = `✦ ${price} oro`;
+        priceLine.style.cssText = `font-size:12px;color:${COLORS.textDim};margin-top:1px;`;
+        const requirements = document.createElement("div");
+        const requirementParts = [
+          item.requiredLevel !== undefined ? `Nivel ${item.requiredLevel}` : "",
+          classNames.length ? classNames.join(", ") : "",
+        ].filter(Boolean);
+        requirements.textContent = requirementParts.join(" · ");
+        requirements.style.cssText = `font-size:11px;color:${COLORS.textDim};margin-top:2px;line-height:1.25;`;
+        info.append(name, priceLine);
+        if (requirementParts.length) info.appendChild(requirements);
         row.appendChild(info);
 
         const buyBtn = document.createElement("button");

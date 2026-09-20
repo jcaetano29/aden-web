@@ -20,28 +20,40 @@ const TYPE_COLOR: Record<string, string> = {
  */
 export class SkillBar {
   private readonly root: HTMLDivElement;
-  private slots: HTMLDivElement[] = [];
+  private slots: HTMLButtonElement[] = [];
   private nameEls: HTMLDivElement[] = [];
   private cooldownVeils: HTMLDivElement[] = [];
   private skillIds: string[] = [];
+  private onUseSkill?: (skillId: string) => void;
 
-  constructor() {
+  constructor(onUseSkill?: (skillId: string) => void) {
+    this.onUseSkill = onUseSkill;
     this.root = document.createElement("div");
+    this.root.dataset.skillBar = "";
     this.root.style.cssText =
-      "position:fixed;bottom:22px;left:50%;transform:translateX(-50%);pointer-events:none;" +
-      "z-index:999;display:flex;gap:10px;user-select:none;";
+      "position:fixed;bottom:22px;left:50%;transform:translateX(-50%);pointer-events:auto;" +
+      "z-index:999;display:flex;gap:10px;user-select:none;max-width:calc(100vw - 24px);" +
+      "overflow-x:auto;overflow-y:hidden;padding:4px;box-sizing:border-box;";
     document.body.appendChild(this.root);
   }
 
-  private buildSlot(index: number): HTMLDivElement {
-    const slot = document.createElement("div");
+  setOnUseSkill(onUseSkill: (skillId: string) => void): void {
+    this.onUseSkill = onUseSkill;
+  }
+
+  private buildSlot(index: number, skillId: string): HTMLButtonElement {
+    const slot = document.createElement("button");
+    slot.type = "button";
+    slot.dataset.skillId = skillId;
+    slot.title = `Usar ${skillId}`;
     slot.style.cssText =
-      `width:${SKILL_SLOT_WIDTH}px;height:${SKILL_SLOT_HEIGHT}px;` +
+      `width:${SKILL_SLOT_WIDTH}px;min-width:${SKILL_SLOT_WIDTH}px;height:${SKILL_SLOT_HEIGHT}px;` +
       "background:linear-gradient(180deg,#241b12,#120c07);" +
       "border:1px solid #4a380f;border-radius:8px;" +
       "display:flex;flex-direction:column;align-items:center;justify-content:flex-end;" +
       "padding:5px 4px;position:relative;overflow:hidden;" +
-      "box-shadow:0 5px 16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(242,216,150,0.12);";
+      "box-shadow:0 5px 16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(242,216,150,0.12);cursor:pointer;";
+    slot.addEventListener("click", () => this.onUseSkill?.(skillId));
 
     const skillName = document.createElement("div");
     skillName.style.cssText =
@@ -55,7 +67,7 @@ export class SkillBar {
     keyLabel.style.cssText =
       `font-family:${FONT_DISPLAY};font-size:11px;font-weight:700;color:#241a0b;margin-top:3px;` +
       "background:linear-gradient(180deg,#f2d896,#c9a24b);border-radius:4px;padding:1px 7px;box-shadow:0 1px 2px rgba(0,0,0,0.5);";
-    keyLabel.textContent = String(index + 1);
+    keyLabel.textContent = index < 6 ? String(index + 1) : "click";
     slot.appendChild(keyLabel);
 
     const cooldownVeil = document.createElement("div");
@@ -77,7 +89,7 @@ export class SkillBar {
     this.nameEls = [];
     this.cooldownVeils = [];
     for (let i = 0; i < ids.length; i++) {
-      const slot = this.buildSlot(i);
+      const slot = this.buildSlot(i, ids[i]);
       const nameEl = this.nameEls[i];
       try {
         const skill = getSkill(ids[i]);

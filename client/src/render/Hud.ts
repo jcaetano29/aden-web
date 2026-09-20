@@ -93,7 +93,7 @@ export class Hud {
     this.questLabel.style.cssText =
       `margin-top:3px;font-size:13px;color:${COLORS.exp1};font-weight:600;` +
       "display:flex;align-items:center;gap:6px;";
-    this.questLabel.textContent = "⚑ Sin misión";
+    this.questLabel.textContent = "⚑ Hablá con el Anciano";
     col.appendChild(this.questLabel);
 
     this.goldLabel = document.createElement("div");
@@ -248,7 +248,9 @@ export class Hud {
     }
 
     if (questId === "") {
-      this.questLabel.textContent = "⚑ Sin misión";
+      this.questLabel.textContent = "⚑ Hablá con el Anciano";
+    } else if (questId === "campaign_complete") {
+      this.questLabel.textContent = "✦ Campaña completada";
     } else {
       try {
         const quest = getQuest(questId);

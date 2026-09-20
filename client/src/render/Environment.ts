@@ -1,3 +1,4 @@
+import { addCryptEnvironment } from "./CryptEnvironment.js";
 import * as THREE from "three";
 import { addMapDressing } from "./MapDressing.js";
 import { ZONES, WORLD_OBJECTS, getZone, zoneAt, TOWN, SAFE_RADIUS, distance2D, type Zone } from "@aden/shared";
@@ -26,6 +27,7 @@ const SUN_INTENSITY: Record<string, number> = {
   ruinas: 1.05,
   yermo: 1.1,
   trono: 0.85,
+  cripta: 1.45,
 };
 
 /**
@@ -89,6 +91,7 @@ export class Environment {
     this.structures();
     this.populate();
     addMapDressing(this.scene);
+    addCryptEnvironment(this.scene);
     this.addMotes();
     this.enableShadows();
   }
@@ -1037,6 +1040,8 @@ export class Environment {
     this.sun.intensity = this.curSun;
     // La luz hemisférica también toma el tinte del bioma (cielo).
     this.hemi.color.lerp(new THREE.Color(b.fog).lerp(new THREE.Color(0xb9d2ed), 0.65), k * 0.6);
+    // Dungeon silhouettes must remain readable against the cold stone, including unlit sides.
+    this.hemi.intensity += ((zone.id === "cripta" ? 1.65 : 1.05) - this.hemi.intensity) * k;
 
     // Brasas del Yermo: ascienden y se reciclan al llegar arriba.
     if (this.embers) {

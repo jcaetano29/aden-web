@@ -26,6 +26,7 @@ import {
   type SkillCastEvent,
   isBoss,
   getTemplate,
+  getQuest,
 } from "@aden/shared";
 import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
 
@@ -42,12 +43,16 @@ export interface PlayerSnapshot {
   dead: boolean;
   /** Clase del jugador (knight/mage/barbarian/rogue); se sincroniza desde el server. Solo para jugadores. */
   className?: string;
+  /** Optional visual override supplied by equipment such as transformation rings. */
+  appearanceModel?: string;
   /** Tag de guild ("" si no pertenece a ninguna); se sincroniza desde el server. Solo para jugadores. */
   guildTag?: string;
   /** Título lucido (Etapa 13, logros); "" si ninguno. Solo para jugadores. */
   title?: string;
   /** Mapa donde está la entidad (Etapa 15). El cliente sólo renderiza su mapa actual. */
   mapId?: string;
+  dungeonStage?: number;
+  dungeonKills?: number;
 }
 
 /** Snapshot de mob: incluye combate (hp/maxHp/dead) para highlight/HUD. */
@@ -56,6 +61,10 @@ export interface MobSnapshot extends PlayerSnapshot {
   maxHp: number;
   dead: boolean;
   windupMs: number;
+  hazardMs?: number;
+  hazardX?: number;
+  hazardZ?: number;
+  hazardRadius?: number;
 }
 
 /** Campos de combate del jugador local, leídos directamente del estado sincronizado (HUD). */
@@ -91,6 +100,8 @@ export interface SelfCombatSnapshot {
   pDef: number;
   /** Mapa actual del jugador local (Etapa 15). */
   mapId: string;
+  dungeonStage?: number;
+  dungeonKills?: number;
 }
 
 export interface RoomCallbacks {
@@ -123,6 +134,8 @@ export interface RoomCallbacks {
   onObjectRemove: (id: string) => void;
   /** Etapa 17: un jugador lanzó una skill (para renderizar su VFX). */
   onSkillCast: (ev: SkillCastEvent) => void;
+  /** Authoritative result for buy/use/equip/unequip operations. */
+  onItemResult?: (result: { success: boolean; text: string }) => void;
 }
 
 export class NetworkClient {
@@ -142,9 +155,12 @@ export class NetworkClient {
       moving: p.moving,
       dead: p.dead,
       className: p.className,
+      appearanceModel: p.appearanceModel ?? "",
       guildTag: p.guildTag ?? "",
       title: p.title ?? "",
       mapId: p.mapId ?? "pueblo",
+      dungeonStage: p.dungeonStage ?? 0,
+      dungeonKills: p.dungeonKills ?? 0,
     });
 
     this.room.state.players.onAdd((player: any, id: string) => {
@@ -164,6 +180,10 @@ export class NetworkClient {
       maxHp: m.maxHp,
       dead: m.dead,
       windupMs: m.windupMs ?? 0,
+      hazardMs: m.hazardMs ?? 0,
+      hazardX: m.hazardX ?? m.x,
+      hazardZ: m.hazardZ ?? m.z,
+      hazardRadius: m.hazardRadius ?? 0,
       mapId: m.mapId ?? "",
     });
 
@@ -186,6 +206,7 @@ export class NetworkClient {
     this.room.onMessage(MessageType.DailyComplete, (data: DailyCompleteEvent) => cb.onDailyComplete(data));
     this.room.onMessage(MessageType.Achievement, (data: AchievementEvent) => cb.onAchievement(data));
     this.room.onMessage(MessageType.WorldAnnounce, (data: WorldAnnounceEvent) => cb.onWorldAnnounce(data));
+    this.room.onMessage(MessageType.ItemResult, (data: { success: boolean; text: string }) => cb.onItemResult?.(data));
 
     // Etapa 16: objetos de mundo.
     const snapObj = (o: any): WorldObjectSnapshot => ({
@@ -234,8 +255,8 @@ export class NetworkClient {
   }
 
   /** Envía la intención de usar un ítem consumible (p.ej. poción). */
-  sendUseItem(itemTemplateId: string) {
-    const msg: UseItemMessage = { itemTemplateId };
+  sendUseItem(itemTemplateId: string, targetItemId?: string) {
+    const msg: UseItemMessage = targetItemId ? { itemTemplateId, targetItemId } : { itemTemplateId };
     this.room.send(MessageType.UseItem, msg);
   }
 
@@ -339,6 +360,29 @@ export class NetworkClient {
    * HUD lo usa cada frame; nunca muta el estado (server autoritativo). Null
    * si el propio jugador todavía no llegó al estado (frame de conexión).
    */
+  getAdventureTarget(): { x: number; z: number; label: string } | undefined {
+    const p = this.room.state.players.get(this.room.sessionId);
+    if (!p) return undefined;
+    let target = "";
+    if (p.mapId === "cripta") {
+      target = ({ 0: "crypt_acolyte", 2: "crypt_flameguard", 4: "crypt_warden" } as Record<number, string>)[p.dungeonStage ?? 0] ?? "";
+    } else {
+      try {
+        const q = getQuest(p.questId);
+        if (p.questProgress < q.amount && (!q.objective || q.objective === "kill")) target = q.mobTemplateId;
+      } catch { return undefined; }
+    }
+    if (!target) return undefined;
+    let nearest: { x: number; z: number; label: string } | undefined;
+    let distance = Infinity;
+    this.room.state.mobs.forEach((m: any) => {
+      if (m.dead || m.mapId !== p.mapId || m.templateId !== target) return;
+      const d = Math.hypot(m.x - p.x, m.z - p.z);
+      if (d < distance) { distance = d; nearest = { x: m.x, z: m.z, label: getTemplate(target).name }; }
+    });
+    return nearest;
+  }
+
   getSelf(): SelfCombatSnapshot | null {
     const p: any = this.room.state.players.get(this.room.sessionId);
     if (!p) return null;
@@ -366,6 +410,8 @@ export class NetworkClient {
       pAtk: p.pAtk ?? 0,
       pDef: p.pDef ?? 0,
       mapId: p.mapId ?? "pueblo",
+      dungeonStage: p.dungeonStage ?? 0,
+      dungeonKills: p.dungeonKills ?? 0,
     };
   }
 
@@ -377,6 +423,14 @@ export class NetworkClient {
     p.equipment.forEach((itemId: string, slot: string) => {
       if (itemId) out[slot] = itemId;
     });
+    return out;
+  }
+
+  /** Permanently learned tome skill ids for the local player. */
+  getLearnedTomes(): string[] {
+    const p: any = this.room.state.players.get(this.room.sessionId);
+    const out: string[] = [];
+    p?.learnedTomes?.forEach((id: string) => out.push(id));
     return out;
   }
 

@@ -1,9 +1,13 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
 import { MessageType, getZone, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN, getDailyQuest, HEAL_COST_GOLD, firstBountyId, nextBountyId, getBounty } from "@aden/shared";
 import appConfig from "../testServer.js";
+import { GameRoom } from './GameRoom.js';
 import { MobState } from "../state/MobState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
+import { CATALOG_ITEMS, createItemInstance } from '@aden/shared';
+import { grantItem } from '../systems/ItemSystem.js';
+import { toCharacterSave } from '../persistence/CharacterSave.js';
 
 describe("GameRoom", () => {
   let colyseus: ColyseusTestServer;
@@ -16,6 +20,204 @@ describe("GameRoom", () => {
   });
   beforeEach(async () => {
     await colyseus.cleanup();
+  });
+
+  it('valida provisiones por distancia y visitas por viaje real; cierra la campaña sin repetir premio', async () => {
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'QuestJourney'}); await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;
+    p.questId='q_supplies'; p.mapId='bosque'; p.x=300;p.z=50;
+    c.send(MessageType.InteractObject,{objectId:'bosque_chest_1'}); await room.waitForNextPatch();
+    expect(p.questProgress).toBe(0);
+    p.x=250;p.z=40;
+    c.send(MessageType.InteractObject,{objectId:'bosque_chest_1'}); await room.waitForNextPatch();
+    expect(p.questProgress).toBe(1);
+    p.questId='q_ruins';p.questProgress=0;p.level=3;
+    c.send(MessageType.WarpTo,{mapId:'ruinas'}); await room.waitForNextPatch();
+    expect(p.questProgress).toBe(1);
+    p.questId='q6';p.questProgress=1;p.mapId='pueblo';p.x=0;p.z=0;
+    c.send(MessageType.InteractNpc,{});await room.waitForNextPatch();
+    expect(p.questId).toBe('campaign_complete');
+    const gold=p.gold;
+    c.send(MessageType.InteractNpc,{});await room.waitForNextPatch();
+    expect(p.gold).toBe(gold);
+  });
+
+  it('la cripta exige sellos personales, rechaza ataque prematuro y paga una sola vez por recorrido', async () => {
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'AdventureDungeon'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;
+    p.level=6;p.mapId='cripta';p.x=900;p.z=-37;p.targetX=p.x;p.targetZ=p.z;
+    p.questId='q_crypt';p.questProgress=0;
+    const mob=room.spawnMob('dungeon-test','crypt_warden',900,-37,'cripta');
+    mob.stunMs=999999;mob.hp=1;p.targetId='dungeon-test';p.attackCooldownMs=0;
+    await room.waitForNextSimulationTick();expect(mob.dead).toBe(false);
+    p.dungeonStage=1;p.x=890;p.z=15;
+    c.send(MessageType.InteractObject,{objectId:'crypt_seal_2'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(1);
+    c.send(MessageType.InteractObject,{objectId:'crypt_seal_1'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(2);
+    expect(room.state.worldObjects.get('crypt_seal_1')!.active).toBe(true);
+    p.dungeonStage=3;p.x=910;p.z=-12;
+    c.send(MessageType.InteractObject,{objectId:'crypt_seal_2'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(4);
+    p.x=900;p.z=-37;p.attackCooldownMs=0;
+    await room.waitForNextSimulationTick();
+    expect(p.dungeonStage).toBe(5);expect(p.questProgress).toBe(1);
+    const prizes=()=>[...p.inventory.keys()].filter(id=>getItem(id).options?.level===5);
+    expect(prizes()).toHaveLength(1);
+    room.spawnMob('dungeon-test','crypt_warden',900,-37,'cripta').stunMs=999999;
+    p.attackCooldownMs=0;await room.waitForNextSimulationTick();expect(prizes()).toHaveLength(1);
+    c.send(MessageType.WarpTo,{mapId:'pueblo'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(0);
+  });
+
+  it('comparte avance cercano sin saltar sellos y reinicia al morir por el área anunciada',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'CriptaAliado'});
+    const d=await colyseus.connectTo(room,{name:'CriptaGrupo'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!, ally=room.state.players.get(d.sessionId)!;
+    for(const player of [p,ally]){player.mapId='cripta';player.x=900;player.z=30;player.pAtk=1000;player.hp=1000;player.maxHp=1000;}
+    for(let i=0;i<3;i++){
+      const m=room.spawnMob(`shared-${i}`,'crypt_acolyte',900,30,'cripta');m.stunMs=999999;m.hp=1;
+      p.targetId=`shared-${i}`;p.attackCooldownMs=0;await room.waitForNextSimulationTick();
+    }
+    expect(p.dungeonStage).toBe(1);expect(ally.dungeonStage).toBe(1);
+    p.dungeonStage=4;p.x=900;p.z=-37;p.hp=1;p.targetId='';
+    const boss=room.spawnMob('hazard-death','crypt_warden',900,-37,'cripta');
+    boss.hazardMs=1;boss.hazardX=p.x;boss.hazardZ=p.z;boss.aggroTargetId=c.sessionId;
+    await room.waitForNextSimulationTick();
+    expect(p.dead).toBe(true);expect(p.dungeonStage).toBe(0);expect(p.dungeonKills).toBe(0);
+    expect(ally.dungeonStage).toBe(1);
+  });
+
+  it.each(['alive', 'dead', 'missing'] as const)('la cripta comparte crédito y EXP una sola vez cuando el autor está %s', async (ownerState) => {
+    const room = (await colyseus.createRoom('game', {})) as GameRoom;
+    const authorClient = await colyseus.connectTo(room, { name: `Author${ownerState}` });
+    const allyClient = await colyseus.connectTo(room, { name: `Ally${ownerState}` });
+    await room.waitForNextPatch();
+    room.state.mobs.clear();
+    const author = room.state.players.get(authorClient.sessionId)!;
+    const ally = room.state.players.get(allyClient.sessionId)!;
+    for (const p of [author, ally]) {
+      p.mapId = 'cripta'; p.x = 900; p.z = 30; p.moving = false;
+      p.level = 6; p.exp = 0; p.dailyQuestId = ''; p.targetId = '';
+    }
+    if (ownerState === 'dead') { author.dead = true; author.respawnMs = 100000; }
+    if (ownerState === 'missing') room.state.players.delete(authorClient.sessionId);
+    const mob = room.spawnMob('shared-poison', 'crypt_acolyte', 900, 30, 'cripta');
+    mob.hp = 1; mob.stunMs = 100000;
+    mob.dotMs = 1000; mob.dotDps = 20; mob.dotAccumMs = 450; mob.dotAttackerId = authorClient.sessionId;
+    room.tick(.05);
+    expect(mob.dead).toBe(true);
+    expect(ally.dungeonKills).toBe(1);
+    expect(ally.exp).toBe(90);
+    expect(author.exp).toBe(ownerState === 'alive' ? 90 : 0);
+    room.tick(.05);
+    expect(ally.dungeonKills).toBe(1);
+    expect(ally.exp).toBe(90);
+  });
+
+  it('el Custodio persigue y anuncia su área frente a un Explorador a nueve metros', async () => {
+    const room = (await colyseus.createRoom('game', {})) as GameRoom;
+    const c = await colyseus.connectTo(room, { name: 'GuardianRanged', className: 'ranger' });
+    await room.waitForNextPatch();
+    room.state.mobs.clear();
+    const p = room.state.players.get(c.sessionId)!;
+    p.mapId = 'cripta'; p.x = 909; p.z = -37; p.moving = false; p.dungeonStage = 4;
+    const boss = room.spawnMob('ranged-guardian', 'crypt_warden', 900, -37, 'cripta');
+    p.targetId = 'ranged-guardian'; p.attackCooldownMs = 0;
+    room.tick(.05);
+    expect(boss.hp).toBeLessThan(boss.maxHp);
+    expect(boss.aggroTargetId).toBe(c.sessionId);
+    expect(boss.aiState).toBe('chase');
+    expect(boss.hazardMs).toBe(1600);
+    expect(boss.hazardX).toBe(909);
+    expect(boss.hazardRadius).toBe(6);
+  });
+
+  it('Explorador empieza equipado y dispara a distancia sólo con munición',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'RangerCatalog',className:'ranger'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;
+    expect(getItem(p.equipment.get('weapon')!).ammo).toBe('arrow');
+    p.mapId='bosque';p.x=100;p.z=0;p.moving=false;
+    const mob=room.spawnMob('range-test','skeleton_minion',108,0,'bosque');mob.hp=500;mob.maxHp=500;mob.stunMs=10000;
+    p.targetId='range-test';
+    const ammo=[...p.inventory.keys()].find(id=>getItem(id).category==='municion')!;
+    const before=p.inventory.get(ammo)!.qty;
+    await room.waitForNextSimulationTick();
+    expect(mob.hp).toBeLessThan(500);expect(p.inventory.get(ammo)!.qty).toBe(before-1);
+    p.inventory.delete(ammo);p.attackCooldownMs=0;const hp=mob.hp;
+    await room.waitForNextSimulationTick();expect(mob.hp).toBe(hp);
+  });
+
+  it('rechaza equipo de otra clase y escudo con dos manos sin consumir objetos',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'EquipCatalog',className:'knight'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;p.level=40;
+    const staff=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='skull_staff')!;
+    grantItem(p,staff.id,1);const staffId=[...p.inventory.keys()].find(k=>getItem(k).ref_origen==='skull_staff')!;
+    c.send(MessageType.EquipItem,{itemTemplateId:staffId});await room.waitForNextPatch();expect(p.inventory.has(staffId)).toBe(true);expect(p.equipment.has('weapon')).toBe(false);
+    const blade=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='giant_sword')!;
+    const shield=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='small_shield')!;
+    grantItem(p,blade.id,1);grantItem(p,shield.id,1);
+    const bladeId=[...p.inventory.keys()].find(k=>getItem(k).ref_origen==='giant_sword')!;
+    const shieldId=[...p.inventory.keys()].find(k=>getItem(k).ref_origen==='small_shield')!;
+    c.send(MessageType.EquipItem,{itemTemplateId:bladeId});await room.waitForNextPatch();
+    c.send(MessageType.EquipItem,{itemTemplateId:shieldId});await room.waitForNextPatch();
+    expect(p.equipment.get('weapon')).toBe(bladeId);expect(p.inventory.has(shieldId)).toBe(true);
+  });
+
+  it('aprende un tomo una sola vez y restaura tomo y modificadores desde el guardado',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'TomeCatalog',className:'mage'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;
+    const tome=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='scroll_of_energy_ball')!;
+    grantItem(p,tome.id,2);c.send(MessageType.UseItem,{itemTemplateId:tome.id});await room.waitForNextPatch();
+    expect([...p.learnedTomes]).toEqual(['tome_energy_ball']);
+    c.send(MessageType.UseItem,{itemTemplateId:tome.id});await room.waitForNextPatch();expect(p.inventory.get(tome.id)!.qty).toBe(1);
+    const staff=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='skull_staff')!;
+    const id=createItemInstance(staff,{quality:'excellent',level:4,luck:true,excellent:[0,3]},'save-roundtrip');
+    grantItem(p,id,1);c.send(MessageType.EquipItem,{itemTemplateId:id});await room.waitForNextPatch();
+    const save=toCharacterSave(p);await (room as any).persistence.save('RestoredCatalog',save);
+    const restored=await colyseus.connectTo(room,{name:'RestoredCatalog'});await room.waitForNextPatch();
+    const q=room.state.players.get(restored.sessionId)!;
+    expect([...q.learnedTomes]).toEqual(['tome_energy_ball']);expect(q.equipment.get('weapon')).toBe(id);
+    expect(q.pAtk).toBe(p.pAtk);expect(getItem(id).options?.excellent).toEqual([0,3]);
+  });
+
+  it('compra dos ejemplares distintos y mejora solamente el objetivo propio',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'UpgradeCatalog'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;p.gold=10000;p.x=TOWN.x;p.z=TOWN.z;
+    const blade=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='kris')!;
+    c.send(MessageType.BuyItem,{itemTemplateId:blade.id,qty:2});await room.waitForNextPatch();
+    const ids=[...p.inventory.keys()].filter(k=>getItem(k).ref_origen==='kris');expect(ids).toHaveLength(2);
+    const jewel=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='jewel_of_bless')!;grantItem(p,jewel.id,1);
+    c.send(MessageType.UseItem,{itemTemplateId:jewel.id,targetItemId:ids[0]});await room.waitForNextPatch();
+    expect(p.inventory.has(ids[0])).toBe(false);expect(p.inventory.has(ids[1])).toBe(true);
+    expect([...p.inventory.keys()].some(k=>getItem(k).options?.level===1)).toBe(true);
+  });
+
+  it('el reflejo letal conserva IDs y no revive al jugador con recuperación por baja',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'ReflectCatalog'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;
+    p.mapId='bosque';p.x=p.targetX=100;p.z=p.targetZ=0;p.moving=false;p.hp=20;p.msSinceCombat=0;
+    p.itemEffects.reflect=.3;p.itemEffects.hpOnKill=.125;
+    const mob=room.spawnMob('reflect-test','skeleton_minion',100,0,'bosque');mob.hp=1;mob.pAtk=1000;mob.windupMs=1;mob.windupTargetId=c.sessionId;
+    room.tick(.01);
+    expect(mob.dead).toBe(true);expect(p.dead).toBe(true);expect(p.hp).toBe(0);
+  });
+
+  it('el reflejo PvP informa la muerte de ambas entidades con sus IDs',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const ca=await colyseus.connectTo(room,{name:'ReflectA'});const cb=await colyseus.connectTo(room,{name:'ReflectB'});await room.waitForNextPatch();
+    const a=room.state.players.get(ca.sessionId)!;const b=room.state.players.get(cb.sessionId)!;
+    for(const p of [a,b]){p.mapId='bosque';p.x=p.targetX=100;p.z=p.targetZ=0;p.moving=false;p.msSinceCombat=0;p.hp=1;}
+    a.pAtk=1000;a.targetId=cb.sessionId;a.attackCooldownMs=0;b.itemEffects.reflect=1;
+    const events=vi.spyOn(room,'broadcast');room.tick(.01);
+    expect(a.dead).toBe(true);expect(b.dead).toBe(true);
+    const deaths=events.mock.calls.filter(([type])=>String(type)===MessageType.Death).map(([,event])=>(event as {entityId:string}).entityId);
+    expect(deaths).toContain(ca.sessionId);expect(deaths).toContain(cb.sessionId);expect(deaths).not.toContain('');events.mockRestore();
+  });
+  it('la mascota guardiana acumula regeneración fraccionaria durante combate',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'GuardianCatalog'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;p.maxHp=100;p.hp=20;p.itemEffects.regen=.01;p.msSinceCombat=0;
+    for(let i=0;i<20;i++)room.tick(.1);
+    expect(p.hp).toBe(22);
   });
 
   it("crea un jugador al unirse", async () => {
@@ -784,7 +986,7 @@ describe("GameRoom", () => {
       const c = await colyseus.connectTo(room, { name: "Peregrino", className: "knight" });
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
-      const shrine = findObject(room, "shrine");
+      const shrine = room.state.worldObjects.get('pueblo_shrine')!;
       p.mapId = shrine.mapId; p.x = shrine.x; p.z = shrine.z;
       c.send(MessageType.InteractObject, { objectId: shrine.id });
       await room.waitForNextPatch();

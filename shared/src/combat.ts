@@ -1,3 +1,5 @@
+import { ITEM_SKILLS } from './itemSkills.js';
+
 export function computeDamage(pAtk: number, pDef: number, factor: number, variance: number): number {
   const raw = pAtk * factor * (100 / (100 + pDef)) * variance;
   return Math.max(1, Math.round(raw));
@@ -16,6 +18,10 @@ export const PLAYER_COMBAT: CombatStats = { maxHp: 100, maxMp: 50, pAtk: 15, pDe
 // Etapa 11: las stats escalan con la profundidad de la zona (ver world.ts). El salto
 // de dificultad entre zonas es lo que gatea la progresión sin muros.
 export const MOB_COMBAT: Record<string, CombatStats> = {
+  umbra_alpha: { maxHp: 200, pAtk: 18, pDef: 14, attackCooldownMs: 2500 },
+  crypt_acolyte: { maxHp: 105, pAtk: 21, pDef: 13, attackCooldownMs: 2100 },
+  crypt_flameguard: { maxHp: 160, pAtk: 24, pDef: 19, attackCooldownMs: 2200 },
+  crypt_warden: { maxHp: 520, pAtk: 27, pDef: 24, attackCooldownMs: 2400 },
   umbra_orc: { maxHp: 55, pAtk: 12, pDef: 10, attackCooldownMs: 2000 },
   forest_troll: { maxHp: 95, pAtk: 17, pDef: 14, attackCooldownMs: 2600 },
   crypt_wraith: { maxHp: 95, pAtk: 21, pDef: 10, attackCooldownMs: 1850 },
@@ -80,6 +86,13 @@ export const POWER_STRIKE: SkillConfig = { id: "power_strike", name: "Golpe Pode
 
 // Etapa 22: 6 skills por clase con roles + counterplay. Números afinables.
 export const SKILLS: Record<string, SkillConfig> = {
+  ...ITEM_SKILLS,
+  aimed_shot: { id:"aimed_shot", name:"Tiro del Vigía", type:"damage", factor:2.2, mpCost:10, cooldownMs:3500, range:10, projectile:true, vfxColor:0x8cce74 },
+  trail_mend: { id:"trail_mend", name:"Aliento del Bosque", type:"heal", healPct:.25, mpCost:15, cooldownMs:12000, vfxColor:0x71ca97 },
+  snaring_shot: { id:"snaring_shot", name:"Flecha de Zarzas", type:"damage", factor:1.6, rootMs:1200, mpCost:16, cooldownMs:7000, range:10, projectile:true, vfxColor:0x81a65f },
+  retreat: { id:"retreat", name:"Paso del Sendero", type:"dash", dash:"away", dashRange:7, mpCost:14, cooldownMs:9000, vfxColor:0x9de5b1 },
+  eagle_focus: { id:"eagle_focus", name:"Ojo del Horizonte", type:"buff", buffStat:"pAtk", buffMult:1.4, buffMs:5000, mpCost:20, cooldownMs:16000, vfxColor:0xffd77f },
+  piercing_shot: { id:"piercing_shot", name:"Saeta del Alba", type:"damage", factor:4.2, mpCost:30, cooldownMs:14000, range:12, projectile:true, vfxColor:0xffeaaa },
   power_strike: POWER_STRIKE,
 
   // ── Caballero (tanque / control) ──

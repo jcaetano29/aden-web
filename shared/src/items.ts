@@ -1,4 +1,6 @@
 import type { EquipSlot, Rarity, StatBonuses } from "./equipment.js";
+import { resolveItemInstance, type ItemOptions, type ItemQuality } from "./itemOptions.js";
+import { CATALOG_ITEMS } from './catalog.js';
 
 export interface ItemTemplate {
   id: string;
@@ -6,6 +8,23 @@ export interface ItemTemplate {
   type: "material" | "currency" | "consumable" | "equipment";
   stackable: boolean;
   heal?: number;
+  ref_origen?: string;
+  category?: string;
+  subcategory?: string;
+  classes?: string[];
+  hands?: "1H" | "2H" | null;
+  tier?: number;
+  description?: string;
+  allowedQualities?: ItemQuality[];
+  requiredLevel?: number;
+  setId?: string;
+  mana?: number;
+  useEffect?: string;
+  learnSkill?: string;
+  ammo?: "arrow" | "bolt";
+  petEffect?: "guardian" | "imp" | "mount";
+  options?: ItemOptions;
+  baseId?: string;
   // Etapa 12 — sólo para type "equipment":
   slot?: EquipSlot;
   rarity?: Rarity;
@@ -13,6 +32,7 @@ export interface ItemTemplate {
 }
 
 export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
+  ...CATALOG_ITEMS,
   gold: { id: "gold", name: "Oro", type: "currency", stackable: true },
   bone: { id: "bone", name: "Hueso", type: "material", stackable: true },
   health_potion: { id: "health_potion", name: "Poción de Vida", type: "consumable", stackable: true, heal: 60 },
@@ -46,7 +66,9 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
 };
 
 export function getItem(id: string): ItemTemplate {
-  const t = ITEM_TEMPLATES[id];
+  if (typeof id !== "string") throw new Error("getItem: id inválido");
+  if (id.includes("~")) return resolveItemInstance(id, ITEM_TEMPLATES);
+  const t = Object.hasOwn(ITEM_TEMPLATES,id) ? ITEM_TEMPLATES[id] : undefined;
   if (!t) throw new Error(`getItem: ítem desconocido ${id}`);
   return t;
 }
@@ -57,13 +79,6 @@ export const SHOP_PRICES: Record<string, number> = {
   // Etapa 12: equipo común a la venta → primera mejora garantizada con oro.
   worn_sword: 45,
   leather_vest: 45,
-  // Etapa 20: el Herrero vende el resto del equipo por oro (sink de economía).
-  iron_sword: 130,
-  iron_mail: 130,
-  hunter_charm: 110,
-  bone_blade: 380,
-  crypt_plate: 380,
-  crypt_ring: 320,
 };
 
 /** Stock del Mercader: consumibles + las dos piezas comunes de arranque. */
@@ -72,12 +87,19 @@ export const SHOP_STOCK: string[] = ["health_potion", "greater_potion", "worn_sw
 /** Etapa 20: stock del Herrero — equipo mejor por oro (progresión sin depender del loot). */
 export const SMITH_STOCK: string[] = [
   "worn_sword", "leather_vest",
-  "iron_sword", "iron_mail", "hunter_charm",
-  "bone_blade", "crypt_plate", "crypt_ring",
+  "aden_punal_del_umbral", "aden_destral_del_lenador_gris", "aden_baston_del_huesero", "aden_arco_de_la_senda", "aden_rodela_del_recluta",
 ];
 
+SHOP_STOCK.push('aden_astiles_del_bosque_gris', 'aden_virotes_de_la_vigilia', 'aden_vial_de_niebla_menor', 'aden_sal_de_purga', 'aden_sello_de_retorno');
+// Toda base se conserva, pero sólo las provisiones y armas iniciales se venden.
+for (const item of Object.values(CATALOG_ITEMS)) {
+  if(item.type==='equipment') ITEM_TEMPLATES[item.id]={...item,rarity:'common'};
+  if (SMITH_STOCK.includes(item.id) || SHOP_STOCK.includes(item.id))
+    SHOP_PRICES[item.id] = item.category === 'municion' ? 1 : item.type === 'equipment' ? 50 : 15;
+}
+
 export function getShopPrice(id: string): number {
-  const price = SHOP_PRICES[id];
+  const price = Object.hasOwn(SHOP_PRICES, id) && (SHOP_STOCK.includes(id) || SMITH_STOCK.includes(id)) ? SHOP_PRICES[id] : undefined;
   if (price === undefined) throw new Error(`getShopPrice: ítem no a la venta ${id}`);
   return price;
 }
@@ -92,6 +114,22 @@ export interface DropEntry {
 // Etapa 11: el loot mejora con la profundidad (más oro, mejores pociones y trofeos
 // de zona). El jefe final es el premio grande. Refuerza el loop peligro → recompensa.
 export const DROP_TABLES: Record<string, DropEntry[]> = {
+  umbra_alpha: [
+    { itemTemplateId: 'gold', chance: 1, qtyMin: 25, qtyMax: 40 },
+    { itemTemplateId: 'health_potion', chance: 1, qtyMin: 2, qtyMax: 3 },
+  ],
+  crypt_acolyte: [
+    { itemTemplateId: 'gold', chance: 1, qtyMin: 8, qtyMax: 15 },
+    { itemTemplateId: 'aden_vial_de_niebla_menor', chance: .4, qtyMin: 1, qtyMax: 1 },
+  ],
+  crypt_flameguard: [
+    { itemTemplateId: 'gold', chance: 1, qtyMin: 12, qtyMax: 22 },
+    { itemTemplateId: 'health_potion', chance: .4, qtyMin: 1, qtyMax: 1 },
+  ],
+  crypt_warden: [
+    { itemTemplateId: 'gold', chance: 1, qtyMin: 60, qtyMax: 90 },
+    { itemTemplateId: 'greater_potion', chance: 1, qtyMin: 2, qtyMax: 2 },
+  ],
   umbra_orc: [
     { itemTemplateId: "gold", chance: 1, qtyMin: 5, qtyMax: 12 },
     { itemTemplateId: "iron_sword", chance: 0.1, qtyMin: 1, qtyMax: 1 },

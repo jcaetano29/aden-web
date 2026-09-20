@@ -13,6 +13,7 @@ function random(seed: number): () => number {
 /** Clustered, reproducible decoration. The main route, central arena, spawn and
  * interactables reserve space before any props are emitted. No gameplay state. */
 export function dressingLayout(zone: Zone): Placement[] {
+  if (zone.id === "cripta") return []; // The dungeon uses authored chambers, not scattered scenery.
   const rng = random(Array.from(zone.id).reduce((n,c)=>n*31+c.charCodeAt(0),8421));
   const objects = WORLD_OBJECTS.filter(o=>o.mapId===zone.id);
   const out: Placement[] = [];
@@ -57,6 +58,7 @@ function instances(scene: THREE.Scene, name: string, geometry: THREE.BufferGeome
 /** Dense scenery uses batches per zone, not one draw call per decoration. */
 export function addMapDressing(scene: THREE.Scene): void {
   for (const zone of ZONES) {
+    if (zone.id === "cripta") continue; // Authored chambers have a separate, clear layout.
     const layout=dressingLayout(zone);
     const forest=zone.id==="bosque" || zone.safe;
     const burnt=zone.id==="yermo";

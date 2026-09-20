@@ -1,4 +1,5 @@
 import { getItem } from "./items.js";
+import { setBonuses } from "./loadout.js";
 
 /**
  * Sistema de equipamiento (Etapa 12 — Loot & Equipo). El gear son ItemTemplates
@@ -8,15 +9,16 @@ import { getItem } from "./items.js";
  * rareza y el cálculo puro de bonificaciones (server los aplica al PlayerState).
  */
 
-export type EquipSlot = "weapon" | "armor" | "accessory";
-export const EQUIP_SLOTS: readonly EquipSlot[] = ["weapon", "armor", "accessory"] as const;
+export type EquipSlot = "weapon" | "armor" | "accessory" | "shield" | "helmet" | "gloves" | "pants" | "boots" | "wings" | "ring" | "pet";
+export const EQUIP_SLOTS: readonly EquipSlot[] = ["weapon", "shield", "helmet", "armor", "gloves", "pants", "boots", "accessory", "ring", "wings", "pet"] as const;
 export const SLOT_LABELS: Record<EquipSlot, string> = {
   weapon: "Arma",
   armor: "Armadura",
   accessory: "Accesorio",
+  shield: "Escudo", helmet: "Casco", gloves: "Guantes", pants: "Grebas", boots: "Botas", wings: "Alas", ring: "Anillo", pet: "Compañero",
 };
 
-export type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary";
+export type Rarity = "common" | "uncommon" | "rare" | "epic" | "legendary" | "magic" | "excellent";
 export const RARITY_ORDER: readonly Rarity[] = ["common", "uncommon", "rare", "epic", "legendary"] as const;
 /** Color de cada rareza (para bordes/nombres en la UI), estilo ARPG clásico. */
 export const RARITY_COLORS: Record<Rarity, string> = {
@@ -25,6 +27,7 @@ export const RARITY_COLORS: Record<Rarity, string> = {
   rare: "#4da6ff",
   epic: "#b96bff",
   legendary: "#ff9a2e",
+  magic: "#75baff", excellent: "#49ef86",
 };
 export const RARITY_LABELS: Record<Rarity, string> = {
   common: "Común",
@@ -32,6 +35,7 @@ export const RARITY_LABELS: Record<Rarity, string> = {
   rare: "Raro",
   epic: "Épico",
   legendary: "Legendario",
+  magic: "Mágico", excellent: "Excelente",
 };
 
 export interface StatBonuses {
@@ -66,14 +70,14 @@ export function getRarity(itemTemplateId: string): Rarity {
  * itemTemplateId ("" o ausente = slot vacío). Ignora ids inválidos o no-equipo.
  */
 export function equipmentBonuses(equipped: Partial<Record<EquipSlot, string>>): StatTotals {
-  const total: StatTotals = { pAtk: 0, pDef: 0, maxHp: 0, maxMp: 0 };
+  const total: StatTotals = setBonuses(equipped);
   for (const slot of EQUIP_SLOTS) {
     const id = equipped[slot];
     if (!id) continue;
     let b: StatBonuses | undefined;
     try {
       const item = getItem(id);
-      if (item.type !== "equipment") continue;
+      if (item.type !== "equipment" || item.slot !== slot) continue;
       b = item.bonuses;
     } catch {
       continue; // id inválido

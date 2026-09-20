@@ -46,7 +46,7 @@ export function eligiblePlayersForAggro(
 export function stepMobAI(
   mob: AIMob,
   players: PlayerPos[],
-  cfg: AIConfig,
+  cfg: { [K in keyof AIConfig]: number },
   rng: () => number,
   dtMs: number,
 ): void {

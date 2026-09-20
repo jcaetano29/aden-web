@@ -45,6 +45,9 @@ function breakables(mapId: string, pts: Array<[number, number]>): WorldObjectDef
 }
 
 export const WORLD_OBJECTS: WorldObjectDef[] = [
+  { id: "crypt_seal_1", mapId: "cripta", kind: "shrine", x: 890, z: 15, buff: "def" },
+  { id: "crypt_seal_2", mapId: "cripta", kind: "shrine", x: 910, z: -12, buff: "atk" },
+  ...breakables("cripta", [[884, 30], [916, 5], [884, -25]]),
   // ── Pueblo (center 0,0) — cofres de inicio + santuario ──
   { id: "pueblo_chest_1", mapId: "pueblo", kind: "chest", x: -20, z: -14, lootId: "chest_pueblo" },
   { id: "pueblo_chest_2", mapId: "pueblo", kind: "chest", x: 22, z: -18, lootId: "chest_pueblo" },

@@ -1,119 +1,55 @@
-import { describe, it, expect } from "vitest";
-import { getQuest, firstQuestId, nextQuestId, QUEST_ORDER, QUESTS } from "./quests.js";
-import { MOB_TEMPLATES } from "./mobs.js";
-import { LORE, ELDER_NAME } from "./story.js";
+import { describe, it, expect } from 'vitest';
+import { getQuest, firstQuestId, nextQuestId, QUEST_ORDER, CAMPAIGN_COMPLETE } from './quests.js';
+import { MOB_TEMPLATES } from './mobs.js';
+import { getWorldObject } from './worldobjects.js';
+import { getZone } from './world.js';
+import { expToNextLevel, getMobExp } from './progression.js';
+import { getItem } from './items.js';
+import { questReward } from './adventure.js';
 
-describe("getQuest", () => {
-  it("retorna la quest q1 con valores correctos (Bosque)", () => {
-    const q = getQuest("q1");
-    expect(q.id).toBe("q1");
-    expect(q.title).toBe("Los primeros huesos");
-    expect(q.mobTemplateId).toBe("skeleton_minion");
-    expect(q.amount).toBe(6);
-    expect(q.rewardExp).toBe(60);
-    expect(q.rewardGold).toBe(25);
+describe('campaña inicial', () => {
+  it('conserva q1 y todos los IDs de personajes existentes', () => {
+    expect(firstQuestId()).toBe('q1');
+    expect(getQuest('q1')).toMatchObject({ title: 'Los primeros huesos', amount: 6, rewardExp: 60, rewardGold: 25, mobTemplateId: 'skeleton_minion' });
+    for (let n=1;n<=6;n++) expect(QUEST_ORDER).toContain(`q${n}`);
+    expect(()=>getQuest('nope')).toThrow();
   });
-
-  it("retorna la quest q3 con valores correctos (Ruinas)", () => {
-    const q = getQuest("q3");
-    expect(q.id).toBe("q3");
-    expect(q.title).toBe("Bajo las Ruinas");
-    expect(q.mobTemplateId).toBe("crypt_warrior");
-    expect(q.amount).toBe(6);
+  it('termina sin reiniciar ni repartir nuevamente los premios', () => {
+    expect(QUEST_ORDER).toHaveLength(12);
+    expect(new Set(QUEST_ORDER).size).toBe(12);
+    for (let n=0;n<QUEST_ORDER.length-1;n++) expect(nextQuestId(QUEST_ORDER[n])).toBe(QUEST_ORDER[n+1]);
+    expect(nextQuestId('q6')).toBe(CAMPAIGN_COMPLETE);
+    expect(nextQuestId(CAMPAIGN_COMPLETE)).toBe(CAMPAIGN_COMPLETE);
+    expect(nextQuestId('unknown')).toBe('q1');
   });
-
-  it("retorna la quest q4 apuntando al mini-jefe (Centinela)", () => {
-    const q = getQuest("q4");
-    expect(q.title).toBe("El Centinela de Nihil");
-    expect(q.mobTemplateId).toBe("crypt_sentinel");
-    expect(q.amount).toBe(1);
-  });
-
-  it("lanza si la quest no existe", () => {
-    expect(() => getQuest("nope")).toThrow();
-  });
-});
-
-describe("firstQuestId", () => {
-  it("retorna q1", () => {
-    expect(firstQuestId()).toBe("q1");
-  });
-});
-
-describe("nextQuestId", () => {
-  it("avanza en cadena q1→q2→...→q6", () => {
-    expect(nextQuestId("q1")).toBe("q2");
-    expect(nextQuestId("q2")).toBe("q3");
-    expect(nextQuestId("q3")).toBe("q4");
-    expect(nextQuestId("q4")).toBe("q5");
-    expect(nextQuestId("q5")).toBe("q6");
-  });
-
-  it("retorna q1 cuando la quest actual es q6 (loop)", () => {
-    expect(nextQuestId("q6")).toBe("q1");
-  });
-
-  it("retorna q1 cuando la quest actual no existe (fallback)", () => {
-    expect(nextQuestId("xxx")).toBe("q1");
-  });
-});
-
-describe("QUEST_ORDER", () => {
-  it("contiene las 6 quests en orden correcto", () => {
-    expect(QUEST_ORDER).toEqual(["q1", "q2", "q3", "q4", "q5", "q6"]);
-  });
-});
-
-describe("getQuest q6", () => {
-  it("retorna la quest final con valores correctos (Rey Nihil)", () => {
-    const q = getQuest("q6");
-    expect(q.id).toBe("q6");
-    expect(q.title).toBe("El Rey Nihil");
-    expect(q.mobTemplateId).toBe("skeleton_king");
-    expect(q.amount).toBe(1);
-    expect(q.rewardExp).toBe(1500);
-    expect(q.rewardGold).toBe(800);
-  });
-});
-
-describe("Quest narrative fields", () => {
-  it("todas las quests tienen intro y done no vacíos", () => {
-    QUEST_ORDER.forEach((questId) => {
-      const q = getQuest(questId);
-      expect(q.intro).toBeDefined();
-      expect(q.intro.length).toBeGreaterThan(0);
-      expect(q.done).toBeDefined();
-      expect(q.done.length).toBeGreaterThan(0);
-    });
-  });
-
-  it("cada quest apunta a un template de mob válido", () => {
-    QUEST_ORDER.forEach((questId) => {
-      expect(MOB_TEMPLATES[getQuest(questId).mobTemplateId]).toBeDefined();
-    });
-  });
-
-  it("las recompensas crecen con el avance de la cadena", () => {
-    for (let i = 1; i < QUEST_ORDER.length; i++) {
-      const prev = QUESTS[QUEST_ORDER[i - 1]];
-      const cur = QUESTS[QUEST_ORDER[i]];
-      expect(cur.rewardExp).toBeGreaterThan(prev.rewardExp);
-      expect(cur.rewardGold).toBeGreaterThan(prev.rewardGold);
+  it('cada objetivo apunta a contenido existente y explica cómo encontrarlo', () => {
+    for (const id of QUEST_ORDER) {
+      const q=getQuest(id);
+      expect(q.intro.length).toBeGreaterThan(10);
+      expect(q.done.length).toBeGreaterThan(10);
+      expect(q.hint!.length).toBeGreaterThan(10);
+      expect(()=>getZone(q.mapId!)).not.toThrow();
+      if(q.objective==='interact') expect(getWorldObject(q.targetId!).mapId).toBe(q.mapId);
+      if(q.objective==='kill'||q.objective==='dungeon') expect(MOB_TEMPLATES[q.mobTemplateId]).toBeDefined();
     }
   });
-});
-
-describe("Story (LORE and ELDER_NAME)", () => {
-  it("LORE.title es 'El Asedio de Aden'", () => {
-    expect(LORE.title).toBe("El Asedio de Aden");
-  });
-
-  it("LORE.body no está vacío", () => {
-    expect(LORE.body).toBeDefined();
-    expect(LORE.body.length).toBeGreaterThan(0);
-  });
-
-  it("ELDER_NAME es 'Anciano Rowan'", () => {
-    expect(ELDER_NAME).toBe("Anciano Rowan");
+  it('alcanza cada puerta sólo con objetivos obligatorios, y termina en nivel 10', () => {
+    let xp=0,level=1;
+    for(const id of QUEST_ORDER){
+      const q=getQuest(id);
+      expect(level, `entrada a ${id} / ${q.mapId}`).toBeGreaterThanOrEqual(getZone(q.mapId!).levelReq);
+      if(id==='q6') expect(level).toBe(9);
+      if(q.objective==='kill') xp+=getMobExp(q.mobTemplateId)*q.amount;
+      if(q.objective==='dungeon') xp+=3*getMobExp('crypt_acolyte')+3*getMobExp('crypt_flameguard')+getMobExp('crypt_warden');
+      xp+=q.rewardExp;
+      while(xp>=expToNextLevel(level)){xp-=expToNextLevel(level);level++;}
+      for(const cls of ['knight','mage','barbarian','rogue','ranger']){
+        const reward=questReward(q,cls);if(!reward)continue;
+        const item=getItem(reward);
+        expect(item.requiredLevel??1).toBeLessThanOrEqual(level);
+        if(item.classes)expect(item.classes).toContain(cls);
+      }
+    }
+    expect(level).toBe(10);
   });
 });

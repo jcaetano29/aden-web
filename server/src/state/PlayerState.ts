@@ -1,5 +1,6 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { InventoryItemState } from "./InventoryItemState.js";
+import { emptyEffects } from '@aden/shared';
 
 export class PlayerState extends Schema {
   @type("number") x = 0;
@@ -19,6 +20,7 @@ export class PlayerState extends Schema {
   @type("number") maxMp = 0;
   @type("boolean") dead = false;
   @type("string") className = "knight";
+  @type("string") appearanceModel = "";
   /** Mapa actual del jugador (Etapa 15, estilo Mu). Se cambia warpeando (tecla M). */
   @type("string") mapId = "pueblo";
   @type("number") pvpKills = 0;
@@ -30,6 +32,8 @@ export class PlayerState extends Schema {
   @type("number") level = 1;
   @type("string") questId = "";
   @type("number") questProgress = 0;
+  @type("number") dungeonStage = 0;
+  @type("number") dungeonKills = 0;
   @type("number") gold = 0;
   // Etapa 20: contrato del Capitán (misión repetible en paralelo a la campaña).
   @type("string") bountyId = "";
@@ -44,10 +48,16 @@ export class PlayerState extends Schema {
 
   // Combat cooldown — server-only (NO @type)
   attackCooldownMs = 0;
+  itemEffects = emptyEffects();
   respawnMs = 0;
 
   // Per-skill cooldowns — server-only (NO @type)
   skillCooldowns = new Map<string, number>();
+  @type(["string"]) learnedTomes = new ArraySchema<string>();
+  @type("number") poisonMs = 0;
+  poisonDps = 0;
+  poisonAccumMs = 0;
+  poisonAttackerId = "";
 
   // Buff fields — server-only (NO @type)
   atkBuffMs = 0;
