@@ -18,3 +18,6 @@ for(const [source,target] of Object.entries(mapping)) {
   fs.writeFileSync(`client/public/models/${target}.glb`,Buffer.concat([header,padded,binHeader,bin]));
   console.log(`${source} → ${target}: ${bin.length} bytes binary, ${json.animations.length} animations`);
 }
+// Alternate enemy presentations use these rigs plus RevenantDetails at load time.
+fs.copyFileSync('client/public/models/Rogue.glb','client/public/models/DreadStalker.glb');
+fs.copyFileSync('client/public/models/Knight.glb','client/public/models/DreadKnight.glb');

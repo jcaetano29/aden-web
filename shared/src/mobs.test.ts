@@ -4,21 +4,21 @@ import { MAP_BOUNDS } from "./constants.js";
 
 describe("MOB_TEMPLATES / getTemplate", () => {
   it("incluye skeleton_minion y skeleton_warrior con su modelo", () => {
-    expect(getTemplate("skeleton_minion").model).toBe("Skeleton_Minion");
-    expect(getTemplate("skeleton_warrior").model).toBe("Skeleton_Warrior");
+    expect(getTemplate("skeleton_minion").model).toBe("DreadStalker");
+    expect(getTemplate("skeleton_warrior").model).toBe("DreadKnight");
   });
 
   it("incluye skeleton_king (Rey Nihil) con boss=true, scale=2.0, respawnMs=60000", () => {
     const t = getTemplate("skeleton_king");
     expect(t.name).toBe("Rey Nihil");
-    expect(t.model).toBe("Skeleton_Warrior");
+    expect(t.model).toBe("DreadKnight");
     expect(t.boss).toBe(true);
     expect(t.scale).toBe(2.0);
     expect(t.respawnMs).toBe(60000);
   });
 
   it("incluye las variantes de zona (cripta violeta, ceniza roja) con tinte", () => {
-    expect(getTemplate("crypt_warrior").model).toBe("Skeleton_Warrior");
+    expect(getTemplate("crypt_warrior").model).toBe("DreadKnight");
     expect(getTemplate("crypt_warrior").tint).toBe(0xb9a7e8);
     expect(getTemplate("ash_warrior").tint).toBe(0xff6a3c);
     expect(getTemplate("skeleton_minion").tint).toBe(0x9fc48f); // bosque musgoso

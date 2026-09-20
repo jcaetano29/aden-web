@@ -4,6 +4,7 @@ import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.j
 import { modelUrl, MODEL_HEIGHTS } from "../assets/manifest.js";
 import { CharacterMaterial } from "./CharacterMaterial.js";
 import { addHeroDetails } from "./HeroDetails.js";
+import { addRevenantDetails } from "./RevenantDetails.js";
 
 interface LoadedModel {
   scene: THREE.Object3D;
@@ -47,6 +48,11 @@ export class CharacterFactory {
         }
         const materials = new Map<THREE.Material, THREE.Material>();
         const finish = (source: THREE.Material): THREE.Material => {
+          if (name.startsWith("Dread") && source instanceof THREE.MeshBasicMaterial) {
+            let material=materials.get(source);
+            if(!material){material=new THREE.MeshStandardMaterial({name:source.name,map:source.map,color:name==="DreadKnight"?0x858f9c:0x667989,roughness:.7,metalness:.25,side:source.side});materials.set(source,material);}
+            return material;
+          }
           if (["Knight", "Mage", "Rogue", "Barbarian"].includes(name) && source instanceof THREE.MeshBasicMaterial) {
             let material = materials.get(source);
             if (!material) {
@@ -93,6 +99,7 @@ export class CharacterFactory {
         normalized.add(gltf.scene);
         const root=new THREE.Group();root.add(normalized);root.userData.visualHeight=height;
         addHeroDetails(root, name);
+        addRevenantDetails(root, name);
         this.loaded.set(name, { scene: root, animations: gltf.animations });
       }),
     );

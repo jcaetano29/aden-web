@@ -20,8 +20,9 @@ const rim=new THREE.DirectionalLight(0x799eff,2);rim.position.set(-5,4,-5);rende
 const factory=new CharacterFactory();const names=[...MODEL_NAMES,...MOB_MODEL_NAMES];await factory.preload(names);
 const characters=names.map(n=>factory.create(n));const views=characters.map(c=>new CharacterView(c));
 characters.forEach((c,i)=>{renderer.scene.add(c.root);c.root.visible=false;views[i].respawn({x:0,z:0,targetX:0,targetZ:0,moving:false});});
-const labels=['Caballero','Mago','Monje guerrero','Asesino','Esqueleto','Guerrero esqueleto','Orco de Umbra','Bestia del Bosque','Custodio de Hueso','Demonio de Ceniza','Espectro de la Cripta','Draco del Umbral'];
+const labels=['Caballero','Mago','Monje guerrero','Asesino','Acechador maldito','Caballero maldito','Orco de Umbra','Bestia del Bosque','Custodio de Hueso','Demonio de Ceniza','Espectro de la Cripta','Draco del Umbral'];
 const select=document.querySelector('#model');names.forEach((n,i)=>select.add(new Option(labels[i],n)));
+const requestedModel=new URLSearchParams(window.location.search).get('model');if(names.includes(requestedModel))select.value=requestedModel;
 let index=0;function show(){index=names.indexOf(select.value);characters.forEach((c,i)=>c.root.visible=i===index);views[index].respawn({x:0,z:0,targetX:0,targetZ:0,moving:false});document.querySelector('#status').textContent=labels[index]+' · '+characters[index].root.userData.visualHeight+' m';}select.onchange=show;show();
 function act(action){const c=characters[index];if(action==='respawn')views[index].respawn({x:0,z:0,targetX:0,targetZ:0,moving:false});else if(action==='death')views[index].playOnce('death');else c.play(selectClip(c.clipNames,action),true);}
 for(const [action,label] of [['idle','Reposo'],['walk','Movimiento'],['attack','Ataque'],['death','Muerte'],['respawn','Respawn']]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>act(action);document.querySelector('#actions').append(b);}

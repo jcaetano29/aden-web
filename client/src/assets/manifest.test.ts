@@ -34,11 +34,11 @@ describe("pickModelForSession", () => {
 
 describe("mobs", () => {
   it("MOB_MODEL_NAMES incluye los esqueletos", () => {
-    expect(MOB_MODEL_NAMES).toContain("Skeleton_Minion");
-    expect(MOB_MODEL_NAMES).toContain("Skeleton_Warrior");
+    expect(MOB_MODEL_NAMES).toContain("DreadStalker");
+    expect(MOB_MODEL_NAMES).toContain("DreadKnight");
   });
   it("modelForTemplate mapea el templateId a su modelo", () => {
-    expect(modelForTemplate("skeleton_minion")).toBe("Skeleton_Minion");
-    expect(modelForTemplate("skeleton_warrior")).toBe("Skeleton_Warrior");
+    expect(modelForTemplate("skeleton_minion")).toBe("DreadStalker");
+    expect(modelForTemplate("skeleton_warrior")).toBe("DreadKnight");
   });
 });

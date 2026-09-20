@@ -6,6 +6,13 @@ import { rollDrops } from "./items.js";
 import { getZone } from "./world.js";
 
 describe("expanded bestiary", () => {
+  it("replaces every original skeleton variant while retaining its gameplay template", () => {
+    for (const id of ["skeleton_minion", "skeleton_warrior", "crypt_minion", "crypt_warrior", "crypt_sentinel", "ash_minion", "ash_warrior", "skeleton_king"]) {
+      expect(["DreadStalker", "DreadKnight"]).toContain(MOB_TEMPLATES[id].model);
+      expect(getMobExp(id)).toBeGreaterThan(0);
+      expect(SPAWN_ZONES.some(s => s.templateId === id)).toBe(true);
+    }
+  });
   const additions = ["umbra_orc", "forest_troll", "crypt_wraith", "bone_warden", "infernal_demon", "ancient_drake"];
   it("gives all six new enemies models, combat stats, XP, loot and real spawn locations", () => {
     for (const id of additions) {

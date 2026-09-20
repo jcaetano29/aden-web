@@ -17,6 +17,13 @@
 
 CC0 no exige atribución; se incluye por buena práctica y trazabilidad.
 
+## Reemplazos de los enemigos originales: acechador y caballero malditos
+- Base: Rogue y Warrior de Quaternius RPG Characters (CC0 1.0).
+- Fuente: https://quaternius.com/packs/rpgcharacters.html
+- Archivos: DreadStalker.glb y DreadKnight.glb.
+- Adaptaciones propias en RevenantDetails.ts: máscaras, casco, púas, hombreras y emblema; materiales oscuros y ojos emisivos. Se mantienen los esqueletos de animación del autor.
+- Los antiguos modelos KayKit de abajo se conservan como recursos históricos, pero ya no se cargan ni se asignan a enemigos.
+
 ## Enemigos: KayKit Character Pack — Skeletons 1.0
 - Autor: Kay Lousberg (KayKit)
 - Licencia: CC0 1.0 (dominio público, sin atribución obligatoria)

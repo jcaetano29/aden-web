@@ -18,8 +18,8 @@ export interface MobTemplate {
   tint?: number;
 }
 
-// Etapa 11: mismos 2 modelos base (Skeleton_Minion / Skeleton_Warrior) reusados
-// como variantes por zona vía `tint` + `scale` + stats. El tinte da la identidad
+// Las variantes originales usan ahora acechadores y caballeros malditos,
+// con sus IDs de gameplay conservados. El tinte da la identidad
 // visual: Bosque = musgoso (verde), Ruinas = cripta (violeta), Yermo = ardiente (rojo).
 export const MOB_TEMPLATES: Record<string, MobTemplate> = {
   umbra_orc: { id: "umbra_orc", name: "Orco de Umbra", model: "OrcBrute" },
@@ -29,17 +29,17 @@ export const MOB_TEMPLATES: Record<string, MobTemplate> = {
   infernal_demon: { id: "infernal_demon", name: "Demonio de Ceniza", model: "InfernalDemon", tint: 0xffaf91 },
   ancient_drake: { id: "ancient_drake", name: "Draco del Umbral", model: "AncientDrake", miniBoss: true, scale: 1.15, respawnMs: 60000, tint: 0xc7a6a0 },
   // Bosque de Umbra (Lv 1-3) — huesos musgosos
-  skeleton_minion: { id: "skeleton_minion", name: "Explorador Óseo", model: "Skeleton_Minion", tint: 0x9fc48f },
-  skeleton_warrior: { id: "skeleton_warrior", name: "Guerrero Musgoso", model: "Skeleton_Warrior", tint: 0x9fc48f },
+  skeleton_minion: { id: "skeleton_minion", name: "Explorador Óseo", model: "DreadStalker", tint: 0x9fc48f },
+  skeleton_warrior: { id: "skeleton_warrior", name: "Guerrero Musgoso", model: "DreadKnight", tint: 0x9fc48f },
   // Ruinas de Nihil (Lv 3-6) — guardianes de la cripta (violeta)
-  crypt_minion: { id: "crypt_minion", name: "Siervo de la Cripta", model: "Skeleton_Minion", tint: 0xb9a7e8 },
-  crypt_warrior: { id: "crypt_warrior", name: "Guardián de la Cripta", model: "Skeleton_Warrior", tint: 0xb9a7e8 },
-  crypt_sentinel: { id: "crypt_sentinel", name: "Centinela de Nihil", model: "Skeleton_Warrior", miniBoss: true, tint: 0x8a6fd4, scale: 1.5, respawnMs: 60000 },
+  crypt_minion: { id: "crypt_minion", name: "Siervo de la Cripta", model: "DreadStalker", tint: 0xb9a7e8 },
+  crypt_warrior: { id: "crypt_warrior", name: "Guardián de la Cripta", model: "DreadKnight", tint: 0xb9a7e8 },
+  crypt_sentinel: { id: "crypt_sentinel", name: "Centinela de Nihil", model: "DreadKnight", miniBoss: true, tint: 0x8a6fd4, scale: 1.5, respawnMs: 60000 },
   // Yermo Ceniciento (Lv 6-9) — verdugos ardientes (rojo/ceniza), élites
-  ash_minion: { id: "ash_minion", name: "Ceniciento", model: "Skeleton_Minion", tint: 0xff9a6a, scale: 1.05 },
-  ash_warrior: { id: "ash_warrior", name: "Verdugo Ardiente", model: "Skeleton_Warrior", tint: 0xff6a3c, scale: 1.15 },
+  ash_minion: { id: "ash_minion", name: "Ceniciento", model: "DreadStalker", tint: 0xff9a6a, scale: 1.05 },
+  ash_warrior: { id: "ash_warrior", name: "Verdugo Ardiente", model: "DreadKnight", tint: 0xff6a3c, scale: 1.15 },
   // Trono del Rey Nihil — jefe final
-  skeleton_king: { id: "skeleton_king", name: "Rey Nihil", model: "Skeleton_Warrior", boss: true, scale: 2.0, respawnMs: 60000, tint: 0xffe6a8 },
+  skeleton_king: { id: "skeleton_king", name: "Rey Nihil", model: "DreadKnight", boss: true, scale: 2.0, respawnMs: 60000, tint: 0xffe6a8 },
 };
 
 export function getTemplate(id: string): MobTemplate {
