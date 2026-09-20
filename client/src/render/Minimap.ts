@@ -26,7 +26,8 @@ export class Minimap {
 
   constructor(parent: HTMLElement = document.body) {
     const wrap = document.createElement("div");
-    wrap.style.cssText = "position:fixed;top:12px;right:12px;z-index:1000;pointer-events:none;text-align:center;";
+    wrap.className = 'aden-minimap';
+    wrap.style.cssText = "position:fixed;top:12px;right:12px;width:184px;z-index:1000;pointer-events:none;text-align:center;overflow-wrap:anywhere;";
 
     this.nameEl = document.createElement("div");
     this.nameEl.style.cssText =

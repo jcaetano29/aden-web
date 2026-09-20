@@ -15,6 +15,18 @@ function view(over: Partial<Parameters<InventoryPanel["update"]>[0]> = {}) {
 }
 
 describe("InventoryPanel (Equipo)", () => {
+  it('compara el objeto seleccionado y actualiza el resultado al cambiar el equipo', () => {
+    const panel = new InventoryPanel(document.body);
+    panel.toggle();
+    const entries = [{ itemTemplateId: 'iron_sword', qty: 1, name: 'Espada de Hierro' }];
+    panel.update(view({ entries, equipment: { weapon: 'worn_sword' } }));
+    expect(document.querySelector('.inventory-verdict')?.textContent).toBe('Mejor');
+    expect(document.querySelector('[data-delta="pAtk"]')?.textContent).toBe('+5');
+    panel.update(view({ entries, equipment: { weapon: 'iron_sword' } }));
+    expect(document.querySelector('.inventory-verdict')?.textContent).toBe('Igual');
+    document.querySelector<HTMLButtonElement>('[data-equip-slot="weapon"]')!.click();
+    expect(document.querySelector('.inventory-comparison')).toBeNull();
+  });
   it("selecciona objetos de la grilla sin equiparlos y mantiene la selección al sincronizar", () => {
     const onEquip = vi.fn();
     const panel = new InventoryPanel(document.body, { onEquip });

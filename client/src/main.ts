@@ -674,6 +674,7 @@ async function main() {
       stats: { pAtk: selfCombat?.pAtk ?? 0, pDef: selfCombat?.pDef ?? 0 },
       className: selfCombat?.className,
       level: selfCombat?.level,
+      attributes: selfCombat ? { str: selfCombat.str, agi: selfCombat.agi, vit: selfCombat.vit, ene: selfCombat.ene } : undefined,
     });
     if (guildPanelVisible) {
       guildPanel.update(net.getGuildPanelData());

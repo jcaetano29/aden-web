@@ -11,7 +11,8 @@ import {
   CLASSES,
   type EquipSlot,
 } from "@aden/shared";
-import { COLORS, FONT_DISPLAY, FONT_BODY } from "./theme.js";
+import { FONT_DISPLAY } from "./theme.js";
+import { compareEquipment, type ComparisonContext } from './EquipmentComparison.js';
 import "./InventoryPanel.css";
 import { itemIcon } from './ItemModels.js';
 
@@ -30,6 +31,7 @@ export interface InventoryView {
   /** Optional for compatibility with callers that do not validate equipment locally. */
   className?: string;
   level?: number;
+  attributes?: ComparisonContext['attributes'];
 }
 
 /**
@@ -44,12 +46,13 @@ export class InventoryPanel {
   private readonly cb: InventoryPanelCallbacks;
   private lastSig = "";
   private selected = "";
+  private minimapObserver?: ResizeObserver;
 
   constructor(parent: HTMLElement = document.body, cb: InventoryPanelCallbacks = {}) {
     this.cb = cb;
     this.root = document.createElement("div");
     this.root.className = "inventory-panel";
-    this.root.style.cssText = `display:none;font-family:${FONT_BODY};`;
+    this.root.style.display = 'none';
     this.root.setAttribute('role', 'region');
     this.root.setAttribute('aria-label', 'Inventario y equipo');
     const heading = document.createElement('div');
@@ -68,27 +71,38 @@ export class InventoryPanel {
     this.root.appendChild(this.body);
 
     parent.appendChild(this.root);
+    this.observeMinimap();
+  }
+
+  private observeMinimap() {
+    const minimap = this.root.parentElement?.querySelector<HTMLElement>('.aden-minimap');
+    if (!minimap) return;
+    const position = () => this.root.style.setProperty('--inventory-minimap-bottom', `${Math.ceil(minimap.getBoundingClientRect().bottom + 12)}px`);
+    position();
+    if (typeof ResizeObserver !== 'undefined') {
+      this.minimapObserver = new ResizeObserver(position);
+      this.minimapObserver.observe(minimap);
+    }
   }
 
   /** Alterna la visibilidad del panel. */
   toggle() {
     this.visible = !this.visible;
     this.root.style.display = this.visible ? "" : "none";
-    if (this.visible) this.lastSig = ""; // forzar redibujo al abrir
+    if (this.visible) {
+      this.lastSig = '';
+      if (!this.minimapObserver) this.observeMinimap();
+    }
   }
 
   private sig(view: InventoryView): string {
     return JSON.stringify(view);
   }
 
-  private makeBtn(label: string, color: string, onClick: () => void): HTMLButtonElement {
+  private makeBtn(label: string, onClick: () => void): HTMLButtonElement {
     const btn = document.createElement("button");
     btn.textContent = label;
-    btn.style.cssText =
-      `padding:3px 9px;background:linear-gradient(180deg,${color},${color}bb);color:#0d0a05;` +
-      "border:1px solid rgba(0,0,0,0.5);border-radius:4px;font-weight:700;font-size:11px;" +
-      "cursor:pointer;pointer-events:auto;box-shadow:0 2px 5px rgba(0,0,0,0.4),inset 0 1px 0 rgba(255,255,255,0.35);" +
-      "transition:filter 0.12s;";
+    btn.className = 'inventory-action';
     btn.addEventListener("mouseenter", () => { btn.style.filter = "brightness(1.12)"; });
     btn.addEventListener("mouseleave", () => { btn.style.filter = "none"; });
     btn.addEventListener("click", onClick);
@@ -130,7 +144,7 @@ export class InventoryPanel {
   private details(itemId: string, setCounts: Map<string, number>): HTMLDivElement {
     const item = getItem(itemId);
     const details = document.createElement("div");
-    details.style.cssText = `font-size:11px;line-height:1.3;color:${COLORS.textDim};margin-top:2px;max-width:230px;`;
+    details.className = 'inventory-details';
     const facts: string[] = [];
     if (item.type === "equipment") {
       const quality = item.options?.quality ?? "normal";
@@ -160,6 +174,45 @@ export class InventoryPanel {
       details.appendChild(description);
     }
     return details;
+  }
+
+  private comparison(id: string, view: InventoryView): HTMLElement | null {
+    const context = view.className && view.level !== undefined && view.attributes
+      ? { className: view.className, level: view.level, attributes: view.attributes } : undefined;
+    const result = compareEquipment(id, view.equipment, context);
+    if (!result) return null;
+    const section = document.createElement('section');
+    section.className = 'inventory-comparison';
+    section.setAttribute('aria-label', 'Comparación con el equipo actual');
+    const title = document.createElement('div');
+    title.className = 'inventory-comparison-title';
+    title.textContent = 'Equipado: ' + (result.current?.name ?? 'Ranura vacía');
+    const verdict = document.createElement('strong');
+    verdict.className = 'inventory-verdict';
+    verdict.dataset.verdict = result.verdict;
+    verdict.textContent = ({ better: 'Mejor', worse: 'Peor', equal: 'Igual', mixed: 'Ventajas y desventajas' })[result.verdict];
+    section.append(title, verdict);
+    const table = document.createElement('table');
+    table.innerHTML = '<thead><tr><th>Estadística</th><th>Actual</th><th>Con este</th><th>Cambio</th></tr></thead>';
+    const body = document.createElement('tbody');
+    const labels = { pAtk: 'Ataque', pDef: 'Defensa', maxHp: 'Vida máx.', maxMp: 'Maná máx.' } as const;
+    for (const key of Object.keys(labels) as (keyof typeof labels)[]) {
+      const row = document.createElement('tr');
+      const label = document.createElement('th'); label.scope = 'row'; label.textContent = labels[key]; row.appendChild(label);
+      for (const value of [result.before[key], result.after[key]]) {
+        const cell = document.createElement('td'); cell.textContent = String(value); row.appendChild(cell);
+      }
+      const delta = document.createElement('td');
+      delta.dataset.delta = key;
+      delta.className = result.delta[key] > 0 ? 'inventory-gain' : result.delta[key] < 0 ? 'inventory-loss' : '';
+      delta.textContent = (result.delta[key] > 0 ? '+' : '') + result.delta[key]; row.appendChild(delta);
+      body.appendChild(row);
+    }
+    table.appendChild(body); section.appendChild(table);
+    const note = document.createElement('p'); note.className = 'inventory-hint';
+    note.textContent = (result.fullStats ? 'Estadísticas del personaje' : 'Bonificaciones del equipo') + ', incluidos conjuntos. La valoración considera estas cuatro estadísticas; revisá también las opciones especiales.';
+    section.appendChild(note);
+    return section;
   }
 
   update(view: InventoryView) {
@@ -266,11 +319,15 @@ export class InventoryPanel {
       name.className = 'inventory-inspector-name'; name.textContent = item.name;
       name.style.color = RARITY_COLORS[item.rarity ?? 'common'];
       inspector.append(name, this.details(id, setCounts));
+      if (!slot && item.type === 'equipment') {
+        const comparison = this.comparison(id, view);
+        if (comparison) inspector.appendChild(comparison);
+      }
       const actions = document.createElement('div'); actions.className = 'inventory-actions';
-      if (slot) actions.appendChild(this.makeBtn('Quitar', '#d9a441', () => this.cb.onUnequip?.(slot)));
+      if (slot) actions.appendChild(this.makeBtn('Quitar', () => this.cb.onUnequip?.(slot)));
       else if (item.type === 'equipment') {
         const reason = this.equipReason(id, view);
-        const equip = this.makeBtn(reason ? 'Equipar · ' + reason : 'Equipar', '#bca164', () => this.cb.onEquip?.(id));
+        const equip = this.makeBtn(reason ? 'Equipar · ' + reason : 'Equipar', () => this.cb.onEquip?.(id));
         equip.disabled = !!reason;
         if (reason) { equip.title = reason; equip.style.opacity = '0.5'; equip.style.cursor = 'not-allowed'; }
         actions.appendChild(equip);
@@ -283,12 +340,12 @@ export class InventoryPanel {
         for (const option of this.equipmentTargets(view)) {
           const el = document.createElement('option'); el.value = option.id; el.textContent = option.name; target.appendChild(el);
         }
-        const use = this.makeBtn('Usar', '#a6be7d', () => this.cb.onUseItem?.(id, target.value));
+        const use = this.makeBtn('Usar', () => this.cb.onUseItem?.(id, target.value));
         use.disabled = target.options.length === 0;
         if (use.disabled) { use.textContent = 'Sin objetivo'; use.style.opacity = '0.5'; }
         actions.append(target, use);
       } else if (item.type === 'consumable' && (item.heal || item.mana || item.useEffect || item.learnSkill)) {
-        actions.appendChild(this.makeBtn('Usar', '#a6be7d', () => this.cb.onUseItem?.(id)));
+        actions.appendChild(this.makeBtn('Usar', () => this.cb.onUseItem?.(id)));
       }
       inspector.appendChild(actions);
     } else inspector.textContent = 'Inventario vacío. Recogé objetos para verlos aquí.';
@@ -327,6 +384,7 @@ export class InventoryPanel {
   }
 
   remove() {
+    this.minimapObserver?.disconnect();
     this.root.remove();
   }
 }
