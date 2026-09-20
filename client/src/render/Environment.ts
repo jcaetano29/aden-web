@@ -664,7 +664,8 @@ export class Environment {
       cobbleMat(0x8f8676, [6, 6]),
     );
     plaza.rotation.x = -Math.PI / 2;
-    plaza.position.set(TOWN.x, 0.03, TOWN.z);
+    // El camino entra en la plaza a y=0.03: separar los planos evita z-fighting.
+    plaza.position.set(TOWN.x, 0.06, TOWN.z);
     plaza.userData.ground = true;
     this.scene.add(plaza);
 
