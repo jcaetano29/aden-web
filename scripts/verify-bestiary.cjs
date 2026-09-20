@@ -4,12 +4,16 @@ const fs=require('node:fs');
  const browser=await chromium.launch({channel:'chrome',headless:true,args:['--enable-unsafe-swiftshader']});
  try {
  const page=await browser.newPage({viewport:{width:1440,height:960}});const errors=[];const models=[];
- page.on('pageerror',e=>errors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!m.location().url.endsWith('favicon.ico'))errors.push(m.text());});
+ page.on('pageerror',e=>{errors.push(e.message);console.error(e.message);});page.on('console',m=>{if(m.type()==='error'&&!m.location().url.endsWith('favicon.ico'))errors.push(m.text());});
  await page.goto('http://127.0.0.1:5174/bestiary-preview.html');await page.waitForSelector('body[data-ready=true]',{timeout:60000});
  fs.mkdirSync('artifacts/bestiary',{recursive:true});
  for(const name of await page.evaluate(()=>window.bestiaryReview.names)){
   await page.evaluate(n=>window.bestiaryReview.select(n),name);await page.waitForTimeout(350);
   const idle=await page.evaluate(()=>window.bestiaryReview.inspect());
+  if(['Knight','Mage','Rogue','Barbarian'].includes(name)){
+   if(idle.details.length<11||idle.details.filter(d=>d.name.startsWith('hero_boot_')&&d.parent.startsWith('Foot')).length!==2||idle.details.filter(d=>d.name.startsWith('hero_eye_')&&d.parent==='Head').length!==2)errors.push({name,message:'Missing facial features or animated boots',details:idle.details});
+   if(idle.min[1]<-0.025)errors.push({name,message:'Hero clips below the floor',min:idle.min});
+  }
   if(idle.size.some(n=>!Number.isFinite(n)||n<=0)||idle.size[1]>7||idle.size[1]<1)errors.push({name,idle});
   await page.screenshot({path:`artifacts/bestiary/${name}.png`});
   for(const action of ['walk','attack']){await page.evaluate(a=>window.bestiaryReview.act(a),action);await page.waitForTimeout(150);const state=await page.evaluate(()=>window.bestiaryReview.inspect());if(!state.actions.length||state.actions.some(n=>/death/i.test(n)))errors.push({name,action,state});}

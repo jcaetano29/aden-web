@@ -3,6 +3,7 @@ import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { modelUrl, MODEL_HEIGHTS } from "../assets/manifest.js";
 import { CharacterMaterial } from "./CharacterMaterial.js";
+import { addHeroDetails } from "./HeroDetails.js";
 
 interface LoadedModel {
   scene: THREE.Object3D;
@@ -46,6 +47,14 @@ export class CharacterFactory {
         }
         const materials = new Map<THREE.Material, THREE.Material>();
         const finish = (source: THREE.Material): THREE.Material => {
+          if (["Knight", "Mage", "Rogue", "Barbarian"].includes(name) && source instanceof THREE.MeshBasicMaterial) {
+            let material = materials.get(source);
+            if (!material) {
+              material = new THREE.MeshStandardMaterial({ name: source.name, color: source.color, map: source.map, side: source.side, transparent: source.transparent, opacity: source.opacity, alphaTest: source.alphaTest, roughness: 0.78, metalness: 0.08 });
+              materials.set(source, material);
+            }
+            return material;
+          }
           if (!(source instanceof THREE.MeshStandardMaterial)) return source;
           let material = materials.get(source);
           if (!material) {
@@ -64,6 +73,13 @@ export class CharacterFactory {
         });
         // Keep normalization outside animated nodes: root animation tracks must
         // never overwrite world scale or move the entity away from server coordinates.
+        // Fit proportions and accessories in the actual idle pose, not the
+        // exporter's rest pose (whose head tilt differs between hero rigs).
+        const idle = gltf.animations.find(clip => clip.name === "Idle");
+        if (idle) {
+          const pose = new THREE.AnimationMixer(gltf.scene);
+          pose.clipAction(idle).play(); pose.update(0);
+        }
         gltf.scene.updateMatrixWorld(true);
         gltf.scene.traverse(o=>{if(o instanceof THREE.SkinnedMesh)o.skeleton.update();});
         const box=new THREE.Box3().setFromObject(gltf.scene,true);
@@ -76,6 +92,7 @@ export class CharacterFactory {
         normalized.position.y=-box.min.y*scale;
         normalized.add(gltf.scene);
         const root=new THREE.Group();root.add(normalized);root.userData.visualHeight=height;
+        addHeroDetails(root, name);
         this.loaded.set(name, { scene: root, animations: gltf.animations });
       }),
     );
