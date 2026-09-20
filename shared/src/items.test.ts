@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getItem, ITEM_TEMPLATES, rollDrops, addToInventory, DROP_TABLES, getShopPrice, SHOP_PRICES, SHOP_STOCK } from "./items.js";
+import { getItem, ITEM_TEMPLATES, rollDrops, addToInventory, DROP_TABLES, getShopPrice, SHOP_PRICES, SHOP_STOCK, SMITH_STOCK } from "./items.js";
 
 describe("items", () => {
   it("getItem devuelve el template y lanza si falta", () => {
@@ -80,5 +80,14 @@ describe("shop config", () => {
 
   it("SHOP_STOCK incluye health_potion", () => {
     expect(SHOP_STOCK).toContain("health_potion");
+  });
+
+  it("SMITH_STOCK vende equipo y todo tiene precio", () => {
+    expect(SMITH_STOCK).toContain("iron_sword");
+    expect(getShopPrice("iron_sword")).toBeGreaterThan(0);
+    for (const id of SMITH_STOCK) {
+      expect(() => getShopPrice(id)).not.toThrow();
+      expect(getItem(id).type).toBe("equipment");
+    }
   });
 });

@@ -31,6 +31,9 @@ export class PlayerState extends Schema {
   @type("string") questId = "";
   @type("number") questProgress = 0;
   @type("number") gold = 0;
+  // Etapa 20: contrato del Capitán (misión repetible en paralelo a la campaña).
+  @type("string") bountyId = "";
+  @type("number") bountyProgress = 0;
 
   // Combat cooldown — server-only (NO @type)
   attackCooldownMs = 0;

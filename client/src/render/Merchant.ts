@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import { TOWN } from "@aden/shared";
+import { getNpc } from "@aden/shared";
 import { FONT_DISPLAY } from "./theme.js";
 
 /**
@@ -19,9 +19,10 @@ export class Merchant {
   private pulse = 0;
 
   constructor(scene: THREE.Scene, css2dLayer: any) {
-    // Crear root del Mercader, offset del Anciano (p.ej. +3 en x)
+    // Crear root del Mercader (posición desde el registro de NPCs).
+    const def = getNpc("merchant");
     this.object = new THREE.Group();
-    this.object.position.set(TOWN.x + 3, 0, TOWN.z);
+    this.object.position.set(def.x, 0, def.z);
     scene.add(this.object);
 
     // Túnica del Mercader: robe teal encapuchado, para distinguirlo del Anciano.
@@ -54,9 +55,9 @@ export class Merchant {
     this.object.add(indicator);
     this.indicatorMesh = indicator;
 
-    // Nameplate CSS2D: "Mercader"
+    // Nameplate CSS2D: nombre del Mercader (registro de NPCs).
     const nameplateDiv = document.createElement("div");
-    nameplateDiv.textContent = "Mercader";
+    nameplateDiv.textContent = def.name;
     nameplateDiv.style.cssText =
       `color:#ffd54f;font-family:${FONT_DISPLAY};font-weight:700;font-size:13px;letter-spacing:0.5px;` +
       "text-shadow:0 0 4px #000,0 1px 2px #000;pointer-events:none;white-space:nowrap;";

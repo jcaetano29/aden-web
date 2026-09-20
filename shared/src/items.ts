@@ -57,9 +57,24 @@ export const SHOP_PRICES: Record<string, number> = {
   // Etapa 12: equipo común a la venta → primera mejora garantizada con oro.
   worn_sword: 45,
   leather_vest: 45,
+  // Etapa 20: el Herrero vende el resto del equipo por oro (sink de economía).
+  iron_sword: 130,
+  iron_mail: 130,
+  hunter_charm: 110,
+  bone_blade: 380,
+  crypt_plate: 380,
+  crypt_ring: 320,
 };
 
+/** Stock del Mercader: consumibles + las dos piezas comunes de arranque. */
 export const SHOP_STOCK: string[] = ["health_potion", "greater_potion", "worn_sword", "leather_vest"];
+
+/** Etapa 20: stock del Herrero — equipo mejor por oro (progresión sin depender del loot). */
+export const SMITH_STOCK: string[] = [
+  "worn_sword", "leather_vest",
+  "iron_sword", "iron_mail", "hunter_charm",
+  "bone_blade", "crypt_plate", "crypt_ring",
+];
 
 export function getShopPrice(id: string): number {
   const price = SHOP_PRICES[id];

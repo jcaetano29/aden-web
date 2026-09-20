@@ -4,6 +4,12 @@ import type { EntityViews } from "../render/EntityViews.js";
 import { groundPointToMove } from "./mapping.js";
 import type { MoveToMessage } from "@aden/shared";
 
+/** Un NPC clickeable: su mesh raíz + qué hacer al hacerle clic. */
+export interface NpcInteractable {
+  object: THREE.Object3D;
+  onInteract: () => void;
+}
+
 export class InputController {
   constructor(
     private readonly renderer: Renderer,
@@ -11,12 +17,10 @@ export class InputController {
     private readonly onMove: (msg: MoveToMessage) => void,
     private readonly onPickMob: (mobId: string) => void,
     private readonly onPickPlayer: (playerId: string) => void,
-    private readonly onInteractNpc?: () => void,
-    private readonly npcObject?: THREE.Object3D,
-    private readonly onInteractMerchant?: () => void,
-    private readonly merchantObject?: THREE.Object3D,
     private readonly onPickObject?: (objectId: string) => void,
     private readonly objectTargets?: () => { objects: THREE.Object3D[]; idOf: (o: THREE.Object3D) => string | null },
+    /** NPCs clickeables (Anciano, Mercader, Sanadora, Herrero, Capitán). Se chequean primero. */
+    private readonly npcTargets?: () => NpcInteractable[],
   ) {}
 
   attach(dom: HTMLElement) {
@@ -24,29 +28,15 @@ export class InputController {
       const ndcX = (e.clientX / window.innerWidth) * 2 - 1;
       const ndcY = -(e.clientY / window.innerHeight) * 2 + 1;
 
-      // Raycast al NPC primero (antes que el Mercader/mobs/suelo)
-      if (this.npcObject && this.onInteractNpc) {
-        this.renderer.raycaster.setFromCamera(
-          new THREE.Vector2(ndcX, ndcY),
-          this.renderer.camera,
-        );
-        const hits = this.renderer.raycaster.intersectObject(this.npcObject, true);
-        if (hits.length > 0) {
-          this.onInteractNpc();
-          return;
-        }
-      }
-
-      // Raycast al Mercader (antes que mobs/suelo, pero después del NPC)
-      if (this.merchantObject && this.onInteractMerchant) {
-        this.renderer.raycaster.setFromCamera(
-          new THREE.Vector2(ndcX, ndcY),
-          this.renderer.camera,
-        );
-        const hits = this.renderer.raycaster.intersectObject(this.merchantObject, true);
-        if (hits.length > 0) {
-          this.onInteractMerchant();
-          return;
+      // Raycast a los NPCs primero (antes que mobs/objetos/suelo).
+      if (this.npcTargets) {
+        this.renderer.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.renderer.camera);
+        for (const npc of this.npcTargets()) {
+          const hits = this.renderer.raycaster.intersectObject(npc.object, true);
+          if (hits.length > 0) {
+            npc.onInteract();
+            return;
+          }
         }
       }
 

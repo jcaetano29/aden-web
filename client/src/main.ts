@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Renderer } from "./render/Renderer.js";
 import { Environment } from "./render/Environment.js";
+import { AmbientLife } from "./render/AmbientLife.js";
 import { EntityViews } from "./render/EntityViews.js";
 import { GroundItems } from "./render/GroundItems.js";
 import { CharacterFactory } from "./render/CharacterFactory.js";
@@ -18,6 +19,7 @@ import { WorldObjectViews } from "./render/WorldObjectViews.js";
 import { SkillEffects } from "./render/SkillEffects.js";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
+import { ServiceNpc } from "./render/ServiceNpc.js";
 import { ShopPanel } from "./render/ShopPanel.js";
 import { ClassSelect } from "./render/ClassSelect.js";
 import { Minimap } from "./render/Minimap.js";
@@ -32,13 +34,14 @@ import { SkillInput } from "./input/SkillInput.js";
 import { AudioEngine } from "./audio/AudioEngine.js";
 import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE, SMITH_STOCK, getNpc, TOWN_SERVICE_RADIUS, HEAL_COST_GOLD, getBounty, firstBountyId } from "@aden/shared";
 
 async function main() {
   injectTheme(); // sistema de diseño (fuentes, tokens, clases) — antes de crear cualquier panel
   const app = document.getElementById("app")!;
   const renderer = new Renderer(app);
   const environment = new Environment(renderer.scene); // biomas por zona, niebla dinámica, props
+  const ambient = new AmbientLife(renderer.scene); // aldeanos/guardias/fauna que deambulan (decorativo)
 
   const factory = new CharacterFactory();
   await factory.preload([...MODEL_NAMES, ...MOB_MODEL_NAMES]);
@@ -60,10 +63,19 @@ async function main() {
   const skillBar = new SkillBar();
   const npc = new Npc(renderer.scene, renderer.css2d);
   const merchant = new Merchant(renderer.scene, renderer.css2d);
+  // Etapa 20: NPCs de servicio nuevos (Sanadora / Herrero / Capitán).
+  const healer = new ServiceNpc(renderer.scene, renderer.css2d, "healer");
+  const smith = new ServiceNpc(renderer.scene, renderer.css2d, "smith");
+  const captain = new ServiceNpc(renderer.scene, renderer.css2d, "captain");
   const shopPanel = new ShopPanel((itemId) => {
     net.sendBuyItem(itemId);
     hud.toast(`¡Compraste ${getItem(itemId).name}!`, "#2ecc40");
   });
+  // Herrero: mismo panel de tienda pero con el stock de equipo.
+  const smithPanel = new ShopPanel((itemId) => {
+    net.sendBuyItem(itemId);
+    hud.toast(`¡Forjaste ${getItem(itemId).name}!`, "#ffb060");
+  }, { stock: SMITH_STOCK, title: "⚔ Fragua de Dorne" });
   const inventoryPanel = new InventoryPanel(document.body, {
     onUseItem: (itemId) => net.sendUseItem(itemId),
     onEquip: (itemId) => {
@@ -236,7 +248,7 @@ async function main() {
     if (!self || !pos) return;
 
     // Gate de cercanía (espeja el del server)
-    if (distance2D(pos.x, pos.z, TOWN.x, TOWN.z) > 4) {
+    if (distance2D(pos.x, pos.z, TOWN.x, TOWN.z) > TOWN_SERVICE_RADIUS) {
       hud.toast(`Acercate al ${ELDER_NAME} para hablarle`, "#ffe066");
       return;
     }
@@ -287,16 +299,85 @@ async function main() {
     }
   }
 
+  // Gate común: ¿el jugador está cerca de los servicios del pueblo?
+  const nearTown = () => {
+    const pos = views.selfPosition();
+    return !!pos && distance2D(pos.x, pos.z, TOWN.x, TOWN.z) <= TOWN_SERVICE_RADIUS;
+  };
+
   // Interacción con el Mercader: abre la tienda si estás lo suficientemente cerca.
   function interactMerchant() {
+    if (!net.getSelf()) return;
+    if (!nearTown()) { hud.toast("Acercate al Mercader para comprar", "#ffe066"); return; }
+    smithPanel.close();
+    shopPanel.toggle();
+  }
+
+  // Herrero: abre la fragua (tienda de equipo).
+  function interactSmith() {
+    if (!net.getSelf()) return;
+    if (!nearTown()) { hud.toast(`Acercate al ${getNpc("smith").name} para forjar`, "#ffe066"); return; }
+    shopPanel.close();
+    smithPanel.toggle();
+  }
+
+  // Sanadora: ofrece descanso completo (HP+MP) por oro.
+  function interactHealer() {
     const self = net.getSelf();
-    const pos = views.selfPosition();
-    if (!self || !pos) return;
-    if (distance2D(pos.x, pos.z, TOWN.x, TOWN.z) > 4) {
-      hud.toast("Acercate al Mercader para comprar", "#ffe066");
+    if (!self) return;
+    if (!nearTown()) { hud.toast(`Acercate a la ${getNpc("healer").name}`, "#ffe066"); return; }
+    if (self.hp >= self.maxHp && self.mp >= self.maxMp) {
+      dialog.open({ speaker: getNpc("healer").name, text: "Ya estás en plena forma, aventurero. Volvé cuando el camino te haya golpeado.", actionLabel: "Gracias", onAction: () => {} });
       return;
     }
-    shopPanel.toggle();
+    if (self.gold < HEAL_COST_GOLD) {
+      dialog.open({ speaker: getNpc("healer").name, text: `Un descanso completo cuesta ${HEAL_COST_GOLD} de oro, y no te alcanza. Traé más y te dejaré como nuevo.`, actionLabel: "Entendido", onAction: () => {} });
+      return;
+    }
+    dialog.open({
+      speaker: getNpc("healer").name,
+      text: `Sentate junto al fuego. Por ${HEAL_COST_GOLD} de oro te curo las heridas y te devuelvo el aliento (HP y MP al máximo).`,
+      actionLabel: `Descansar (${HEAL_COST_GOLD} oro)`,
+      onAction: () => { net.sendInteractNpc("healer"); hud.toast("Descansaste: HP y MP al máximo ✚", "#5effc8"); },
+    });
+  }
+
+  // Capitán de la Guardia: contratos repetibles (asignar / progreso / entregar).
+  function interactCaptain() {
+    const self = net.getSelf();
+    if (!self) return;
+    if (!nearTown()) { hud.toast(`Acercate al ${getNpc("captain").name}`, "#ffe066"); return; }
+    const cap = getNpc("captain").name;
+    if (self.bountyId === "") {
+      const b = getBounty(firstBountyId());
+      dialog.open({
+        speaker: cap,
+        text: `¿Buscás trabajo, mercenario? Tengo un contrato: "${b.title}" — cazá ${b.amount}. Paga ${b.rewardGold} de oro y ${b.rewardExp} de experiencia.`,
+        actionLabel: "Aceptar contrato",
+        onAction: () => { net.sendInteractNpc("captain"); hud.toast(`Contrato aceptado: ${b.title}`, "#ff8a5a"); },
+      });
+      return;
+    }
+    try {
+      const b = getBounty(self.bountyId);
+      if (self.bountyProgress >= b.amount) {
+        dialog.open({
+          speaker: cap,
+          text: `Contrato cumplido: "${b.title}". Buen trabajo. Tomá tu paga — y si querés, tengo otro esperando.`,
+          actionLabel: "Cobrar",
+          onAction: () => { net.sendInteractNpc("captain"); hud.toast(`+${b.rewardGold} oro · +${b.rewardExp} exp`, "#ffd54f"); },
+        });
+      } else {
+        dialog.open({
+          speaker: cap,
+          text: `Contrato en curso: "${b.title}".\n\n(Progreso: ${self.bountyProgress}/${b.amount})`,
+          actionLabel: "Sigo en eso",
+          onAction: () => {},
+        });
+      }
+    } catch {
+      hud.toast("Contrato desconocido", "#ff6b6b");
+    }
   }
 
   // Targetear (mob o jugador, para PvP): misma lógica de picking en ambos
@@ -327,12 +408,15 @@ async function main() {
     (msg) => net.sendMove(msg),
     pickTarget,
     pickTarget,
-    () => interactNpc(),
-    npc.object,
-    () => interactMerchant(),
-    merchant.object,
     interactObject,
     () => worldObjects.raycastTargets(),
+    () => [
+      { object: npc.object, onInteract: interactNpc },
+      { object: merchant.object, onInteract: interactMerchant },
+      { object: healer.object, onInteract: interactHealer },
+      { object: smith.object, onInteract: interactSmith },
+      { object: captain.object, onInteract: interactCaptain },
+    ],
   );
   input.attach(document.body);
 
@@ -461,12 +545,16 @@ async function main() {
     views.setCurrentMap(myMapId);
     worldObjects.setCurrentMap(myMapId);
     worldObjects.update3d(dt);
+    ambient.update(dt, myMapId); // vida ambiental (decorativa) del mapa actual
     if (myMapId !== lastMapId) {
       lastMapId = myMapId;
       minimap.setMap(getZone(myMapId));
     }
     npc.update(dt);
     merchant.update(dt);
+    healer.update(dt);
+    smith.update(dt);
+    captain.update(dt);
     minimap.update(net.getMinimapEntities());
     // Barra del jefe en pantalla + contador de reaparición (Etapa 14).
     bossBar.update(net.getBossState(), bossRespawnMs);
@@ -496,9 +584,12 @@ async function main() {
         }
       }
       npc.setReady(ready);
-      // Refrescar el oro mostrado en la tienda si está abierta
+      // Refrescar el oro mostrado en las tiendas si están abiertas
       if (shopPanel.isOpen()) {
         shopPanel.updateGold(selfCombat.gold);
+      }
+      if (smithPanel.isOpen()) {
+        smithPanel.updateGold(selfCombat.gold);
       }
     }
     inventoryPanel.update({

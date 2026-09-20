@@ -14,3 +14,5 @@ export * from "./classes.js";
 export * from "./pvp.js";
 export * from "./story.js";
 export * from "./guilds.js";
+export * from "./npcs.js";
+export * from "./bounties.js";

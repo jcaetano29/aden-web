@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { ZONES, getZone, zoneAt, TOWN, SAFE_RADIUS, type Zone } from "@aden/shared";
+import { ZONES, getZone, zoneAt, TOWN, SAFE_RADIUS, distance2D, type Zone } from "@aden/shared";
+import { stoneMat, woodMat, roofMat, thatchMat, plasterMat, cobbleMat, clothMat, crackedStoneMat } from "./textures.js";
 
 /** RNG determinístico (mulberry32) con seed fija → todos los clientes ven el mismo mundo. */
 function mulberry32(seed: number): () => number {
@@ -238,58 +239,321 @@ export class Environment {
     }
   }
 
-  // ── Estructuras (Etapa 17): landmarks arquitectónicos colocados a mano por mapa ──
+  // ── Estructuras (Etapa 17/20): landmarks arquitectónicos por mapa. En el pueblo,
+  //    una CIUDAD amurallada con portón, mercado, calles y faroles. ────────────────
   private structures(): void {
-    // Pueblo (0,0): casas alrededor de la plaza + pozo.
-    this.house(-24, -6, 0.3, 0xb98a5a);
-    this.house(24, -8, -0.5, 0xa87d4e);
-    this.house(-20, 18, 2.6, 0xc39866);
-    this.house(20, 20, 3.6, 0xb98a5a);
-    this.house(0, -28, 0, 0xa87d4e);
-    this.well(10, -2);
+    this.buildTown();
 
-    // Bosque (300,0): torre de vigía en ruinas + arco de entrada.
+    // Bosque (300,0): torre de vigía en ruinas + arco de entrada + campamento.
     this.tower(340, -30, 9, 0x8a8497);
     this.arch(300, 55, 0, 0x6b6577, 1.2);
     this.tower(262, 30, 6, 0x7a7d80);
+    this.campfireCamp(276, -8);
+    this.arch(300, -58, 0, 0x5f5a52, 1.0);
 
     // Ruinas (0,300): gran templo caído — plataforma + columnatas + arco.
     this.templeHall(0, 300);
     this.arch(0, 355, 0, 0x9b7fd4, 1.6);
+    this.tower(-40, 268, 7, 0x6a5f80, true);
+    this.arch(40, 300, Math.PI / 2, 0x7a6f90, 1.1);
 
-    // Yermo (300,300): campo de obeliscos de obsidiana + torre quemada.
+    // Yermo (300,300): campo de obeliscos de obsidiana + torre quemada + ruina.
     this.obeliskField(300, 300);
     this.tower(340, 320, 8, 0x3b322c, true);
+    this.tower(262, 276, 6, 0x2e2622, true);
+    this.arch(300, 356, 0, 0x2a231f, 1.2);
 
-    // Trono (600,150): gran pórtico de entrada + escalinata al trono.
+    // Trono (600,150): gran pórtico de entrada + escalinata al trono + columnas.
     this.arch(600, 200, 0, 0x1e1b26, 2.0);
     this.stairs(600, 130);
+    for (const sx of [-26, 26]) this.tower(600 + sx, 190, 10, 0x201c28, true);
   }
 
-  private house(cx: number, cz: number, rot: number, color: number): void {
+  /** Construye el Pueblo de Aden como una ciudad amurallada con portón sur. */
+  private buildTown(): void {
+    const cx = TOWN.x, cz = TOWN.z;
+    const R = 42;             // radio de la muralla
+    const gateHalf = 5;       // medio ancho del portón (mira al sur, +Z, hacia el spawn)
+
+    // Muralla octogonal de piedra con almenas, con un hueco para el portón al sur.
+    this.townWall(cx, cz, R, gateHalf);
+    this.gate(cx, cz + R, gateHalf);
+
+    // Camino empedrado del portón a la plaza + faroles a los costados.
+    this.road(cx, cz + R - 3, cx, cz + 8, 5);
+    for (let i = 0; i < 5; i++) {
+      const z = cz + R - 6 - i * 7;
+      this.lamp(cx - 4, z);
+      this.lamp(cx + 4, z);
+    }
+
+    // Plaza central de adoquín con fuente.
+    this.fountain(cx, cz);
+    this.well(14, -4);
+
+    // Casas dispuestas en dos "calles" a los lados del camino principal.
+    const houseColors = [0xc9b48c, 0xbfa77e, 0xd0bE95, 0xb89f76, 0xcab488];
+    const roofColors = [0x7a3b2b, 0x8a4a2b, 0x6a4a3b, 0x7a4a2b];
+    let hi = 0;
+    for (const side of [-1, 1]) {
+      for (let row = 0; row < 3; row++) {
+        const hx = cx + side * (16 + (row % 2) * 3);
+        const hz = cz - 26 + row * 16;
+        const rot = side < 0 ? 1.5 + (hi % 2) * 0.1 : -1.5 - (hi % 2) * 0.1;
+        this.house(hx, hz, rot, houseColors[hi % houseColors.length], roofColors[hi % roofColors.length], hi % 3 === 0);
+        hi++;
+      }
+    }
+    // Casona/posada más grande al fondo.
+    this.house(cx, cz - 34, 0, 0xcab488, 0x6a4a3b, false, 1.5);
+
+    // Distrito de mercado al este de la plaza: fila de puestos con toldos.
+    const stallColors = [0xb23b3b, 0x2f7d4f, 0x3060a8, 0xb8902b, 0x8a4fa8];
+    for (let i = 0; i < 5; i++) {
+      this.marketStall(cx + 20 + (i % 2) * 2, cz + 2 + (i - 2) * 6, stallColors[i], -Math.PI / 2);
+    }
+    // Puestos al oeste también.
+    for (let i = 0; i < 3; i++) {
+      this.marketStall(cx - 22, cz - 6 + i * 7, stallColors[(i + 2) % stallColors.length], Math.PI / 2);
+    }
+
+    // Estandartes en las torres del portón + tablón de anuncios.
+    this.signpost(cx - 6, cz + 16);
+
+    // Corral con vallas y algunos props de vida.
+    this.fence(cx - 30, cz + 8, cx - 30, cz - 6);
+    this.fence(cx - 30, cz - 6, cx - 18, cz - 6);
+  }
+
+  /** Muralla de piedra alrededor del pueblo (octógono), con hueco de portón al sur. */
+  private townWall(cx: number, cz: number, r: number, gateHalf: number): void {
+    const segs = 24;
+    const wallMat = stoneMat(0x8f877a, [1.4, 0.9], true);
+    const merlonMat = stoneMat(0x847c70, [0.5, 0.5], true);
+    for (let i = 0; i < segs; i++) {
+      const a0 = (i / segs) * Math.PI * 2;
+      const a1 = ((i + 1) / segs) * Math.PI * 2;
+      const mx = cx + Math.cos((a0 + a1) / 2) * r;
+      const mz = cz + Math.sin((a0 + a1) / 2) * r;
+      // Saltar los segmentos del sur (donde va el portón).
+      if (mz > cz + r - 8 && Math.abs(mx - cx) < gateHalf + 3) continue;
+      const len = Math.hypot(Math.cos(a1) * r - Math.cos(a0) * r, Math.sin(a1) * r - Math.sin(a0) * r) + 0.6;
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(len, 5, 1.6), wallMat);
+      seg.position.set(mx, 2.5, mz);
+      seg.rotation.y = -((a0 + a1) / 2) - Math.PI / 2;
+      this.scene.add(seg);
+      // Almena arriba del segmento.
+      const merlon = new THREE.Mesh(new THREE.BoxGeometry(len, 1, 0.8), merlonMat);
+      merlon.position.set(mx, 5.4, mz);
+      merlon.rotation.y = seg.rotation.y;
+      this.scene.add(merlon);
+    }
+  }
+
+  /** Portón: dos torres cuadradas flanqueando el acceso + estandartes + braseros. */
+  private gate(cx: number, cz: number, gateHalf: number): void {
+    const towerMat = stoneMat(0x8a8276, [1, 2], true);
+    for (const sx of [-1, 1]) {
+      const g = new THREE.Group();
+      const shaft = new THREE.Mesh(new THREE.BoxGeometry(4, 9, 4), towerMat);
+      shaft.position.y = 4.5;
+      g.add(shaft);
+      // almenas
+      for (const ox of [-1.2, 1.2]) for (const oz of [-1.2, 1.2]) {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 1), towerMat);
+        m.position.set(ox, 9.6, oz); g.add(m);
+      }
+      g.position.set(cx + sx * (gateHalf + 2), 0, cz);
+      this.scene.add(g);
+      // Estandarte colgando de cada torre.
+      this.banner(cx + sx * (gateHalf + 2), cz - 2.1, 6.5, 0x8a2b2b);
+    }
+    // Dintel sobre el portón.
+    const lintel = new THREE.Mesh(new THREE.BoxGeometry(gateHalf * 2 + 4, 1.6, 2.4), towerMat);
+    lintel.position.set(cx, 8.2, cz);
+    this.scene.add(lintel);
+    // Braseros a la entrada.
+    this.addGlow(cx - gateHalf - 2, cz + 1, 0xffa030, 0.7);
+    this.addGlow(cx + gateHalf + 2, cz + 1, 0xffa030, 0.7);
+  }
+
+  /** Casa low-poly texturizada: revoque + tejado de tejas + puerta, ventanas y chimenea. */
+  private house(cx: number, cz: number, rot: number, color: number, roof = 0x7a3b2b, thatched = false, scale = 1): void {
     const g = new THREE.Group();
-    const wall = new THREE.MeshStandardMaterial({ color, flatShading: true });
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x7a3b2b, flatShading: true });
-    const body = new THREE.Mesh(new THREE.BoxGeometry(5, 3, 4.5), wall);
-    body.position.y = 1.5;
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(4.1, 2.4, 4), roofMat);
-    roof.position.y = 4.2; roof.rotation.y = Math.PI / 4;
-    const door = new THREE.Mesh(new THREE.BoxGeometry(1.1, 1.8, 0.2), new THREE.MeshStandardMaterial({ color: 0x4a3018 }));
-    door.position.set(0, 0.9, 2.3);
-    g.add(body, roof, door);
+    const w = 5 * scale, h = 3 * scale, d = 4.5 * scale;
+    const wall = plasterMat(color, [w / 3, h / 3]);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wall);
+    body.position.y = h / 2;
+    g.add(body);
+    // Techo: tejas (cono de 4 lados) o paja.
+    const roofGeo = new THREE.ConeGeometry(w * 0.82, 2.4 * scale, 4);
+    const roofMesh = new THREE.Mesh(roofGeo, thatched ? thatchMat(0xb99850, [2, 1]) : roofMat(roof, [3, 2]));
+    roofMesh.position.y = h + 1.2 * scale; roofMesh.rotation.y = Math.PI / 4;
+    g.add(roofMesh);
+    // Puerta de madera.
+    const door = new THREE.Mesh(new THREE.BoxGeometry(1.1 * scale, 1.8 * scale, 0.2), woodMat(0x5a3d1e, [1, 2]));
+    door.position.set(0, 0.9 * scale, d / 2 + 0.01);
+    g.add(door);
+    // Ventanas iluminadas (emissive cálido → brillan en la hora dorada + bloom).
+    const winMat = new THREE.MeshStandardMaterial({ color: 0xffd98a, emissive: 0xffb347, emissiveIntensity: 0.9 });
+    for (const wx of [-w * 0.28, w * 0.28]) {
+      const win = new THREE.Mesh(new THREE.BoxGeometry(0.8 * scale, 0.9 * scale, 0.15), winMat);
+      win.position.set(wx, h * 0.55, d / 2 + 0.01);
+      g.add(win);
+    }
+    // Chimenea con humo insinuado (caja de piedra).
+    const chimney = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.6 * scale, 0.7), stoneMat(0x6b635a, [1, 1], true));
+    chimney.position.set(w * 0.3, h + 1.6 * scale, -d * 0.2);
+    g.add(chimney);
     g.position.set(cx, 0, cz); g.rotation.y = rot;
     this.scene.add(g);
   }
 
+  /** Fuente de piedra central con "agua" translúcida. */
+  private fountain(cx: number, cz: number): void {
+    const g = new THREE.Group();
+    const stone = stoneMat(0xa39a8c, [2, 1], true);
+    const basin = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.6, 1, 16), stone);
+    basin.position.y = 0.5; g.add(basin);
+    const inner = new THREE.Mesh(
+      new THREE.CylinderGeometry(2.9, 2.9, 0.4, 16),
+      new THREE.MeshStandardMaterial({ color: 0x2f7fb0, transparent: true, opacity: 0.7, roughness: 0.2, metalness: 0.1, emissive: 0x14344a, emissiveIntensity: 0.3 }),
+    );
+    inner.position.y = 0.85; inner.userData.ground = true; g.add(inner);
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.7, 2.2, 12), stone);
+    pillar.position.y = 1.6; g.add(pillar);
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 0.4, 0.5, 12), stone);
+    bowl.position.y = 2.7; g.add(bowl);
+    const top = new THREE.Mesh(new THREE.SphereGeometry(0.35, 10, 10), new THREE.MeshStandardMaterial({ color: 0x9fd8f0, emissive: 0x2f7fb0, emissiveIntensity: 0.6 }));
+    top.position.y = 3.2; g.add(top);
+    g.position.set(cx, 0, cz);
+    this.scene.add(g);
+  }
+
+  /** Puesto de mercado: mostrador de madera + toldo de tela a rayas + mercancía. */
+  private marketStall(cx: number, cz: number, cloth: number, rot: number): void {
+    const g = new THREE.Group();
+    const wood = woodMat(0x8a6a3c, [2, 1]);
+    // Mostrador.
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1, 1.4), wood);
+    counter.position.y = 0.5; g.add(counter);
+    // Postes.
+    for (const ox of [-1.4, 1.4]) for (const oz of [-0.5, 0.5]) {
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.09, 2.6, 6), wood);
+      post.position.set(ox, 1.3, oz); g.add(post);
+    }
+    // Toldo inclinado.
+    const awning = new THREE.Mesh(new THREE.BoxGeometry(3.8, 0.12, 2), clothMat(cloth, [3, 2]));
+    awning.position.set(0, 2.7, 0.2); awning.rotation.x = -0.22; g.add(awning);
+    // Mercancía sobre el mostrador (cajitas/frutas).
+    for (let i = 0; i < 4; i++) {
+      const s = 0.25 + Math.random() * 0.2;
+      const goodMat = Math.random() < 0.5 ? woodMat(0x9a7040, [1, 1]) : new THREE.MeshStandardMaterial({ color: [0xc0392b, 0xd68910, 0x27ae60][i % 3], flatShading: true });
+      const good = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), goodMat);
+      good.position.set(-1.2 + i * 0.7, 1.1, 0); g.add(good);
+    }
+    g.position.set(cx, 0, cz); g.rotation.y = rot;
+    this.scene.add(g);
+  }
+
+  /** Farol de calle: poste de madera + lámpara emissiva (glow con bloom). */
+  private lamp(cx: number, cz: number): void {
+    const g = new THREE.Group();
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.12, 3.2, 6), woodMat(0x4a3a24, [1, 3]));
+    post.position.y = 1.6; g.add(post);
+    const arm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.08, 0.08), woodMat(0x4a3a24));
+    arm.position.set(0.25, 3.1, 0); g.add(arm);
+    const lampMat = new THREE.MeshStandardMaterial({ color: 0xffe6a8, emissive: 0xffb347, emissiveIntensity: 1.4 });
+    const lantern = new THREE.Mesh(new THREE.OctahedronGeometry(0.28, 0), lampMat);
+    lantern.position.set(0.5, 2.95, 0); g.add(lantern);
+    g.position.set(cx, 0, cz);
+    this.scene.add(g);
+  }
+
+  /** Estandarte de tela colgante. */
+  private banner(cx: number, cz: number, y: number, color: number): void {
+    const cloth = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 3.4), clothMat(color, [1, 2]));
+    cloth.material.side = THREE.DoubleSide;
+    cloth.position.set(cx, y, cz);
+    this.scene.add(cloth);
+    // Punta triangular abajo.
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.7, 0.8, 3), clothMat(color, [1, 1]));
+    (tip.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide;
+    tip.position.set(cx, y - 1.9, cz); tip.rotation.x = Math.PI; tip.rotation.y = Math.PI;
+    this.scene.add(tip);
+  }
+
+  /** Cartel de madera con poste (tablón). */
+  private signpost(cx: number, cz: number): void {
+    const g = new THREE.Group();
+    const wood = woodMat(0x6a4a2b, [1, 2]);
+    const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.4, 6), wood);
+    post.position.y = 1.2; g.add(post);
+    const board = new THREE.Mesh(new THREE.BoxGeometry(1.8, 1.1, 0.15), woodMat(0x8a6a3c, [2, 1]));
+    board.position.set(0, 1.9, 0); g.add(board);
+    g.position.set(cx, 0, cz); g.rotation.y = 0.2;
+    this.scene.add(g);
+  }
+
+  /** Tramo de valla de madera entre dos puntos. */
+  private fence(x0: number, z0: number, x1: number, z1: number): void {
+    const wood = woodMat(0x6a4a2b, [1, 1]);
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const n = Math.max(2, Math.round(len / 2));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.2, 6), wood);
+      post.position.set(x0 + (x1 - x0) * t, 0.6, z0 + (z1 - z0) * t);
+      this.scene.add(post);
+    }
+    // Travesaños.
+    for (const y of [0.5, 0.95]) {
+      const rail = new THREE.Mesh(new THREE.BoxGeometry(len, 0.1, 0.1), wood);
+      rail.position.set((x0 + x1) / 2, y, (z0 + z1) / 2);
+      rail.rotation.y = Math.atan2(x1 - x0, z1 - z0) + Math.PI / 2;
+      this.scene.add(rail);
+    }
+  }
+
+  /** Camino de adoquín (placa fina texturizada) entre dos puntos. */
+  private road(x0: number, z0: number, x1: number, z1: number, width: number): void {
+    const len = Math.hypot(x1 - x0, z1 - z0);
+    const geo = new THREE.PlaneGeometry(width, len);
+    const mat = cobbleMat(0x8f8676, [Math.max(1, width / 2), Math.max(2, len / 4)]);
+    const road = new THREE.Mesh(geo, mat);
+    road.rotation.x = -Math.PI / 2;
+    road.rotation.z = -Math.atan2(x1 - x0, z1 - z0);
+    road.position.set((x0 + x1) / 2, 0.03, (z0 + z1) / 2);
+    road.userData.ground = true;
+    this.scene.add(road);
+  }
+
+  /** Pequeño campamento: fogata + un par de troncos como asientos + tienda. */
+  private campfireCamp(cx: number, cz: number): void {
+    this.addGlow(cx, cz, 0xff8a2c, 0.6);
+    const wood = woodMat(0x5a3f24, [1, 1]);
+    for (let i = 0; i < 3; i++) {
+      const a = (i / 3) * Math.PI * 2;
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 1.6, 6), wood);
+      log.position.set(cx + Math.cos(a) * 2.2, 0.25, cz + Math.sin(a) * 2.2);
+      log.rotation.z = Math.PI / 2; log.rotation.y = a;
+      this.scene.add(log);
+    }
+    // Tienda triangular.
+    const tent = new THREE.Mesh(new THREE.ConeGeometry(2, 2.2, 4), clothMat(0x6a5a3a, [2, 2]));
+    tent.position.set(cx + 4, 1.1, cz + 3); tent.rotation.y = Math.PI / 4;
+    this.scene.add(tent);
+  }
+
   private well(cx: number, cz: number): void {
     const g = new THREE.Group();
-    const stone = new THREE.MeshStandardMaterial({ color: 0x9a938a, flatShading: true });
+    const stone = stoneMat(0x9a938a, [1.5, 1], true);
     const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.1, 12), stone);
     ring.position.y = 0.55;
-    const post1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.4, 6), new THREE.MeshStandardMaterial({ color: 0x6b4a2b }));
+    const post1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.4, 6), woodMat(0x6b4a2b, [1, 2]));
     post1.position.set(-0.9, 1.7, 0);
     const post2 = post1.clone(); post2.position.x = 0.9;
-    const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 0.9, 4), new THREE.MeshStandardMaterial({ color: 0x7a3b2b, flatShading: true }));
+    const roof = new THREE.Mesh(new THREE.ConeGeometry(1.5, 0.9, 4), roofMat(0x7a3b2b, [2, 1]));
     roof.position.y = 3.2; roof.rotation.y = Math.PI / 4;
     g.add(ring, post1, post2, roof);
     g.position.set(cx, 0, cz);
@@ -298,7 +562,7 @@ export class Environment {
 
   private tower(cx: number, cz: number, h: number, color: number, broken = false): void {
     const g = new THREE.Group();
-    const stone = new THREE.MeshStandardMaterial({ color, flatShading: true });
+    const stone = stoneMat(color, [2, Math.max(2, Math.round(h / 3))], true);
     const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.4, h, 10), stone);
     shaft.position.y = h / 2;
     g.add(shaft);
@@ -325,7 +589,7 @@ export class Environment {
 
   private arch(cx: number, cz: number, rot: number, color: number, scale = 1): void {
     const g = new THREE.Group();
-    const stone = new THREE.MeshStandardMaterial({ color, flatShading: true });
+    const stone = stoneMat(color, [1, 4], true);
     const p1 = new THREE.Mesh(new THREE.BoxGeometry(1, 7, 1), stone); p1.position.set(-3, 3.5, 0);
     const p2 = p1.clone(); p2.position.x = 3;
     const top = new THREE.Mesh(new THREE.BoxGeometry(8, 1.2, 1.2), stone); top.position.y = 7.2;
@@ -336,7 +600,8 @@ export class Environment {
 
   private templeHall(cx: number, cz: number): void {
     const g = new THREE.Group();
-    const stone = new THREE.MeshStandardMaterial({ color: 0x8a8497, flatShading: true });
+    const stone = crackedStoneMat(0x8a8497, [4, 1], true);
+    const colStone = crackedStoneMat(0x8a8497, [1, 3], true);
     const platform = new THREE.Mesh(new THREE.BoxGeometry(30, 1, 20), stone);
     platform.position.y = 0.5;
     g.add(platform);
@@ -345,7 +610,7 @@ export class Environment {
       const z = -8 + i * 3.2;
       for (const sx of [-12, 12]) {
         const h = 6 + (Math.random() < 0.3 ? -3 - Math.random() * 2 : Math.random());
-        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, h, 10), stone);
+        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, h, 10), colStone);
         col.position.set(sx, 1 + h / 2, z);
         g.add(col);
       }
@@ -362,7 +627,7 @@ export class Environment {
   }
 
   private obeliskField(cx: number, cz: number): void {
-    const obs = new THREE.MeshStandardMaterial({ color: 0x241f2e, flatShading: true });
+    const obs = stoneMat(0x241f2e, [1, 3], true);
     const pts: Array<[number, number, number]> = [
       [-30, 20, 10], [28, -18, 12], [-10, -30, 8], [18, 26, 9], [-26, -8, 11], [8, 8, 7],
     ];
@@ -377,7 +642,7 @@ export class Environment {
   }
 
   private stairs(cx: number, cz: number): void {
-    const stone = new THREE.MeshStandardMaterial({ color: 0x2b2733, flatShading: true });
+    const stone = stoneMat(0x2b2733, [4, 1], true);
     for (let i = 0; i < 5; i++) {
       const step = new THREE.Mesh(new THREE.BoxGeometry(14 - i * 1.5, 0.6, 2.2), stone);
       step.position.set(cx, 0.3 + i * 0.55, cz + i * 2);
@@ -419,61 +684,133 @@ export class Environment {
     this.scene.add(rock);
   }
 
-  // ── Pueblo: prado luminoso con vallas, cajas y una fogata central ──────────
+  // ── Pueblo: ciudad viva — plaza de adoquín, barriles/sacos/heno, árboles ─────
   private populatePueblo(z: Zone, rng: () => number): void {
-    // Empedrado de la plaza (disco de piedra clara sobre el prado).
+    // Plaza de ADOQUÍN alrededor de la fuente.
     const plaza = new THREE.Mesh(
-      new THREE.CircleGeometry(SAFE_RADIUS * 0.85, 32),
-      new THREE.MeshStandardMaterial({ color: 0x9a8f6b, flatShading: true }),
+      new THREE.CircleGeometry(SAFE_RADIUS * 1.1, 48),
+      cobbleMat(0x8f8676, [6, 6]),
     );
     plaza.rotation.x = -Math.PI / 2;
-    plaza.position.set(TOWN.x, 0.04, TOWN.z);
+    plaza.position.set(TOWN.x, 0.03, TOWN.z);
+    plaza.userData.ground = true;
     this.scene.add(plaza);
 
     // Fogata (acento cálido) al costado de la plaza.
-    this.addGlow(TOWN.x - 5, TOWN.z + 4, 0xff9a3c, 0.5);
+    this.addGlow(TOWN.x - 7, TOWN.z + 5, 0xff9a3c, 0.5);
 
-    // Postes de valla en anillo alrededor del pueblo.
-    const postGeo = new THREE.CylinderGeometry(0.12, 0.12, 1.1, 6);
-    const postMat = new THREE.MeshStandardMaterial({ color: 0x7a5a34 });
-    const fenceR = ((z.bounds.maxX - z.bounds.minX) / 2) * 0.85;
-    for (let i = 0; i < 28; i++) {
-      const ang = (i / 28) * Math.PI * 2;
-      const post = new THREE.Mesh(postGeo, postMat);
-      post.position.set(z.center.x + Math.cos(ang) * fenceR, 0.55, z.center.z + Math.sin(ang) * fenceR);
-      this.scene.add(post);
-    }
-    // Cajas y barriles dispersos.
-    const crateMat = new THREE.MeshStandardMaterial({ color: 0x8a6a3c, flatShading: true });
-    for (let i = 0; i < 6; i++) {
+    // Barriles, sacos y cajas cerca del mercado y las casas.
+    for (let i = 0; i < 14; i++) {
       const [x, zz] = this.spot(z, rng, 0.3);
-      const s = 0.5 + rng() * 0.4;
-      const crate = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), crateMat);
-      crate.position.set(x, s / 2, zz);
-      crate.rotation.y = rng() * Math.PI;
-      this.scene.add(crate);
+      if (distance2D(x, zz, TOWN.x, TOWN.z) > 42) continue; // dentro de la muralla
+      const kind = rng();
+      if (kind < 0.5) this.barrel(x, zz, rng);
+      else if (kind < 0.8) this.crate(x, zz, rng);
+      else this.sack(x, zz, rng);
     }
-    // Algunos árboles frondosos en el borde del prado.
-    for (let i = 0; i < 8; i++) {
+    // Pilas de leña y fardos de heno junto a las casas.
+    for (let i = 0; i < 4; i++) {
+      const [x, zz] = this.spot(z, rng, 0.3);
+      if (distance2D(x, zz, TOWN.x, TOWN.z) > 40) continue;
+      if (rng() < 0.5) this.woodPile(x, zz, rng); else this.hayBale(x, zz, rng);
+    }
+    // Árboles frondosos dentro y en el borde de la ciudad.
+    for (let i = 0; i < 12; i++) {
       const [x, zz] = this.spot(z, rng, 0.6);
       this.conifer(x, zz, rng, 0x3f8a44, 0x6b4a2b);
     }
   }
 
-  // ── Bosque de Umbra: coníferas densas, rocas musgosas, pasto ───────────────
+  /** Barril de madera con aros oscuros. */
+  private barrel(x: number, z: number, rng: () => number): void {
+    const g = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.36, 0.95, 10), woodMat(0x8a6a3c, [2, 1]));
+    body.position.y = 0.48; g.add(body);
+    for (const y of [0.2, 0.76]) {
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.08, 10), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, metalness: 0.4, roughness: 0.6 }));
+      ring.position.y = y; g.add(ring);
+    }
+    g.position.set(x, 0, z); g.rotation.y = rng() * Math.PI;
+    this.scene.add(g);
+  }
+
+  /** Caja de madera. */
+  private crate(x: number, z: number, rng: () => number): void {
+    const s = 0.5 + rng() * 0.45;
+    const crate = new THREE.Mesh(new THREE.BoxGeometry(s, s, s), woodMat(0x9a7040, [1, 1]));
+    crate.position.set(x, s / 2, z); crate.rotation.y = rng() * Math.PI;
+    this.scene.add(crate);
+    if (rng() < 0.4) { // a veces apilada
+      const s2 = s * 0.7;
+      const c2 = new THREE.Mesh(new THREE.BoxGeometry(s2, s2, s2), woodMat(0x8a6a3c, [1, 1]));
+      c2.position.set(x + (rng() - 0.5) * 0.2, s + s2 / 2, z + (rng() - 0.5) * 0.2);
+      c2.rotation.y = rng() * Math.PI; this.scene.add(c2);
+    }
+  }
+
+  /** Saco de arpillera. */
+  private sack(x: number, z: number, rng: () => number): void {
+    const sack = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.7, 8), new THREE.MeshStandardMaterial({ color: 0xbfa878, roughness: 1, flatShading: true }));
+    sack.position.set(x, 0.35, z); sack.rotation.y = rng() * Math.PI;
+    sack.scale.y = 0.9 + rng() * 0.2;
+    this.scene.add(sack);
+  }
+
+  /** Pila de leña. */
+  private woodPile(x: number, z: number, rng: () => number): void {
+    const g = new THREE.Group();
+    const wood = woodMat(0x6b4a2b, [1, 1]);
+    for (let i = 0; i < 6; i++) {
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 1.3, 6), wood);
+      const row = Math.floor(i / 3);
+      log.position.set(-0.3 + (i % 3) * 0.3, 0.13 + row * 0.26, 0);
+      log.rotation.z = Math.PI / 2;
+      g.add(log);
+    }
+    g.position.set(x, 0, z); g.rotation.y = rng() * Math.PI;
+    this.scene.add(g);
+  }
+
+  /** Fardo de heno. */
+  private hayBale(x: number, z: number, rng: () => number): void {
+    const bale = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.9, 12), thatchMat(0xcaa93f, [2, 1]));
+    bale.rotation.z = Math.PI / 2;
+    bale.position.set(x, 0.5, z); bale.rotation.y = rng() * Math.PI;
+    this.scene.add(bale);
+  }
+
+  // ── Bosque de Umbra: coníferas densas, rocas musgosas, pasto, arbustos, hongos ─
   private populateBosque(z: Zone, rng: () => number): void {
-    for (let i = 0; i < 46; i++) {
+    for (let i = 0; i < 66; i++) {
       const [x, zz] = this.spot(z, rng);
       this.conifer(x, zz, rng, 0x2f6b34, 0x5a3f24);
     }
-    for (let i = 0; i < 14; i++) {
+    for (let i = 0; i < 20; i++) {
       const [x, zz] = this.spot(z, rng);
       this.rock(x, zz, rng, 0x5d6b54);
     }
-    // Matas de pasto.
+    // Arbustos redondeados.
+    for (let i = 0; i < 22; i++) {
+      const [x, zz] = this.spot(z, rng);
+      this.bush(x, zz, rng, 0x35722f);
+    }
+    // Setas rojas al pie de los árboles.
+    for (let i = 0; i < 16; i++) {
+      const [x, zz] = this.spot(z, rng);
+      this.mushroom(x, zz, rng);
+    }
+    // Troncos caídos.
+    for (let i = 0; i < 6; i++) {
+      const [x, zz] = this.spot(z, rng);
+      const log = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.4, 3.5 + rng() * 2, 7), woodMat(0x5a3f24, [1, 2]));
+      log.rotation.z = Math.PI / 2; log.rotation.y = rng() * Math.PI;
+      log.position.set(x, 0.4, zz);
+      this.scene.add(log);
+    }
+    // Matas de pasto que se mecen.
     const grassGeo = new THREE.ConeGeometry(0.18, 0.6, 4);
     const grassMat = new THREE.MeshStandardMaterial({ color: 0x4f8d41, flatShading: true });
-    for (let i = 0; i < 40; i++) {
+    for (let i = 0; i < 72; i++) {
       const [x, zz] = this.spot(z, rng);
       const g = new THREE.Mesh(grassGeo, grassMat);
       g.position.set(x, 0.3, zz);
@@ -483,10 +820,31 @@ export class Environment {
     }
   }
 
+  /** Arbusto: cúpula de icosaedro achatada. */
+  private bush(x: number, z: number, rng: () => number, color: number): void {
+    const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7 + rng() * 0.5, 0), new THREE.MeshStandardMaterial({ color, flatShading: true }));
+    bush.scale.y = 0.7;
+    bush.position.set(x, 0.4, z);
+    bush.rotation.set(rng(), rng(), rng());
+    this.scene.add(bush);
+    this.swayers.push({ o: bush, phase: rng() * Math.PI * 2, amt: 0.03 + rng() * 0.03 });
+  }
+
+  /** Seta con tallo claro y sombrero rojo con motas. */
+  private mushroom(x: number, z: number, rng: () => number): void {
+    const g = new THREE.Group();
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.35, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0cf, flatShading: true }));
+    stem.position.y = 0.17; g.add(stem);
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc0392b, flatShading: true }));
+    cap.position.y = 0.34; g.add(cap);
+    g.position.set(x, 0, z); g.scale.setScalar(0.7 + rng() * 0.9);
+    this.scene.add(g);
+  }
+
   // ── Ruinas de Nihil: columnas rotas, bloques caídos, cristales violeta ─────
   private populateRuinas(z: Zone, rng: () => number): void {
-    const stone = new THREE.MeshStandardMaterial({ color: 0x8a8497, flatShading: true });
-    for (let i = 0; i < 18; i++) {
+    const stone = crackedStoneMat(0x8a8497, [1, 2], true);
+    for (let i = 0; i < 26; i++) {
       const [x, zz] = this.spot(z, rng);
       const h = 1.5 + rng() * 4;
       const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, h, 8), stone);
@@ -495,7 +853,7 @@ export class Environment {
       this.scene.add(col);
     }
     // Bloques/escombros.
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 30; i++) {
       const [x, zz] = this.spot(z, rng);
       const s = 0.7 + rng() * 1.3;
       const block = new THREE.Mesh(new THREE.BoxGeometry(s, s * 0.7, s), stone);
@@ -507,14 +865,15 @@ export class Environment {
     const crystalMat = new THREE.MeshStandardMaterial({
       color: 0x9b7fd4, emissive: 0x6a4fb0, emissiveIntensity: 0.6, flatShading: true,
     });
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 16; i++) {
       const [x, zz] = this.spot(z, rng);
       const cr = new THREE.Mesh(new THREE.OctahedronGeometry(0.6, 0), crystalMat);
       cr.position.set(x, 0.6, zz);
       cr.rotation.y = rng() * Math.PI;
+      cr.scale.setScalar(0.7 + rng() * 1.1);
       this.scene.add(cr);
     }
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 14; i++) {
       const [x, zz] = this.spot(z, rng);
       this.rock(x, zz, rng, 0x6b6577);
     }
@@ -523,7 +882,7 @@ export class Environment {
   // ── Yermo Ceniciento: árboles muertos, rocas agrietadas, brasas ────────────
   private populateYermo(z: Zone, rng: () => number): void {
     const deadMat = new THREE.MeshStandardMaterial({ color: 0x3b322c, flatShading: true });
-    for (let i = 0; i < 24; i++) {
+    for (let i = 0; i < 34; i++) {
       const [x, zz] = this.spot(z, rng);
       const tree = new THREE.Group();
       const h = 2.5 + rng() * 2;
@@ -542,7 +901,7 @@ export class Environment {
       this.scene.add(tree);
       this.swayers.push({ o: tree, phase: rng() * Math.PI * 2, amt: 0.012 + rng() * 0.016 });
     }
-    for (let i = 0; i < 16; i++) {
+    for (let i = 0; i < 24; i++) {
       const [x, zz] = this.spot(z, rng);
       this.rock(x, zz, rng, 0x4a3d38);
     }
@@ -550,7 +909,7 @@ export class Environment {
     const emberRock = new THREE.MeshStandardMaterial({
       color: 0xff7a3c, emissive: 0xff4a10, emissiveIntensity: 0.7, flatShading: true,
     });
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 13; i++) {
       const [x, zz] = this.spot(z, rng);
       const r = new THREE.Mesh(new THREE.IcosahedronGeometry(0.5 + rng() * 0.4, 0), emberRock);
       r.position.set(x, 0.4, zz);

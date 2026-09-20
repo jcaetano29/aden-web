@@ -1,9 +1,18 @@
 import { getItem, getShopPrice, SHOP_STOCK, isEquipment, getRarity, RARITY_COLORS } from "@aden/shared";
 import { COLORS, FONT_DISPLAY, FONT_BODY, applyButton } from "./theme.js";
 
+export interface ShopPanelOpts {
+  /** Ítems a la venta (default: stock del Mercader). */
+  stock?: string[];
+  /** Título del panel. */
+  title?: string;
+  parent?: HTMLElement;
+}
+
 /**
  * Panel HTML de tienda (fijo, oculto por defecto) que lista los ítems a la venta:
- * nombre + precio + botón "Comprar". Muestra el oro actual del jugador.
+ * nombre + precio + botón "Comprar". Muestra el oro actual del jugador. Reutilizable
+ * para el Mercader (consumibles) y el Herrero (equipo) vía `stock`/`title`.
  * Callback `onBuy(itemTemplateId)` se dispara al hacer clic en "Comprar".
  */
 export class ShopPanel {
@@ -12,12 +21,16 @@ export class ShopPanel {
   private readonly goldLabel: HTMLDivElement;
   private visible = false;
   private onBuy: (itemTemplateId: string) => void;
+  private readonly stock: string[];
 
   constructor(
     onBuy: (itemTemplateId: string) => void,
-    parent: HTMLElement = document.body,
+    opts: ShopPanelOpts = {},
   ) {
     this.onBuy = onBuy;
+    this.stock = opts.stock ?? SHOP_STOCK;
+    const parent = opts.parent ?? document.body;
+    const titleText = opts.title ?? "⚒ Mercado de Aden";
 
     this.root = document.createElement("div");
     this.root.className = "aden-panel aden-fadein";
@@ -29,7 +42,7 @@ export class ShopPanel {
     header.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;";
 
     const title = document.createElement("div");
-    title.textContent = "⚒ Mercado de Aden";
+    title.textContent = titleText;
     title.style.cssText = `font-family:${FONT_DISPLAY};font-weight:700;font-size:17px;color:${COLORS.goldBright};letter-spacing:0.5px;`;
     header.appendChild(title);
 
@@ -63,7 +76,7 @@ export class ShopPanel {
   /** Renderiza cada ítem del stock con nombre, precio y botón Comprar. */
   private renderItems(): void {
     this.itemsList.innerHTML = "";
-    for (const itemId of SHOP_STOCK) {
+    for (const itemId of this.stock) {
       try {
         const item = getItem(itemId);
         const price = getShopPrice(itemId);

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
-import { TOWN, ELDER_NAME } from "@aden/shared";
+import { ELDER_NAME, getNpc } from "@aden/shared";
 import { FONT_DISPLAY } from "./theme.js";
 
 /**
@@ -21,9 +21,10 @@ export class Npc {
   private pulse = 0;
 
   constructor(scene: THREE.Scene, css2dLayer: any) {
-    // Crear root del NPC
+    // Crear root del NPC (posición desde el registro de NPCs).
+    const def = getNpc("elder");
     this.object = new THREE.Group();
-    this.object.position.set(TOWN.x, 0, TOWN.z);
+    this.object.position.set(def.x, 0, def.z);
     scene.add(this.object);
 
     // Túnica del Anciano: cono ancho abajo (robe) + capucha, low-poly encapuchado.

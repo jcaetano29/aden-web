@@ -71,6 +71,9 @@ export interface SelfCombatSnapshot {
   gold: number;
   questId: string;
   questProgress: number;
+  /** Contrato del Capitán (Etapa 20). */
+  bountyId: string;
+  bountyProgress: number;
   /** Clase del jugador local. */
   className: string;
   /** Stats de combate efectivos (base + equipo), para mostrar el impacto del gear. */
@@ -202,9 +205,9 @@ export class NetworkClient {
     this.room.send(MessageType.UseSkill, msg);
   }
 
-  /** Envía la intención de interactuar con el NPC (aceptar/entregar misión). */
-  sendInteractNpc() {
-    const msg: InteractNpcMessage = {};
+  /** Envía la intención de interactuar con un NPC (npcId ruteado por el server). */
+  sendInteractNpc(npcId?: string) {
+    const msg: InteractNpcMessage = npcId ? { npcId } : {};
     this.room.send(MessageType.InteractNpc, msg);
   }
 
@@ -334,6 +337,8 @@ export class NetworkClient {
       gold: p.gold ?? 0,
       questId: p.questId ?? "",
       questProgress: p.questProgress ?? 0,
+      bountyId: p.bountyId ?? "",
+      bountyProgress: p.bountyProgress ?? 0,
       className: p.className ?? "knight",
       pAtk: p.pAtk ?? 0,
       pDef: p.pDef ?? 0,

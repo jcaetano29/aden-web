@@ -11,6 +11,7 @@ describe("toCharacterSave", () => {
       className: "mage", pvpKills: 0, guildId: "", guildName: "", guildTag: "", equipment: equip,
       loginStreak: 4, lastLoginDay: "2026-08-24", dailyQuestId: "d_hunt", dailyProgress: 3,
       dailyDone: false, totalKills: 42, bossKills: 1, title: "Aventurero", achievements,
+      bountyId: "b_forest", bountyProgress: 3,
     });
     expect(save.mapId).toBe("bosque");
     expect(save.equipment).toEqual({ weapon: "iron_sword" });
@@ -18,6 +19,7 @@ describe("toCharacterSave", () => {
       loginStreak: 4, lastLoginDay: "2026-08-24", dailyQuestId: "d_hunt", dailyProgress: 3,
       dailyDone: false, totalKills: 42, bossKills: 1, title: "Aventurero",
       achievements: ["first_blood", "adventurer"],
+      bountyId: "b_forest", bountyProgress: 3,
     });
   });
 });

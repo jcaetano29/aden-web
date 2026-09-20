@@ -9,6 +9,9 @@ export interface ProgressSave {
   bossKills: number;
   title: string;
   achievements: string[];
+  // Etapa 20: contrato activo del Capitán.
+  bountyId: string;
+  bountyProgress: number;
 }
 
 export interface CharacterSave {
@@ -59,6 +62,9 @@ export interface Persistable {
   bossKills: number;
   title: string;
   achievements: { forEach(cb: (v: string) => void): void };
+  // Etapa 20: contrato activo del Capitán.
+  bountyId: string;
+  bountyProgress: number;
 }
 
 export function toCharacterSave(p: Persistable): CharacterSave {
@@ -101,6 +107,8 @@ export function toCharacterSave(p: Persistable): CharacterSave {
       bossKills: p.bossKills,
       title: p.title,
       achievements,
+      bountyId: p.bountyId,
+      bountyProgress: p.bountyProgress,
     },
   };
 }
@@ -121,5 +129,7 @@ export function emptyProgress(): ProgressSave {
     bossKills: 0,
     title: "",
     achievements: [],
+    bountyId: "",
+    bountyProgress: 0,
   };
 }

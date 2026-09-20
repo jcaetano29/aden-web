@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
-import { MessageType, getZone, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN, getDailyQuest } from "@aden/shared";
+import { MessageType, getZone, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN, getDailyQuest, HEAL_COST_GOLD, firstBountyId, nextBountyId, getBounty } from "@aden/shared";
 import appConfig from "../testServer.js";
 import { MobState } from "../state/MobState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
@@ -797,6 +797,96 @@ describe("GameRoom", () => {
       c.send(MessageType.InteractObject, { objectId: chest.id });
       await room.waitForNextPatch();
       expect(chest.active).toBe(true); // no se abrió
+    });
+  });
+
+  describe("NPCs de servicio y contratos (Etapa 20)", () => {
+    async function killOneMob(room: any, client: any, p: any, templateId: string): Promise<void> {
+      let mobId = ""; let mob: any;
+      room.state.mobs.forEach((m: any, id: string) => {
+        if (mobId === "" && m.templateId === templateId && !m.dead) { mobId = id; mob = m; }
+      });
+      mob.hp = 1;
+      p.mapId = mob.mapId; p.x = p.targetX = mob.x; p.z = p.targetZ = mob.z + 1; p.moving = false; p.hp = 500;
+      client.send(MessageType.SetTarget, { targetId: mobId });
+      for (let i = 0; i < 8; i++) await room.waitForNextSimulationTick();
+    }
+
+    it("la Sanadora restaura HP y MP a full y cobra oro", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Herido", className: "mage" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z; p.gold = 50; p.hp = 1; p.mp = 0;
+      c.send(MessageType.InteractNpc, { npcId: "healer" });
+      await room.waitForNextPatch();
+      expect(p.hp).toBe(p.maxHp);
+      expect(p.mp).toBe(p.maxMp);
+      expect(p.gold).toBe(40); // 50 - HEAL_COST_GOLD
+      expect(HEAL_COST_GOLD).toBe(10);
+    });
+
+    it("la Sanadora no cobra si ya estás a full (no-op)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Sano", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z; p.gold = 50; p.hp = p.maxHp; p.mp = p.maxMp;
+      c.send(MessageType.InteractNpc, { npcId: "healer" });
+      await room.waitForNextPatch();
+      expect(p.gold).toBe(50); // sin cambio
+    });
+
+    it("el Capitán asigna el primer contrato si no tenés ninguno", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Merc", className: "rogue" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z;
+      expect(p.bountyId).toBe("");
+      c.send(MessageType.InteractNpc, { npcId: "captain" });
+      await room.waitForNextPatch();
+      expect(p.bountyId).toBe(firstBountyId());
+      expect(p.bountyProgress).toBe(0);
+    });
+
+    it("el contrato progresa al matar el enemigo correcto", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Cazador", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.bountyId = "b_forest"; p.bountyProgress = 0; // caza de skeleton_minion
+      await killOneMob(room, c, p, "skeleton_minion");
+      expect(p.bountyProgress).toBeGreaterThanOrEqual(1);
+    });
+
+    it("el Capitán entrega el contrato completo: da exp+oro y rota al siguiente", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Cumplidor", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z;
+      const b = getBounty("b_forest");
+      p.bountyId = "b_forest"; p.bountyProgress = b.amount; // completo
+      const gold0 = p.gold; const exp0 = p.exp;
+      c.send(MessageType.InteractNpc, { npcId: "captain" });
+      await room.waitForNextPatch();
+      expect(p.gold).toBe(gold0 + b.rewardGold);
+      expect(p.exp).toBe(exp0 + b.rewardExp);
+      expect(p.bountyId).toBe(nextBountyId("b_forest"));
+      expect(p.bountyProgress).toBe(0);
+    });
+
+    it("hablar con la Sanadora no toca la misión de la campaña", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Campaña", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z; p.gold = 50; p.hp = 1;
+      const quest0 = p.questId;
+      c.send(MessageType.InteractNpc, { npcId: "healer" });
+      await room.waitForNextPatch();
+      expect(p.questId).toBe(quest0); // el router no confundió healer con elder
     });
   });
 });

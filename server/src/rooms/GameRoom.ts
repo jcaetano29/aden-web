@@ -69,6 +69,12 @@ import {
   firstQuestId,
   getQuest,
   nextQuestId,
+  type InteractNpcMessage,
+  TOWN_SERVICE_RADIUS,
+  HEAL_COST_GOLD,
+  getBounty,
+  firstBountyId,
+  nextBountyId,
   getItem,
   getShopPrice,
   getClass,
@@ -403,35 +409,18 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
-    // Etapa 4b-1: handler de interacción con NPC (aceptar/entregar misiones)
-    this.onMessage(MessageType.InteractNpc, (client) => {
+    // Etapa 4b-1 / 20: interacción con NPCs, ruteada por npcId. El pueblo es un
+    // mapa seguro entero; la cercanía a los servicios se mide contra su centro.
+    this.onMessage(MessageType.InteractNpc, (client, msg: InteractNpcMessage) => {
       const p = this.state.players.get(client.sessionId);
       if (!p || p.dead) return;
+      if (distance2D(p.x, p.z, TOWN.x, TOWN.z) > TOWN_SERVICE_RADIUS) return;
 
-      // Verificar proximidad al pueblo (opcional pero recomendado)
-      if (distance2D(p.x, p.z, TOWN.x, TOWN.z) > 4) return;
-
-      // Si no hay misión activa, asignar la primera
-      if (p.questId === "") {
-        p.questId = firstQuestId();
-        p.questProgress = 0;
-        return;
-      }
-
-      try {
-        const q = getQuest(p.questId);
-
-        // Si la misión está completa, entregarla
-        if (p.questProgress >= q.amount) {
-          this.grantExp(p, client, q.rewardExp);
-          p.gold += q.rewardGold;
-          p.questId = nextQuestId(p.questId);
-          p.questProgress = 0;
-        }
-        // Si no está completa, no-op (el cliente muestra "todavía no terminaste")
-      } catch {
-        // Quest no encontrada, ignorar
-      }
+      const npcId = msg?.npcId ?? "elder";
+      if (npcId === "healer") { this.serveHealer(p); return; }
+      if (npcId === "captain") { this.serveCaptain(p, client); return; }
+      // Por defecto: el Anciano (campaña principal).
+      this.serveElder(p, client);
     });
 
     // Etapa 4b-2: handler de compra en el mercader
@@ -440,7 +429,7 @@ export class GameRoom extends Room<GameState> {
       if (!p || p.dead) return;
 
       // Gate de proximidad al pueblo (igual que interactNpc)
-      if (distance2D(p.x, p.z, TOWN.x, TOWN.z) > 4) return;
+      if (distance2D(p.x, p.z, TOWN.x, TOWN.z) > TOWN_SERVICE_RADIUS) return;
 
       // Validar cantidad
       const qty = Math.max(1, Math.floor(msg?.qty ?? 1));
@@ -618,6 +607,51 @@ export class GameRoom extends Room<GameState> {
     this.setSimulationInterval(() => this.tick(dt), 1000 / TICK_RATE);
   }
 
+  /** Anciano Rowan: campaña principal (asignar / entregar / avanzar). */
+  private serveElder(p: PlayerState, client: Client): void {
+    if (p.questId === "") {
+      p.questId = firstQuestId();
+      p.questProgress = 0;
+      return;
+    }
+    try {
+      const q = getQuest(p.questId);
+      if (p.questProgress >= q.amount) {
+        this.grantExp(p, client, q.rewardExp);
+        p.gold += q.rewardGold;
+        p.questId = nextQuestId(p.questId);
+        p.questProgress = 0;
+      }
+    } catch { /* quest desconocida: ignorar */ }
+  }
+
+  /** Sanadora: restaura HP y MP a full por oro (no-op si ya está full o falta oro). */
+  private serveHealer(p: PlayerState): void {
+    if (p.hp >= p.maxHp && p.mp >= p.maxMp) return;
+    if (p.gold < HEAL_COST_GOLD) return;
+    p.gold -= HEAL_COST_GOLD;
+    p.hp = p.maxHp;
+    p.mp = p.maxMp;
+  }
+
+  /** Capitán de la Guardia: contratos repetibles (asignar / entregar / rotar). */
+  private serveCaptain(p: PlayerState, client: Client): void {
+    if (p.bountyId === "") {
+      p.bountyId = firstBountyId();
+      p.bountyProgress = 0;
+      return;
+    }
+    try {
+      const b = getBounty(p.bountyId);
+      if (p.bountyProgress >= b.amount) {
+        this.grantExp(p, client, b.rewardExp);
+        p.gold += b.rewardGold;
+        p.bountyId = nextBountyId(p.bountyId);
+        p.bountyProgress = 0;
+      }
+    } catch { /* contrato desconocido: ignorar */ }
+  }
+
   /** Otorga EXP a un jugador y envía LevelUp si sube de nivel (Etapa 4b-1: reutilizable en quests). */
   private grantExp(player: PlayerState, client: Client, amount: number) {
     const lvls = gainExp(player, amount, player.className);
@@ -685,6 +719,18 @@ export class GameRoom extends Room<GameState> {
           }
         } catch {
           // Quest no encontrada, ignorar
+        }
+      }
+
+      // Etapa 20: progreso del contrato del Capitán (se entrega hablando con él).
+      if (killer.bountyId !== "") {
+        try {
+          const b = getBounty(killer.bountyId);
+          if ((b.mobTemplateId === "" || b.mobTemplateId === mob.templateId) && killer.bountyProgress < b.amount) {
+            killer.bountyProgress++;
+          }
+        } catch {
+          // Contrato desconocido, ignorar
         }
       }
 
@@ -1085,6 +1131,9 @@ export class GameRoom extends Room<GameState> {
         player.bossKills = pr.bossKills ?? 0;
         player.title = pr.title ?? "";
         for (const id of pr.achievements ?? []) player.achievements.push(id);
+        // Etapa 20: contrato activo del Capitán.
+        player.bountyId = pr.bountyId ?? "";
+        player.bountyProgress = pr.bountyProgress ?? 0;
       }
     }
 
