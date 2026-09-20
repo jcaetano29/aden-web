@@ -17,10 +17,12 @@ const CLASS_STYLE: Record<string, { accent: string; glyph: string; role: string 
  */
 export class ClassSelect {
   private readonly root: HTMLDivElement;
-  private resolver: ((v: { name: string; className: string }) => void) | null = null;
+  private resolver: ((v: { name: string; className: string; password: string }) => void) | null = null;
   private selected: string | null = null;
   private readonly cards = new Map<string, HTMLDivElement>();
   private readonly nameInput: HTMLInputElement;
+  private readonly passwordInput: HTMLInputElement;
+  private readonly errorDiv: HTMLDivElement;
   private readonly enterBtn: HTMLButtonElement;
 
   constructor(parent: HTMLElement = document.body) {
@@ -69,7 +71,28 @@ export class ClassSelect {
     this.nameInput.addEventListener("blur", () => {
       this.nameInput.style.boxShadow = "inset 0 2px 6px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,162,75,0.15)";
     });
-    nameWrap.append(nameLabel, this.nameInput);
+    // Campo de contraseña (la cuenta = tu nombre; protege tu progreso).
+    const passLabel = document.createElement("div");
+    passLabel.textContent = "CONTRASEÑA";
+    passLabel.style.cssText = `font-family:${FONT_DISPLAY};font-size:11px;letter-spacing:3px;color:${COLORS.textDim};margin-top:10px;`;
+    this.passwordInput = document.createElement("input");
+    this.passwordInput.type = "password";
+    this.passwordInput.maxLength = 40;
+    this.passwordInput.placeholder = "••••••";
+    this.passwordInput.autocomplete = "current-password";
+    this.passwordInput.style.cssText = this.nameInput.style.cssText;
+    this.passwordInput.addEventListener("focus", () => {
+      this.passwordInput.style.boxShadow = "inset 0 2px 6px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,162,75,0.5), 0 0 14px rgba(201,162,75,0.3)";
+    });
+    this.passwordInput.addEventListener("blur", () => {
+      this.passwordInput.style.boxShadow = "inset 0 2px 6px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,162,75,0.15)";
+    });
+    const hint = document.createElement("div");
+    hint.textContent = "Con nombre nuevo se crea tu cuenta. Con uno existente, entrás con tu contraseña.";
+    hint.style.cssText = `font-size:11px;color:${COLORS.textDim};max-width:300px;text-align:center;line-height:1.3;`;
+    this.errorDiv = document.createElement("div");
+    this.errorDiv.style.cssText = `min-height:16px;font-size:13px;color:#ff6b6b;font-weight:600;text-align:center;`;
+    nameWrap.append(nameLabel, this.nameInput, passLabel, this.passwordInput, hint, this.errorDiv);
 
     const pickLabel = document.createElement("div");
     pickLabel.textContent = "ELEGÍ TU CLASE";
@@ -127,9 +150,9 @@ export class ClassSelect {
     this.enterBtn.style.opacity = "0.5";
     this.enterBtn.style.cursor = "not-allowed";
     this.enterBtn.addEventListener("click", () => this.confirm());
-    this.nameInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && this.selected) this.confirm();
-    });
+    const onEnter = (e: KeyboardEvent) => { if (e.key === "Enter" && this.selected) this.confirm(); };
+    this.nameInput.addEventListener("keydown", onEnter);
+    this.passwordInput.addEventListener("keydown", onEnter);
 
     this.root.append(eyebrow, title, rule, subtitle, nameWrap, pickLabel, cardContainer, this.enterBtn);
     parent.appendChild(this.root);
@@ -152,16 +175,27 @@ export class ClassSelect {
   private confirm(): void {
     if (!this.selected || !this.resolver) return;
     const name = this.nameInput.value.trim() || "Adventurer";
-    this.resolver({ name, className: this.selected });
+    const password = this.passwordInput.value;
+    if (password.length < 4) {
+      this.errorDiv.textContent = "La contraseña necesita al menos 4 caracteres.";
+      this.passwordInput.focus();
+      return;
+    }
+    this.resolver({ name, className: this.selected, password });
     this.hide();
   }
 
-  /** Muestra la pantalla y resuelve con el nombre + clase elegidos. */
-  async create(): Promise<{ name: string; className: string }> {
+  /**
+   * Muestra la pantalla y resuelve con nombre + clase + contraseña. `errorMsg`
+   * muestra un error arriba del botón (p.ej. "Contraseña incorrecta") al reintentar.
+   */
+  async create(errorMsg = ""): Promise<{ name: string; className: string; password: string }> {
     return new Promise((resolve) => {
       this.resolver = resolve;
+      this.errorDiv.textContent = errorMsg;
+      this.passwordInput.value = "";
       this.root.style.display = "flex";
-      setTimeout(() => this.nameInput.focus(), 50);
+      setTimeout(() => (this.nameInput.value ? this.passwordInput : this.nameInput).focus(), 50);
     });
   }
 

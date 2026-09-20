@@ -22,6 +22,7 @@ export const MessageType = {
   WarpTo: "warpTo",
   InteractObject: "interactObject",
   SkillCast: "skillCast",
+  AllocateStat: "allocateStat",
 } as const;
 
 export interface MoveToMessage {
@@ -137,4 +138,9 @@ export interface SkillCastEvent {
   skillId: string;
   /** objetivo del efecto ("" para heal/buff sobre uno mismo). */
   targetId: string;
+}
+
+/** Cliente→server: gastar un punto de atributo (Etapa 21). attr ∈ str|agi|vit|ene. */
+export interface AllocateStatMessage {
+  attr: string;
 }

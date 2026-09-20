@@ -7,6 +7,8 @@ export interface Quest {
   amount: number;
   rewardExp: number;
   rewardGold: number;
+  /** Etapa 21: pieza de equipo que entrega la misión al completarla (opcional). */
+  rewardItemId?: string;
 }
 
 // Etapa 11: la cadena de misiones es la brújula del jugador — cada quest lo empuja
@@ -22,6 +24,7 @@ export const QUESTS: Record<string, Quest> = {
     amount: 6,
     rewardExp: 60,
     rewardGold: 25,
+    rewardItemId: "leather_vest",
   },
   q2: {
     id: "q2",
@@ -32,6 +35,7 @@ export const QUESTS: Record<string, Quest> = {
     amount: 5,
     rewardExp: 140,
     rewardGold: 70,
+    rewardItemId: "iron_sword",
   },
   q3: {
     id: "q3",
@@ -42,6 +46,7 @@ export const QUESTS: Record<string, Quest> = {
     amount: 6,
     rewardExp: 320,
     rewardGold: 150,
+    rewardItemId: "hunter_charm",
   },
   q4: {
     id: "q4",
@@ -52,6 +57,7 @@ export const QUESTS: Record<string, Quest> = {
     amount: 1,
     rewardExp: 600,
     rewardGold: 300,
+    rewardItemId: "bone_blade",
   },
   q5: {
     id: "q5",
@@ -62,6 +68,7 @@ export const QUESTS: Record<string, Quest> = {
     amount: 8,
     rewardExp: 900,
     rewardGold: 450,
+    rewardItemId: "ash_guard",
   },
   q6: {
     id: "q6",
@@ -72,6 +79,7 @@ export const QUESTS: Record<string, Quest> = {
     amount: 1,
     rewardExp: 1500,
     rewardGold: 800,
+    rewardItemId: "nihil_aegis",
   },
 };
 

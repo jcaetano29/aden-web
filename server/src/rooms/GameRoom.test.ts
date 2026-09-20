@@ -889,4 +889,79 @@ describe("GameRoom", () => {
       expect(p.questId).toBe(quest0); // el router no confundió healer con elder
     });
   });
+
+  describe("Cuentas y atributos (Etapa 21)", () => {
+    it("registra una cuenta con contraseña y rechaza la contraseña incorrecta", async () => {
+      const room = await colyseus.createRoom("game", {});
+      // Registro (cuenta nueva): entra bien.
+      await colyseus.connectTo(room, { name: "Cuenta", password: "secreta", className: "knight" });
+      await room.waitForNextPatch();
+      // Otro cliente con la MISMA cuenta y contraseña equivocada: rechazado.
+      await expect(colyseus.connectTo(room, { name: "Cuenta", password: "mala" })).rejects.toBeDefined();
+      // Con la contraseña correcta: entra.
+      const ok = await colyseus.connectTo(room, { name: "Cuenta", password: "secreta" });
+      await room.waitForNextPatch();
+      expect(room.state.players.get(ok.sessionId)?.name).toBe("Cuenta");
+    });
+
+    it("una cuenta protegida no se puede tomar sin contraseña", async () => {
+      const room = await colyseus.createRoom("game", {});
+      await colyseus.connectTo(room, { name: "Protegido", password: "clave1" });
+      await room.waitForNextPatch();
+      await expect(colyseus.connectTo(room, { name: "Protegido" })).rejects.toBeDefined();
+    });
+
+    it("asignar un punto de atributo sube el stat y baja los puntos disponibles", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "AttrGuy", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.statPoints = 5; p.str = 0;
+      const atk0 = p.pAtk;
+      c.send(MessageType.AllocateStat, { attr: "str" });
+      await room.waitForNextPatch();
+      expect(p.str).toBe(1);
+      expect(p.statPoints).toBe(4);
+      expect(p.pAtk).toBe(atk0 + 2); // +2 ataque por punto de Fuerza
+    });
+
+    it("no se puede asignar sin puntos disponibles (no-op)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "SinPuntos", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.statPoints = 0; p.vit = 0;
+      c.send(MessageType.AllocateStat, { attr: "vit" });
+      await room.waitForNextPatch();
+      expect(p.vit).toBe(0);
+    });
+
+    it("subir de nivel otorga puntos de atributo", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "SubeNivel", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z;
+      const pts0 = p.statPoints;
+      // Entregar q5 (900 exp) parado en el pueblo → sube varios niveles.
+      p.questId = "q5"; p.questProgress = getQuest("q5").amount;
+      c.send(MessageType.InteractNpc, {});
+      await room.waitForNextPatch();
+      expect(p.level).toBeGreaterThan(1);
+      expect(p.statPoints).toBeGreaterThan(pts0);
+    });
+
+    it("entregar una misión con recompensa de equipo la agrega al inventario", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Botin", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z;
+      const q = getQuest("q1"); // rewardItemId: leather_vest
+      p.questId = "q1"; p.questProgress = q.amount;
+      c.send(MessageType.InteractNpc, {});
+      await room.waitForNextPatch();
+      expect(p.inventory.get(q.rewardItemId!)?.qty).toBe(1);
+    });
+  });
 });

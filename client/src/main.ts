@@ -28,13 +28,14 @@ import { DialogPanel } from "./render/DialogPanel.js";
 import { ZoneIndicator } from "./render/ZoneIndicator.js";
 import { ZoneBanner } from "./render/ZoneBanner.js";
 import { injectTheme } from "./render/theme.js";
-import { NetworkClient } from "./net/NetworkClient.js";
+import { NetworkClient, isAuthError, type RoomCallbacks } from "./net/NetworkClient.js";
+import { StatsPanel } from "./render/StatsPanel.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
 import { AudioEngine } from "./audio/AudioEngine.js";
 import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE, SMITH_STOCK, getNpc, TOWN_SERVICE_RADIUS, HEAL_COST_GOLD, getBounty, firstBountyId } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE, SMITH_STOCK, getNpc, TOWN_SERVICE_RADIUS, HEAL_COST_GOLD, getBounty, firstBountyId, type Attribute } from "@aden/shared";
 
 async function main() {
   injectTheme(); // sistema de diseño (fuentes, tokens, clases) — antes de crear cualquier panel
@@ -94,6 +95,8 @@ async function main() {
   leaderboardPanel.mount(document.body);
   const progressPanel = new ProgressPanel((title) => net.sendSetTitle(title));
   progressPanel.mount(document.body);
+  // Etapa 21: panel de atributos (tecla C).
+  const statsPanel = new StatsPanel((attr: Attribute) => net.sendAllocateStat(attr));
   const bossBar = new BossBar();
   // Tiempo de reaparición del jefe (config compartida) para el contador de la barra.
   const bossRespawnMs = respawnForTemplate("skeleton_king") ?? 60000;
@@ -116,14 +119,9 @@ async function main() {
   // se usa para saber cuándo limpiar el resaltado visual).
   let currentTargetId: string | null = null;
 
-  // Pantalla de creación de personaje (nombre + clase) — reemplaza al prompt() nativo.
-  const { name, className } = await classSelect.create();
-
-  // Mostrar la premisa narrativa una sola vez
-  await storyCard.show();
-
-  try {
-   await net.connect(name, className, {
+  // Callbacks de red (se reutilizan si hay que reintentar el login).
+  let className = "";
+  const netCallbacks: RoomCallbacks = {
     onAdd: (id, isSelf, snap) =>
       views.add(id, isSelf, modelForClass(snap.className ?? "knight"), snap),
     onChange: (id, snap) => views.update(id, snap),
@@ -197,6 +195,7 @@ async function main() {
       hud.flashLevelUp(level);
       audio.play("levelup");
       screenShake.addTrauma(0.5);
+      hud.toast("✦ +3 puntos de atributo — repartilos con C", "#ffd54f", 3200);
     },
     onBossKilled: (ev) => {
       hud.toast(`⚔ ¡La guild [${ev.guildTag}] abatió al ${ev.bossName}!`, "#ff5252");
@@ -233,12 +232,30 @@ async function main() {
       }
       skillEffects.cast(ev.skillId, { x: caster.x, z: caster.z }, target ? { x: target.x, z: target.z } : null);
     },
-   });
-  } catch (err) {
-    console.error("[aden] no se pudo conectar al servidor:", err);
-    showServerOffline();
-    return;
+  };
+
+  // Pantalla de creación + login con reintento ante contraseña incorrecta.
+  let connected = false;
+  let loginError = "";
+  while (!connected) {
+    const creds = await classSelect.create(loginError);
+    className = creds.className;
+    try {
+      await net.connect(creds.name, creds.password, creds.className, netCallbacks);
+      connected = true;
+    } catch (err) {
+      if (isAuthError(err)) {
+        loginError = (err as Error)?.message || "No se pudo entrar. Probá de nuevo.";
+        continue;
+      }
+      console.error("[aden] no se pudo conectar al servidor:", err);
+      showServerOffline();
+      return;
+    }
   }
+
+  // Mostrar la premisa narrativa una sola vez, ya conectado.
+  await storyCard.show();
 
   // Interacción con el NPC de misiones: diálogo narrativo contextual.
   // El server es autoritativo; el diálogo es presentación.
@@ -487,6 +504,11 @@ async function main() {
       progressPanel.setVisible(progressPanelVisible);
       if (progressPanelVisible) progressPanel.update(net.getProgress());
     }
+    // Tecla C: panel de atributos (Etapa 21).
+    if (e.key === "c" || e.key === "C" || e.code === "KeyC") {
+      statsPanel.toggle();
+      if (statsPanel.isOpen()) { const s = net.getSelf(); if (s) statsPanel.update(s); }
+    }
     // Tecla M: menú de mapas (viajar). Etapa 15.
     if (e.key === "m" || e.key === "M" || e.code === "KeyM") {
       const sc = net.getSelf();
@@ -602,6 +624,10 @@ async function main() {
     }
     if (leaderboardPanelVisible) {
       leaderboardPanel.update(net.getLeaderboardData());
+    }
+    if (statsPanel.isOpen()) {
+      const s = net.getSelf();
+      if (s) statsPanel.update(s);
     }
     if (progressPanelVisible) {
       progressPanel.update(net.getProgress());

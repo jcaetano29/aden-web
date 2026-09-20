@@ -2,7 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { CharacterSave, ProgressSave } from "./CharacterSave.js";
 import { emptyProgress } from "./CharacterSave.js";
 import type { GuildSave } from "./GuildSave.js";
-import type { CharacterRank, GuildRank, PersistenceService } from "./PersistenceService.js";
+import type { AccountRecord, CharacterRank, GuildRank, PersistenceService } from "./PersistenceService.js";
 
 export class SupabasePersistence implements PersistenceService {
   private readonly client: SupabaseClient;
@@ -115,5 +115,24 @@ export class SupabasePersistence implements PersistenceService {
       .limit(limit);
     if (error) { console.error("[aden] SupabasePersistence.topGuilds error:", error.message); return []; }
     return (data ?? []).map((r) => ({ name: r.name, tag: r.tag, bossKills: (r.bossKills as number) ?? 0 }));
+  }
+
+  async loadAccount(name: string): Promise<AccountRecord | null> {
+    const { data, error } = await this.client
+      .from("accounts")
+      .select("name,password_hash,password_salt")
+      .eq("name", name)
+      .maybeSingle();
+    if (error) { console.error("[aden] SupabasePersistence.loadAccount error:", error.message); return null; }
+    if (!data) return null;
+    return { name: data.name, passwordHash: data.password_hash ?? "", passwordSalt: data.password_salt ?? "" };
+  }
+
+  async saveAccount(acct: AccountRecord): Promise<void> {
+    const { error } = await this.client.from("accounts").upsert(
+      { name: acct.name, password_hash: acct.passwordHash, password_salt: acct.passwordSalt },
+      { onConflict: "name" },
+    );
+    if (error) console.error("[aden] SupabasePersistence.saveAccount error:", error.message);
   }
 }

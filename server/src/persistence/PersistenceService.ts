@@ -4,6 +4,9 @@ import type { GuildSave } from "./GuildSave.js";
 export interface CharacterRank { name: string; level: number; pvpKills: number; className: string; }
 export interface GuildRank { name: string; tag: string; bossKills: number; }
 
+/** Etapa 21: credenciales de cuenta (nombre = cuenta = personaje). */
+export interface AccountRecord { name: string; passwordHash: string; passwordSalt: string; }
+
 export interface PersistenceService {
   load(name: string): Promise<CharacterSave | null>;
   save(name: string, data: CharacterSave): Promise<void>;
@@ -11,6 +14,9 @@ export interface PersistenceService {
   saveGuild(g: GuildSave): Promise<void>;
   topCharacters(limit: number): Promise<CharacterRank[]>;
   topGuilds(limit: number): Promise<GuildRank[]>;
+  /** Etapa 21: cuentas (auth). */
+  loadAccount(name: string): Promise<AccountRecord | null>;
+  saveAccount(acct: AccountRecord): Promise<void>;
 }
 
 function cloneCharacterSave(data: CharacterSave): CharacterSave {
@@ -57,5 +63,16 @@ export class InMemoryPersistence implements PersistenceService {
       .map((g) => ({ name: g.name, tag: g.tag, bossKills: g.bossKills }))
       .sort((a, b) => b.bossKills - a.bossKills)
       .slice(0, limit);
+  }
+
+  private readonly accounts = new Map<string, AccountRecord>();
+
+  async loadAccount(name: string): Promise<AccountRecord | null> {
+    const a = this.accounts.get(name);
+    return a ? { ...a } : null;
+  }
+
+  async saveAccount(acct: AccountRecord): Promise<void> {
+    this.accounts.set(acct.name, { ...acct });
   }
 }

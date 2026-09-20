@@ -13,6 +13,7 @@ import {
   type AchievementEvent,
   type SetTitleMessage,
   type InteractNpcMessage,
+  type AllocateStatMessage,
   type BuyItemMessage,
   type UseItemMessage,
   type CreateGuildMessage,
@@ -74,6 +75,12 @@ export interface SelfCombatSnapshot {
   /** Contrato del Capitán (Etapa 20). */
   bountyId: string;
   bountyProgress: number;
+  /** Atributos primarios + puntos sin gastar (Etapa 21). */
+  str: number;
+  agi: number;
+  vit: number;
+  ene: number;
+  statPoints: number;
   /** Clase del jugador local. */
   className: string;
   /** Stats de combate efectivos (base + equipo), para mostrar el impacto del gear. */
@@ -118,9 +125,9 @@ export interface RoomCallbacks {
 export class NetworkClient {
   private room!: Room;
 
-  async connect(name: string, className: string, cb: RoomCallbacks): Promise<void> {
+  async connect(name: string, password: string, className: string, cb: RoomCallbacks): Promise<void> {
     const client = new Client(SERVER_URL);
-    this.room = await client.joinOrCreate("game", { name, className });
+    this.room = await client.joinOrCreate("game", { name, password, className });
     const selfId = this.room.sessionId;
 
     const snap = (p: any): PlayerSnapshot => ({
@@ -209,6 +216,12 @@ export class NetworkClient {
   sendInteractNpc(npcId?: string) {
     const msg: InteractNpcMessage = npcId ? { npcId } : {};
     this.room.send(MessageType.InteractNpc, msg);
+  }
+
+  /** Etapa 21: gastar un punto de atributo (str|agi|vit|ene). */
+  sendAllocateStat(attr: string) {
+    const msg: AllocateStatMessage = { attr };
+    this.room.send(MessageType.AllocateStat, msg);
   }
 
   /** Envía la intención de comprar un ítem en la tienda. */
@@ -339,6 +352,11 @@ export class NetworkClient {
       questProgress: p.questProgress ?? 0,
       bountyId: p.bountyId ?? "",
       bountyProgress: p.bountyProgress ?? 0,
+      str: p.str ?? 0,
+      agi: p.agi ?? 0,
+      vit: p.vit ?? 0,
+      ene: p.ene ?? 0,
+      statPoints: p.statPoints ?? 0,
       className: p.className ?? "knight",
       pAtk: p.pAtk ?? 0,
       pDef: p.pDef ?? 0,
@@ -449,4 +467,15 @@ export class NetworkClient {
 
     return { players, guilds };
   }
+}
+
+/**
+ * ¿El fallo de connect() es de autenticación (contraseña/nombre) y no de conexión?
+ * Colyseus reporta los errores de onAuth con un código en el rango 4xxx; una
+ * conexión rechazada (server caído) no trae ese código. Sirve para decidir si
+ * re-pedir la contraseña o mostrar "Aden dormida".
+ */
+export function isAuthError(err: unknown): boolean {
+  const e = err as { code?: number } | null;
+  return !!e && typeof e.code === "number" && e.code >= 4000 && e.code < 5000;
 }

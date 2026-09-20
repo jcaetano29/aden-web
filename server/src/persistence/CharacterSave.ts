@@ -12,6 +12,12 @@ export interface ProgressSave {
   // Etapa 20: contrato activo del Capitán.
   bountyId: string;
   bountyProgress: number;
+  // Etapa 21: atributos asignados + puntos sin gastar.
+  str: number;
+  agi: number;
+  vit: number;
+  ene: number;
+  statPoints: number;
 }
 
 export interface CharacterSave {
@@ -65,6 +71,12 @@ export interface Persistable {
   // Etapa 20: contrato activo del Capitán.
   bountyId: string;
   bountyProgress: number;
+  // Etapa 21: atributos asignados + puntos sin gastar.
+  str: number;
+  agi: number;
+  vit: number;
+  ene: number;
+  statPoints: number;
 }
 
 export function toCharacterSave(p: Persistable): CharacterSave {
@@ -109,6 +121,11 @@ export function toCharacterSave(p: Persistable): CharacterSave {
       achievements,
       bountyId: p.bountyId,
       bountyProgress: p.bountyProgress,
+      str: p.str,
+      agi: p.agi,
+      vit: p.vit,
+      ene: p.ene,
+      statPoints: p.statPoints,
     },
   };
 }
@@ -131,5 +148,10 @@ export function emptyProgress(): ProgressSave {
     achievements: [],
     bountyId: "",
     bountyProgress: 0,
+    str: 0,
+    agi: 0,
+    vit: 0,
+    ene: 0,
+    statPoints: 0,
   };
 }

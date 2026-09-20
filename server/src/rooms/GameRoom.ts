@@ -70,11 +70,17 @@ import {
   getQuest,
   nextQuestId,
   type InteractNpcMessage,
+  type AllocateStatMessage,
   TOWN_SERVICE_RADIUS,
   HEAL_COST_GOLD,
   getBounty,
   firstBountyId,
   nextBountyId,
+  attributeBonuses,
+  isValidAttribute,
+  POINTS_PER_LEVEL,
+  pointsForLevel,
+  type Attribute,
   getItem,
   getShopPrice,
   getClass,
@@ -101,6 +107,7 @@ import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.
 import { createPersistence } from "../persistence/createPersistence.js";
 import type { PersistenceService, CharacterRank, GuildRank } from "../persistence/PersistenceService.js";
 import { toCharacterSave, inventoryRecordToEntries } from "../persistence/CharacterSave.js";
+import { hashPassword, verifyPassword } from "../auth/password.js";
 
 /** Intervalo de guardado periódico de personajes (Etapa 3c). */
 const SAVE_INTERVAL_MS = 15000;
@@ -134,10 +141,12 @@ export class GameRoom extends Room<GameState> {
     const equipped: Partial<Record<EquipSlot, string>> = {};
     p.equipment.forEach((id, slot) => { equipped[slot as EquipSlot] = id; });
     const bonus = equipmentBonuses(equipped);
-    p.maxHp = base.maxHp + bonus.maxHp;
-    p.maxMp = base.maxMp + bonus.maxMp;
-    p.pAtk = base.pAtk + bonus.pAtk;
-    p.pDef = base.pDef + bonus.pDef;
+    // Etapa 21: bonus de atributos primarios asignados (str/agi/vit/ene).
+    const attr = attributeBonuses({ str: p.str, agi: p.agi, vit: p.vit, ene: p.ene });
+    p.maxHp = base.maxHp + bonus.maxHp + attr.maxHp;
+    p.maxMp = base.maxMp + bonus.maxMp + attr.maxMp;
+    p.pAtk = base.pAtk + bonus.pAtk + attr.pAtk;
+    p.pDef = base.pDef + bonus.pDef + attr.pDef;
     if (p.hp > p.maxHp) p.hp = p.maxHp;
     if (p.mp > p.maxMp) p.mp = p.maxMp;
   }
@@ -603,6 +612,18 @@ export class GameRoom extends Room<GameState> {
       o.respawnMs = objectRespawnMs(def.kind);
     });
 
+    // Etapa 21: gastar un punto de atributo (Fuerza/Agilidad/Vitalidad/Energía).
+    this.onMessage(MessageType.AllocateStat, (client, msg: AllocateStatMessage) => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p) return;
+      if (p.statPoints <= 0) return;
+      const attr = msg?.attr ?? "";
+      if (!isValidAttribute(attr)) return;
+      p[attr as Attribute] += 1;
+      p.statPoints -= 1;
+      this.recomputeStats(p);
+    });
+
     const dt = 1 / TICK_RATE;
     this.setSimulationInterval(() => this.tick(dt), 1000 / TICK_RATE);
   }
@@ -619,6 +640,11 @@ export class GameRoom extends Room<GameState> {
       if (p.questProgress >= q.amount) {
         this.grantExp(p, client, q.rewardExp);
         p.gold += q.rewardGold;
+        // Etapa 21: la misión puede entregar una pieza de equipo.
+        if (q.rewardItemId) {
+          this.addToInventory(p, q.rewardItemId, 1);
+          this.checkAchievements(p, client.sessionId);
+        }
         p.questId = nextQuestId(p.questId);
         p.questProgress = 0;
       }
@@ -656,8 +682,13 @@ export class GameRoom extends Room<GameState> {
   private grantExp(player: PlayerState, client: Client, amount: number) {
     const lvls = gainExp(player, amount, player.className);
     if (lvls > 0) {
-      // gainExp resetea los stats a la base de clase/nivel; re-aplicar el equipo.
+      // Etapa 21: cada nivel otorga puntos de atributo para repartir.
+      player.statPoints += lvls * POINTS_PER_LEVEL;
+      // gainExp resetea los stats a la base de clase/nivel; re-aplicar equipo + atributos
+      // y rellenar HP/MP al nuevo máximo (que incluye equipo y atributos).
       this.recomputeStats(player);
+      player.hp = player.maxHp;
+      player.mp = player.maxMp;
       client.send(MessageType.LevelUp, { level: player.level });
     }
   }
@@ -1040,6 +1071,32 @@ export class GameRoom extends Room<GameState> {
     });
   }
 
+  /**
+   * Etapa 21: autenticación. El nombre ES la cuenta. Si la cuenta existe, verifica
+   * la contraseña (rechaza si no coincide); si no existe, la registra (cuenta nueva
+   * o reclamo de un personaje viejo sin cuenta). Devuelve truthy para permitir el
+   * join. Lanzar rechaza el join con el mensaje (el cliente lo muestra y reintenta).
+   */
+  async onAuth(_client: Client, options: { name?: string; password?: string; className?: string }) {
+    const name = (options?.name ?? "").trim();
+    const password = options?.password ?? "";
+    if (name.length < 1 || name.length > 16) throw new Error("Nombre inválido (1-16 caracteres).");
+    const acct = await this.persistence.loadAccount(name);
+    if (acct && acct.passwordHash) {
+      // Cuenta protegida: exige la contraseña correcta (protege el progreso).
+      if (!verifyPassword(password, acct.passwordHash, acct.passwordSalt)) {
+        throw new Error("Contraseña incorrecta.");
+      }
+    } else if (password.length >= 4) {
+      // Registro: crea la cuenta (o reclama un personaje viejo sin cuenta).
+      const { hash, salt } = hashPassword(password);
+      await this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt });
+    }
+    // Sin cuenta y sin contraseña válida → invitado (no persiste cuenta). El cliente
+    // real siempre exige contraseña (≥4) en la pantalla de creación.
+    return { name };
+  }
+
   async onJoin(client: Client, options: { name?: string; className?: string }) {
     const player = new PlayerState();
     player.name = options?.name ?? "Adventurer";
@@ -1112,13 +1169,10 @@ export class GameRoom extends Room<GameState> {
         it.qty = qty;
         player.inventory.set(id, it);
       }
-      // Etapa 12: restaurar el equipo y recalcular los stats con sus bonuses.
+      // Etapa 12: restaurar el equipo.
       for (const [slot, itemId] of Object.entries(save.equipment ?? {})) {
         if (itemId) player.equipment.set(slot, itemId);
       }
-      this.recomputeStats(player);
-      player.hp = player.maxHp;
-      player.mp = player.maxMp;
       // Etapa 13: restaurar el estado de retención (racha/diaria/logros/título).
       const pr = save.progress;
       if (pr) {
@@ -1134,7 +1188,19 @@ export class GameRoom extends Room<GameState> {
         // Etapa 20: contrato activo del Capitán.
         player.bountyId = pr.bountyId ?? "";
         player.bountyProgress = pr.bountyProgress ?? 0;
+        // Etapa 21: atributos asignados. statPoints se DERIVA del nivel (invariante:
+        // total por nivel − gastados), así los personajes viejos reciben sus puntos
+        // retroactivamente y nunca queda desincronizado.
+        player.str = pr.str ?? 0;
+        player.agi = pr.agi ?? 0;
+        player.vit = pr.vit ?? 0;
+        player.ene = pr.ene ?? 0;
       }
+      player.statPoints = Math.max(0, pointsForLevel(player.level) - (player.str + player.agi + player.vit + player.ene));
+      // Recalcular stats con clase/nivel + equipo + atributos, y rellenar HP/MP.
+      this.recomputeStats(player);
+      player.hp = player.maxHp;
+      player.mp = player.maxMp;
     }
 
     // Etapa 3c (fix race save-before-load): recién ahora, con el save (si existía) ya
