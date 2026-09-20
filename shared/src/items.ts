@@ -92,6 +92,33 @@ export interface DropEntry {
 // Etapa 11: el loot mejora con la profundidad (más oro, mejores pociones y trofeos
 // de zona). El jefe final es el premio grande. Refuerza el loop peligro → recompensa.
 export const DROP_TABLES: Record<string, DropEntry[]> = {
+  umbra_orc: [
+    { itemTemplateId: "gold", chance: 1, qtyMin: 5, qtyMax: 12 },
+    { itemTemplateId: "iron_sword", chance: 0.1, qtyMin: 1, qtyMax: 1 },
+  ],
+  forest_troll: [
+    { itemTemplateId: "gold", chance: 1, qtyMin: 10, qtyMax: 20 },
+    { itemTemplateId: "health_potion", chance: 0.4, qtyMin: 1, qtyMax: 2 },
+  ],
+  crypt_wraith: [
+    { itemTemplateId: "gold", chance: 1, qtyMin: 12, qtyMax: 25 },
+    { itemTemplateId: "ancient_relic", chance: 0.25, qtyMin: 1, qtyMax: 1 },
+  ],
+  bone_warden: [
+    { itemTemplateId: "gold", chance: 1, qtyMin: 25, qtyMax: 45 },
+    { itemTemplateId: "crypt_plate", chance: 0.18, qtyMin: 1, qtyMax: 1 },
+  ],
+  infernal_demon: [
+    { itemTemplateId: "gold", chance: 1, qtyMin: 35, qtyMax: 60 },
+    { itemTemplateId: "ember_core", chance: 0.5, qtyMin: 1, qtyMax: 2 },
+    { itemTemplateId: "ember_axe", chance: 0.15, qtyMin: 1, qtyMax: 1 },
+  ],
+  ancient_drake: [
+    { itemTemplateId: "gold", chance: 1, qtyMin: 80, qtyMax: 130 },
+    { itemTemplateId: "greater_potion", chance: 1, qtyMin: 2, qtyMax: 3 },
+    { itemTemplateId: "ember_core", chance: 1, qtyMin: 2, qtyMax: 3 },
+    { itemTemplateId: "ash_guard", chance: 0.4, qtyMin: 1, qtyMax: 1 },
+  ],
   // Bosque de Umbra — equipo común (raro)
   skeleton_minion: [
     { itemTemplateId: "gold", chance: 0.8, qtyMin: 1, qtyMax: 5 },

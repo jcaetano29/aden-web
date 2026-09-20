@@ -22,8 +22,8 @@
   const renderer = new Renderer(document.querySelector('#app'));
   const environment = new Environment(renderer.scene);
   const factory = new CharacterFactory();
-  await factory.preload([...MODEL_NAMES,...MOB_MODEL_NAMES]);
-  const characters = [...MODEL_NAMES,...MOB_MODEL_NAMES].map((name,i)=>{
+  await factory.preload([...MODEL_NAMES,...MOB_MODEL_NAMES.slice(0,2)]);
+  const characters = [...MODEL_NAMES,...MOB_MODEL_NAMES.slice(0,2)].map((name,i)=>{
     const c = factory.create(name); c.root.position.set((i-2.5)*2.3,0,8);
     renderer.scene.add(c.root); c.play(selectClip(c.clipNames,'idle') || c.clipNames[0]); return c;
   });
@@ -43,6 +43,8 @@
     document.body.dataset.respawn='walking';
   };
   document.querySelector('#controls').append(demoButton);
+  const bestiaryButton=document.createElement('button');bestiaryButton.textContent='Ver bestiario';
+  bestiaryButton.onclick=()=>window.location.assign('/bestiary-preview.html');document.querySelector('#controls').append(bestiaryButton);
   window.respawnReview=()=>({position:views[5].object.position.toArray(),
     actions:characters[5].mixer._actions.filter(a=>a.isRunning()).map(a=>a.getClip().name)});
   let last=performance.now();

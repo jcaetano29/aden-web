@@ -22,6 +22,12 @@ export interface MobTemplate {
 // como variantes por zona vía `tint` + `scale` + stats. El tinte da la identidad
 // visual: Bosque = musgoso (verde), Ruinas = cripta (violeta), Yermo = ardiente (rojo).
 export const MOB_TEMPLATES: Record<string, MobTemplate> = {
+  umbra_orc: { id: "umbra_orc", name: "Orco de Umbra", model: "OrcBrute" },
+  forest_troll: { id: "forest_troll", name: "Bestia del Bosque", model: "ForestTroll", tint: 0xa7b6a0 },
+  crypt_wraith: { id: "crypt_wraith", name: "Espectro de la Cripta", model: "DeathWraith", tint: 0xb9c8eb },
+  bone_warden: { id: "bone_warden", name: "Custodio de Hueso", model: "BoneWarden", tint: 0xb3a5c6 },
+  infernal_demon: { id: "infernal_demon", name: "Demonio de Ceniza", model: "InfernalDemon", tint: 0xffaf91 },
+  ancient_drake: { id: "ancient_drake", name: "Draco del Umbral", model: "AncientDrake", miniBoss: true, scale: 1.15, respawnMs: 60000, tint: 0xc7a6a0 },
   // Bosque de Umbra (Lv 1-3) — huesos musgosos
   skeleton_minion: { id: "skeleton_minion", name: "Explorador Óseo", model: "Skeleton_Minion", tint: 0x9fc48f },
   skeleton_warrior: { id: "skeleton_warrior", name: "Guerrero Musgoso", model: "Skeleton_Warrior", tint: 0x9fc48f },
@@ -62,6 +68,12 @@ export interface SpawnZone {
 // grande (center ±65). Más clusters/mobs para llenar los mapas amplios. Los mapas se
 // viajan con M (no se camina entre ellos); la dificultad sigue escalando por mapa.
 export const SPAWN_ZONES: SpawnZone[] = [
+  { id: "bosque_orcs", mapId: "bosque", templateId: "umbra_orc", centerX: 335, centerZ: -5, radius: 8, count: 4 },
+  { id: "bosque_beasts", mapId: "bosque", templateId: "forest_troll", centerX: 270, centerZ: -43, radius: 6, count: 2 },
+  { id: "ruinas_wraiths", mapId: "ruinas", templateId: "crypt_wraith", centerX: -38, centerZ: 302, radius: 7, count: 3 },
+  { id: "ruinas_wardens", mapId: "ruinas", templateId: "bone_warden", centerX: 32, centerZ: 265, radius: 7, count: 2 },
+  { id: "yermo_demons", mapId: "yermo", templateId: "infernal_demon", centerX: 340, centerZ: 300, radius: 7, count: 3 },
+  { id: "trono_drake", mapId: "trono", templateId: "ancient_drake", centerX: 625, centerZ: 145, radius: 4, count: 1 },
   // ── Bosque de Umbra (mapa center 300,0) — Lv 1-3 ──
   { id: "bosque_scouts_1", mapId: "bosque", templateId: "skeleton_minion", centerX: 280, centerZ: 20, radius: 12, count: 5 },
   { id: "bosque_scouts_2", mapId: "bosque", templateId: "skeleton_minion", centerX: 320, centerZ: -30, radius: 12, count: 5 },

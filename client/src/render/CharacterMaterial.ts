@@ -17,6 +17,8 @@ export class CharacterMaterial extends THREE.MeshStandardMaterial {
     shader.uniforms.adenLeather = { value: leather.color };
     shader.uniforms.adenBone = { value: bone.color };
     shader.uniforms.adenUndead = { value: this.name.toLowerCase().includes("skeleton") ? 1 : 0 };
+    shader.uniforms.adenMonster = { value: this.name.startsWith("monster_") ? 1 : 0 };
+    shader.uniforms.adenDarkEyes = { value: /monster_(InfernalDemon|AncientDrake|OrcBrute)/.test(this.name) ? 1 : 0 };
     shader.vertexShader = `varying vec3 adenPosition; varying vec3 adenNormal;\n` + shader.vertexShader;
     shader.vertexShader = shader.vertexShader.replace("#include <begin_vertex>",
       "#include <begin_vertex>\nadenPosition = position; adenNormal = normal;");
@@ -25,6 +27,7 @@ export class CharacterMaterial extends THREE.MeshStandardMaterial {
       uniform sampler2D adenSteel; uniform sampler2D adenCloth;
       uniform sampler2D adenLeather; uniform sampler2D adenBone;
       uniform float adenUndead;
+      uniform float adenMonster; uniform float adenDarkEyes;
       vec3 adenSample(sampler2D surface) {
         vec3 w = pow(abs(normalize(adenNormal)), vec3(4.0));
         w /= max(dot(w, vec3(1.0)), 0.001);
@@ -43,9 +46,10 @@ export class CharacterMaterial extends THREE.MeshStandardMaterial {
       float adenSkin = step(adenBase.b * 1.35, adenBase.g) * step(adenBase.g * 1.15, adenBase.r);
       float adenMetal = (1.0 - smoothstep(0.12, 0.32, adenSaturation)) * step(0.09, adenMax);
       float adenIsBone = adenUndead * step(0.35, adenMax);
-      adenMetal *= 1.0 - adenIsBone;
+      adenMetal *= (1.0 - adenIsBone) * (1.0 - adenMonster);
       vec3 adenDetail;
-      if (adenIsBone > 0.5) adenDetail = adenSample(adenBone);
+      if (adenMonster > 0.5) adenDetail = adenSample(adenLeather);
+      else if (adenIsBone > 0.5) adenDetail = adenSample(adenBone);
       else if (adenMetal > 0.5) adenDetail = adenSample(adenSteel);
       else if (adenSkin > 0.5 || adenMax < 0.1) adenDetail = adenSample(adenLeather);
       else adenDetail = adenSample(adenCloth);
@@ -55,6 +59,10 @@ export class CharacterMaterial extends THREE.MeshStandardMaterial {
       // Desaturate cloth gently; retain faces and readable team/variant colours.
       float adenLuma = dot(diffuseColor.rgb, vec3(0.2126, 0.7152, 0.0722));
       diffuseColor.rgb = mix(diffuseColor.rgb, vec3(adenLuma), 0.16 * (1.0 - adenSkin));
+      // Muted hide and dark ivory replace the source monsters' toy palette.
+      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(adenLuma) * vec3(0.72, 0.77, 0.82), adenMonster * 0.48);
+      float adenIvory = step(0.18, adenMin) * (1.0 - smoothstep(0.15, 0.35, adenSaturation));
+      diffuseColor.rgb *= 1.0 - adenDarkEyes * adenIvory * 0.88;
     `);
     shader.fragmentShader = shader.fragmentShader.replace("#include <roughnessmap_fragment>",
       "#include <roughnessmap_fragment>\nroughnessFactor = mix(0.86, 0.38 + adenGrain * 0.18, adenMetal);");

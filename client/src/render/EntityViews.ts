@@ -262,7 +262,7 @@ export class EntityViews {
     const view = this.mobViews.get(mobId);
     if (!view) return null;
     const p = view.object.position;
-    return new THREE.Vector3(p.x, MOB_HP_BAR_Y, p.z);
+    return new THREE.Vector3(p.x, p.y + (view.object.userData.visualHeight ?? MOB_HP_BAR_Y) * view.object.scale.y + 0.2, p.z);
   }
 
   /** ¿Existe una vista de mob con este id? (para rutear Damage/Death: mob vs. jugador). */
@@ -291,7 +291,7 @@ export class EntityViews {
     const view = this.views.get(playerId);
     if (!view) return null;
     const p = view.object.position;
-    return new THREE.Vector3(p.x, PLAYER_HP_BAR_Y, p.z);
+    return new THREE.Vector3(p.x, p.y + (view.object.userData.visualHeight ?? PLAYER_HP_BAR_Y) * view.object.scale.y + 0.2, p.z);
   }
 
   /**

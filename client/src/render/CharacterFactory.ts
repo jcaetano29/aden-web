@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { modelUrl } from "../assets/manifest.js";
+import { modelUrl, MODEL_HEIGHTS } from "../assets/manifest.js";
 import { CharacterMaterial } from "./CharacterMaterial.js";
 
 interface LoadedModel {
@@ -31,12 +31,28 @@ export class CharacterFactory {
     await Promise.all(
       names.map(async (name) => {
         const gltf = await this.loader.loadAsync(modelUrl(name));
+        // Reduce the remaining skeletons' oversized heads, including animated
+        // scale keys, so subsequent clips cannot restore the old proportions.
+        {
+          const headName = name.startsWith("Skeleton_") ? "head" : "Head";
+          const headScale = name === "DeathWraith" ? 0.85 : name === "AncientDrake" ? 0.62 : 0.63;
+          gltf.scene.getObjectByName(headName)?.scale.multiplyScalar(headScale);
+          for (const clip of gltf.animations) for (const track of clip.tracks)
+            if (track.name === `${headName}.scale`) for (let i=0;i<track.values.length;i++) track.values[i]*=headScale;
+        }
+        if (name === "Mage") {
+          const spell=gltf.animations.find(clip=>clip.name==="Spell1")?.clone();
+          if(spell) { spell.name="Primary_Attack";gltf.animations.push(spell); }
+        }
         const materials = new Map<THREE.Material, THREE.Material>();
         const finish = (source: THREE.Material): THREE.Material => {
           if (!(source instanceof THREE.MeshStandardMaterial)) return source;
           let material = materials.get(source);
           if (!material) {
             material = new CharacterMaterial().copy(source);
+            if (["OrcBrute", "ForestTroll", "BoneWarden", "InfernalDemon", "DeathWraith", "AncientDrake"].includes(name)) {
+              material.name = `monster_${name}_${source.name}`;
+            }
             materials.set(source, material);
           }
           return material;
@@ -46,7 +62,21 @@ export class CharacterFactory {
           if (!mesh.isMesh) return;
           mesh.material = Array.isArray(mesh.material) ? mesh.material.map(finish) : finish(mesh.material);
         });
-        this.loaded.set(name, { scene: gltf.scene, animations: gltf.animations });
+        // Keep normalization outside animated nodes: root animation tracks must
+        // never overwrite world scale or move the entity away from server coordinates.
+        gltf.scene.updateMatrixWorld(true);
+        gltf.scene.traverse(o=>{if(o instanceof THREE.SkinnedMesh)o.skeleton.update();});
+        const box=new THREE.Box3().setFromObject(gltf.scene,true);
+        const size=box.getSize(new THREE.Vector3());
+        const height=MODEL_HEIGHTS[name] ?? 2.4;
+        const scale=height/Math.max(size.y,0.001);
+        const normalized=new THREE.Group();
+        normalized.name=`${name}_normalized`;
+        normalized.scale.setScalar(scale);
+        normalized.position.y=-box.min.y*scale;
+        normalized.add(gltf.scene);
+        const root=new THREE.Group();root.add(normalized);root.userData.visualHeight=height;
+        this.loaded.set(name, { scene: root, animations: gltf.animations });
       }),
     );
   }

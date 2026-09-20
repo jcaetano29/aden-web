@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aden · Héroes y bestiario</title>
+<style>body{margin:0;background:#111720;color:#ece2c9;font:14px Georgia}nav{position:fixed;top:20px;left:20px;z-index:3;background:#101720ed;border:1px solid #8d7850;padding:18px;max-width:340px}h1{font-weight:400;font-size:24px}button,select{padding:9px;background:#25303b;color:#ece2c9;border:1px solid #8d7850;margin:3px}a{color:#ceb783}</style>
+<div id="app"></div><nav><small>ADEN / HÉROES Y BESTIARIO</small><h1>Guardianes del umbral</h1><select id="model" aria-label="Modelo"></select><div id="actions"></div><p id="status">Cargando modelos…</p><a href="/material-preview.html">Ver escenarios</a></nav>
+<script type="module">
+import * as THREE from 'three';
+import {Renderer} from '/src/render/Renderer.ts';
+import {CharacterFactory} from '/src/render/CharacterFactory.ts';
+import {CharacterView} from '/src/render/CharacterView.ts';
+import {preloadMaterialAtlas} from '/src/render/materialAtlas.ts';
+import {MODEL_NAMES,MOB_MODEL_NAMES} from '/src/assets/manifest.ts';
+import {selectClip} from '/src/render/animation.ts';
+await preloadMaterialAtlas();
+const renderer=new Renderer(document.querySelector('#app'));
+renderer.scene.background=new THREE.Color(0x18202b);
+renderer.scene.add(new THREE.HemisphereLight(0xc9dcff,0x5d4931,2));
+const key=new THREE.DirectionalLight(0xffdfb3,3);key.position.set(4,8,6);renderer.scene.add(key);
+const rim=new THREE.DirectionalLight(0x799eff,2);rim.position.set(-5,4,-5);renderer.scene.add(rim);
+const factory=new CharacterFactory();const names=[...MODEL_NAMES,...MOB_MODEL_NAMES];await factory.preload(names);
+const characters=names.map(n=>factory.create(n));const views=characters.map(c=>new CharacterView(c));
+characters.forEach((c,i)=>{renderer.scene.add(c.root);c.root.visible=false;views[i].respawn({x:0,z:0,targetX:0,targetZ:0,moving:false});});
+const labels=['Caballero','Mago','Monje guerrero','Asesino','Esqueleto','Guerrero esqueleto','Orco de Umbra','Bestia del Bosque','Custodio de Hueso','Demonio de Ceniza','Espectro de la Cripta','Draco del Umbral'];
+const select=document.querySelector('#model');names.forEach((n,i)=>select.add(new Option(labels[i],n)));
+let index=0;function show(){index=names.indexOf(select.value);characters.forEach((c,i)=>c.root.visible=i===index);views[index].respawn({x:0,z:0,targetX:0,targetZ:0,moving:false});document.querySelector('#status').textContent=labels[index]+' · '+characters[index].root.userData.visualHeight+' m';}select.onchange=show;show();
+function act(action){const c=characters[index];if(action==='respawn')views[index].respawn({x:0,z:0,targetX:0,targetZ:0,moving:false});else if(action==='death')views[index].playOnce('death');else c.play(selectClip(c.clipNames,action),true);}
+for(const [action,label] of [['idle','Reposo'],['walk','Movimiento'],['attack','Ataque'],['death','Muerte'],['respawn','Respawn']]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>act(action);document.querySelector('#actions').append(b);}
+window.bestiaryReview={names,select(name){select.value=name;show();},act,inspect(){const c=characters[index];c.root.updateMatrixWorld(true);c.root.traverse(o=>{if(o.isSkinnedMesh)o.skeleton.update();});const box=new THREE.Box3().setFromObject(c.root,true);return {name:names[index],position:c.root.position.toArray(),size:box.getSize(new THREE.Vector3()).toArray(),min:box.min.toArray(),actions:c.mixer._actions.filter(a=>a.isRunning()).map(a=>a.getClip().name)};}};
+let last=performance.now();function frame(now){const dt=Math.min((now-last)/1000,.05);last=now;views[index].update(dt);const h=characters[index].root.userData.visualHeight;renderer.camera.position.set(0,h*.75,h*2.3);renderer.camera.lookAt(0,h*.45,0);renderer.render();document.body.dataset.ready='true';requestAnimationFrame(frame);}requestAnimationFrame(frame);
+</script></html>

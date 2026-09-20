@@ -4,6 +4,12 @@ import { selectClip } from "./animation.js";
 const CLIPS = ["Idle", "Walking_A", "Running_A", "Attack_Melee"];
 
 describe("selectClip", () => {
+  it("uses flight locomotion and melee strikes from the new creature rigs", () => {
+    expect(selectClip(["Death", "Fast_Flying", "Flying_Idle", "Headbutt"], "walk")).toBe("Fast_Flying");
+    expect(selectClip(["Idle", "Punch", "Death"], "attack")).toBe("Punch");
+    expect(selectClip(["Flying_Idle", "Headbutt"], "attack")).toBe("Headbutt");
+    expect(selectClip(["Staff_Attack", "Primary_Attack"], "attack")).toBe("Primary_Attack");
+  });
   it("elige el clip de caminar por 'walk'", () => {
     expect(selectClip(CLIPS, "walk")).toBe("Walking_A");
   });

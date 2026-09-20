@@ -71,7 +71,7 @@ export class CharacterView {
       // Let the fall finish, then remove the corpse below the ground. Keep the
       // root's visibility reserved for map filtering in EntityViews.
       const sink = Math.min(1, Math.max(0, (this.deathTime - 2.5) / 1.2));
-      root.position.y = -3 * root.scale.y * sink * sink * (3 - 2 * sink);
+      root.position.y = -(root.userData.visualHeight ?? 3) * 1.2 * root.scale.y * sink * sink * (3 - 2 * sink);
       return;
     }
     // Etapa 15: si el salto es enorme (warp entre mapas / respawn a otro mapa),

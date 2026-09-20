@@ -39,7 +39,7 @@ export class HealthBar {
   attach(parent: THREE.Object3D) {
     if (this.label) return;
     this.label = new CSS2DObject(this.root);
-    this.label.position.set(0, OFFSET_Y, 0);
+    this.label.position.set(0, (parent.userData.visualHeight ?? OFFSET_Y - 0.25) + 0.25, 0);
     parent.add(this.label);
   }
 

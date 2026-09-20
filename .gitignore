@@ -4,3 +4,5 @@ dist/
 .env.local
 *.log
 artifacts/materials/
+artifacts/source-models/
+artifacts/bestiary/

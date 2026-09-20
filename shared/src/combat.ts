@@ -16,6 +16,12 @@ export const PLAYER_COMBAT: CombatStats = { maxHp: 100, maxMp: 50, pAtk: 15, pDe
 // Etapa 11: las stats escalan con la profundidad de la zona (ver world.ts). El salto
 // de dificultad entre zonas es lo que gatea la progresión sin muros.
 export const MOB_COMBAT: Record<string, CombatStats> = {
+  umbra_orc: { maxHp: 55, pAtk: 12, pDef: 10, attackCooldownMs: 2000 },
+  forest_troll: { maxHp: 95, pAtk: 17, pDef: 14, attackCooldownMs: 2600 },
+  crypt_wraith: { maxHp: 95, pAtk: 21, pDef: 10, attackCooldownMs: 1850 },
+  bone_warden: { maxHp: 180, pAtk: 25, pDef: 24, attackCooldownMs: 2200 },
+  infernal_demon: { maxHp: 300, pAtk: 34, pDef: 27, attackCooldownMs: 2000 },
+  ancient_drake: { maxHp: 650, pAtk: 36, pDef: 29, attackCooldownMs: 2400 },
   // Bosque de Umbra (Lv 1-3)
   skeleton_minion: { maxHp: 30, pAtk: 8, pDef: 5, attackCooldownMs: 2000 },
   skeleton_warrior: { maxHp: 60, pAtk: 14, pDef: 12, attackCooldownMs: 1800 },

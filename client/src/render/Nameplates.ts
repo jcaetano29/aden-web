@@ -34,7 +34,7 @@ export class Nameplates {
 
     wrap.append(titleEl, nameEl);
     const label = new CSS2DObject(wrap);
-    label.position.set(0, 2.4, 0);
+    label.position.set(0, (parent.userData.visualHeight ?? 2) + 0.5, 0);
     parent.add(label);
     this.plates.set(id, { label, titleEl, nameEl });
   }

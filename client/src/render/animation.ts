@@ -11,12 +11,14 @@ interface ClipRule {
 // p.ej. "Idle" sobre "2H_Melee_Idle", "Death_A" sobre "Death_A_Pose").
 const RULES: Record<ClipKind, ClipRule[]> = {
   idle: [{ include: ["idle"] }, { include: ["wait"] }, { include: ["stand"] }],
-  walk: [{ include: ["walk"] }, { include: ["run"] }, { include: ["jog"] }],
+  walk: [{ include: ["walk"] }, { include: ["run"] }, { include: ["jog"] }, { include: ["fly"], exclude: ["idle"] }],
   // "block" se excluye para no resolver a "Block_Attack" (pose defensiva) en vez
   // de un golpe real.
   attack: [
+    { include: ["primary_attack"] },
     { include: ["melee_attack"], exclude: ["block"] },
     { include: ["attack"], exclude: ["block"] },
+    { include: ["punch", "headbutt", "bite"] },
   ],
   // "Block_Hit" es una reacción de bloqueo, no un golpe recibido; se prefieren
   // "Hit_A"/"Hit_B".
