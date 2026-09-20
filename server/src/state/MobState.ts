@@ -18,6 +18,9 @@ export class MobState extends Schema {
   @type("number") pDef = 0;
   @type("boolean") dead = false;
   @type("number") windupMs = 0;
+  // Etapa 22: control (sincronizado para el VFX de aturdido/enraizado en el cliente).
+  @type("number") stunMs = 0;
+  @type("number") rootMs = 0;
 
   // Estado interno server-only (NO sincronizado — sin @type)
   homeX = 0;

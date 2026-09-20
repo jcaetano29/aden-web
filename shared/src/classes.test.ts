@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getClass, isValidClass, CLASSES, CLASS_ORDER, getClassSkills } from "./classes.js";
+import { getClass, isValidClass, CLASSES, CLASS_ORDER, getClassSkills, learnedSkillIds, newSkillsAtLevel, isSkillLearned } from "./classes.js";
 import { getSkill } from "./combat.js";
 
 describe("getClass", () => {
@@ -65,41 +65,47 @@ describe("CLASS_ORDER", () => {
 });
 
 describe("getClassSkills", () => {
-  it("mage tiene las 3 skills correctas", () => {
-    expect(getClassSkills("mage")).toEqual(["fireball", "ice_lance", "arcane_mend"]);
+  it("mage tiene sus 6 skills (todas)", () => {
+    expect(getClassSkills("mage")).toEqual(["fireball", "ice_lance", "arcane_mend", "blink", "frost_nova", "meteor"]);
   });
 
-  it("knight tiene las 3 skills correctas", () => {
-    expect(getClassSkills("knight")).toEqual(["shield_bash", "guard", "second_wind"]);
+  it("knight arranca con 1 skill aprendido y llega a 6 al nivel 40", () => {
+    expect(learnedSkillIds("knight", 1)).toEqual(["shield_bash"]);
+    expect(learnedSkillIds("knight", 3)).toEqual(["shield_bash", "guard"]);
+    expect(learnedSkillIds("knight", 40)).toHaveLength(6);
   });
 
-  it("barbarian tiene las 3 skills correctas", () => {
-    expect(getClassSkills("barbarian")).toEqual(["brutal_strike", "rage", "cleave"]);
+  it("newSkillsAtLevel devuelve lo aprendido exactamente en ese nivel", () => {
+    expect(newSkillsAtLevel("rogue", 3)).toEqual(["poison"]);
+    expect(newSkillsAtLevel("rogue", 2)).toEqual([]);
+    expect(newSkillsAtLevel("mage", 40)).toEqual(["meteor"]);
   });
 
-  it("rogue tiene las 3 skills correctas", () => {
-    expect(getClassSkills("rogue")).toEqual(["backstab", "poison", "evasion"]);
+  it("isSkillLearned respeta el nivel", () => {
+    expect(isSkillLearned("barbarian", 1, "brutal_strike")).toBe(true);
+    expect(isSkillLearned("barbarian", 1, "charge")).toBe(false); // se aprende a nivel 15
+    expect(isSkillLearned("barbarian", 15, "charge")).toBe(true);
   });
 });
 
 describe("skill kits", () => {
-  it("cada clase tiene exactamente 3 skills", () => {
+  it("cada clase tiene exactamente 6 skills", () => {
     Object.values(CLASSES).forEach((cls) => {
-      expect(cls.skills).toHaveLength(3);
+      expect(cls.skills).toHaveLength(6);
     });
   });
 
   it("todas las skills de cada clase existen en SKILLS", () => {
     Object.values(CLASSES).forEach((cls) => {
-      cls.skills.forEach((skillId) => {
-        expect(() => getSkill(skillId)).not.toThrow();
+      cls.skills.forEach((s) => {
+        expect(() => getSkill(s.id)).not.toThrow();
       });
     });
   });
 
-  it("skillId es igual a skills[0] para backward-compatibility", () => {
+  it("skillId es igual a skills[0].id para backward-compatibility", () => {
     Object.values(CLASSES).forEach((cls) => {
-      expect(cls.skillId).toBe(cls.skills[0]);
+      expect(cls.skillId).toBe(cls.skills[0].id);
     });
   });
 });
@@ -116,7 +122,7 @@ describe("skill types", () => {
   it("poison es DoT con values correctos", () => {
     const poison = getSkill("poison");
     expect(poison.type).toBe("dot");
-    expect(poison.dotDps).toBe(12);
+    expect(poison.dotDps).toBe(14);
     expect(poison.dotMs).toBe(5000);
   });
 
@@ -126,10 +132,10 @@ describe("skill types", () => {
     expect(heal.healPct).toBe(0.4);
   });
 
-  it("fireball es damage con factor 3.6", () => {
+  it("fireball es damage con factor 3.4", () => {
     const fb = getSkill("fireball");
     expect(fb.type).toBe("damage");
-    expect(fb.factor).toBe(3.6);
+    expect(fb.factor).toBe(3.4);
   });
 
   it("los skills damage existentes tienen type damage", () => {
@@ -145,10 +151,10 @@ describe("skill types", () => {
     expect(ice.factor).toBe(2.2);
   });
 
-  it("arcane_mend es heal con 30%", () => {
+  it("arcane_mend es heal con 32%", () => {
     const mend = getSkill("arcane_mend");
     expect(mend.type).toBe("heal");
-    expect(mend.healPct).toBe(0.3);
+    expect(mend.healPct).toBe(0.32);
   });
 
   it("rage es buff con pAtk", () => {

@@ -197,6 +197,8 @@ describe("GameRoom", () => {
     const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
     await room.waitForNextPatch();
     const p = room.state.players.get(c.sessionId)!;
+    p.level = 8; // Etapa 22: second_wind se aprende a nivel 8
+    p.msSinceCombat = 0; // en combate → sin regen de HP que ensucie el assert
     p.hp = 10; // herido
     const mpBefore = p.mp;
     c.send(MessageType.UseSkill, { skillId: "second_wind" });
@@ -210,6 +212,7 @@ describe("GameRoom", () => {
     const c = await colyseus.connectTo(room, { name: "Barb", className: "barbarian" });
     await room.waitForNextPatch();
     const p = room.state.players.get(c.sessionId)! as any;
+    p.level = 3; // Etapa 22: rage se aprende a nivel 3
     c.send(MessageType.UseSkill, { skillId: "rage" });
     await room.waitForNextPatch();
     expect(p.atkBuffMs).toBeGreaterThan(0);
@@ -232,6 +235,8 @@ describe("GameRoom", () => {
     const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
     await room.waitForNextPatch();
     const p = room.state.players.get(c.sessionId)!;
+    p.level = 8; // Etapa 22: second_wind se aprende a nivel 8
+    p.msSinceCombat = 0; // en combate → sin regen de HP que ensucie el assert
     p.hp = 10;
     c.send(MessageType.UseSkill, { skillId: "second_wind" });
     await room.waitForNextPatch();
@@ -985,6 +990,106 @@ describe("GameRoom", () => {
       c.send(MessageType.InteractNpc, {});
       await room.waitForNextPatch();
       expect(p.inventory.get(q.rewardItemId!)?.qty).toBe(1);
+    });
+  });
+
+  describe("Combate competitivo (Etapa 22)", () => {
+    function adjacentMob(room: any, p: any, id = "cc-mob"): any {
+      const mob = new MobState();
+      mob.templateId = "skeleton_minion";
+      mob.mapId = p.mapId;
+      mob.hp = 300; mob.maxHp = 300; mob.pDef = 5; mob.dead = false;
+      mob.x = p.x; mob.z = p.z;
+      room.state.mobs.set(id, mob);
+      return mob;
+    }
+
+    it("Golpe de Escudo aturde al objetivo", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      const mob = adjacentMob(room, p);
+      p.targetId = "cc-mob";
+      c.send(MessageType.UseSkill, { skillId: "shield_bash" });
+      await room.waitForNextPatch();
+      expect(mob.stunMs).toBeGreaterThan(0);
+    });
+
+    it("un jugador aturdido no puede castear", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 8; p.msSinceCombat = 0; p.hp = 10; p.stunMs = 2000;
+      c.send(MessageType.UseSkill, { skillId: "second_wind" });
+      await room.waitForNextPatch();
+      expect(p.hp).toBe(10); // no curó: estaba aturdido
+    });
+
+    it("el maná regenera con el tiempo", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Mago", className: "mage" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.mp = 0;
+      for (let i = 0; i < 40; i++) await room.waitForNextSimulationTick();
+      expect(p.mp).toBeGreaterThan(0);
+    });
+
+    it("Embestida (gap-closer) acerca al caster y aturde", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Barb", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 15; // charge se aprende a nivel 15
+      p.x = p.targetX = 0; p.z = p.targetZ = 0; p.moving = false;
+      const mob = adjacentMob(room, p);
+      mob.x = 8; mob.z = 0; // lejos, fuera de rango de ataque
+      p.targetId = "cc-mob";
+      const distBefore = Math.hypot(mob.x - p.x, mob.z - p.z);
+      c.send(MessageType.UseSkill, { skillId: "charge" });
+      await room.waitForNextPatch();
+      const distAfter = Math.hypot(mob.x - p.x, mob.z - p.z);
+      expect(distAfter).toBeLessThan(distBefore); // se acercó
+      expect(mob.stunMs).toBeGreaterThan(0);
+    });
+
+    it("Voluntad de Hierro limpia el enraizamiento (cleanse)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 25; // iron_will se aprende a nivel 25
+      p.rootMs = 3000; // enraizado (puede castear)
+      c.send(MessageType.UseSkill, { skillId: "iron_will" });
+      await room.waitForNextPatch();
+      expect(p.rootMs).toBe(0);
+      expect(p.defBuffMs).toBeGreaterThan(0);
+    });
+
+    it("Sed de Sangre cura al caster por robo de vida", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Barb", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 25; p.msSinceCombat = 0; p.hp = 50;
+      adjacentMob(room, p);
+      p.targetId = "cc-mob";
+      c.send(MessageType.UseSkill, { skillId: "bloodthirst" });
+      await room.waitForNextPatch();
+      expect(p.hp).toBeGreaterThan(50); // el lifesteal curó
+    });
+
+    it("no se puede castear un skill aún no aprendido", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 1; p.msSinceCombat = 0; p.hp = 10;
+      c.send(MessageType.UseSkill, { skillId: "second_wind" }); // se aprende a nivel 8
+      await room.waitForNextPatch();
+      expect(p.hp).toBe(10); // no curó: aún no lo aprendió
     });
   });
 });

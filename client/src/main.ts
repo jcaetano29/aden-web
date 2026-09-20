@@ -35,7 +35,7 @@ import { SkillInput } from "./input/SkillInput.js";
 import { AudioEngine } from "./audio/AudioEngine.js";
 import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { getItem, getQuest, TOWN, distance2D, getClass, getClassSkills, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE, SMITH_STOCK, getNpc, TOWN_SERVICE_RADIUS, HEAL_COST_GOLD, getBounty, firstBountyId, type Attribute } from "@aden/shared";
+import { getItem, getQuest, TOWN, distance2D, getClass, learnedSkillIds, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE, SMITH_STOCK, getNpc, TOWN_SERVICE_RADIUS, HEAL_COST_GOLD, getBounty, firstBountyId, type Attribute } from "@aden/shared";
 
 async function main() {
   injectTheme(); // sistema de diseño (fuentes, tokens, clases) — antes de crear cualquier panel
@@ -191,11 +191,18 @@ async function main() {
         }
       }
     },
-    onLevelUp: (level) => {
+    onLevelUp: (level, learned) => {
       hud.flashLevelUp(level);
       audio.play("levelup");
       screenShake.addTrauma(0.5);
       hud.toast("✦ +3 puntos de atributo — repartilos con C", "#ffd54f", 3200);
+      // Etapa 22: reconstruir la barra con las skills aprendidas y avisar las nuevas.
+      const learnedIds = learnedSkillIds(className, level);
+      skillInput.setSkills(learnedIds);
+      skillBar.setSkills(learnedIds);
+      for (const id of learned) {
+        try { hud.toast(`✨ ¡Aprendiste ${getSkill(id).name}! (tecla ${learnedIds.indexOf(id) + 1})`, "#a0e0ff", 4000); } catch { /* skill desconocida */ }
+      }
     },
     onBossKilled: (ev) => {
       hud.toast(`⚔ ¡La guild [${ev.guildTag}] abatió al ${ev.bossName}!`, "#ff5252");
@@ -231,6 +238,16 @@ async function main() {
         target = views.hasMob(ev.targetId) ? views.mobWorldPosition(ev.targetId) : views.playerWorldPosition(ev.targetId);
       }
       skillEffects.cast(ev.skillId, { x: caster.x, z: caster.z }, target ? { x: target.x, z: target.z } : null);
+      // Etapa 22: nombre del skill flotante sobre el caster + número de cura.
+      try {
+        const skill = getSkill(ev.skillId);
+        const nameAbove = caster.clone(); nameAbove.y += 2.6;
+        damageNumbers.spawnText(nameAbove, skill.name, "#ffe6a8");
+        if (skill.type === "heal" && ev.amount && ev.amount > 0) {
+          const healAt = caster.clone(); healAt.y += 1.4;
+          damageNumbers.spawnText(healAt, `+${ev.amount}`, "#5fd06a");
+        }
+      } catch { /* skill desconocida */ }
     },
   };
 
@@ -442,41 +459,38 @@ async function main() {
   );
   input.attach(document.body);
 
-  // Configurar el kit de skills de la clase
-  const kit = getClassSkills(className);
-  let skillInputCreated = false;
+  // Configurar el kit de skills de la clase (sólo las APRENDIDAS al nivel actual).
+  let kit = learnedSkillIds(className, net.getSelf()?.level ?? 1);
+  // Cooldowns locales (feedback optimista; el server es la autoridad real).
+  const cooldownUntil: Record<string, number> = {};
 
-  // Función auxiliar para usar una skill: envía al server, activa cooldown local y feedback
+  // Usa una skill: chequeo local para feedback INSTANTÁNEO, luego envía al server.
   const useSkill = (skillId: string) => {
+    let skill;
+    try { skill = getSkill(skillId); } catch { return; }
+    const self = net.getSelf();
+    if (!self) return;
+    // Pre-chequeos con feedback claro (el server igual revalida).
+    if (self.stunMs > 0) { hud.toast("¡Aturdido! No podés castear", "#ff6b6b"); return; }
+    if ((cooldownUntil[skillId] ?? 0) > Date.now()) { hud.toast("En cooldown", "#ffe066"); return; }
+    if (self.mp < skill.mpCost) { hud.toast(`Sin maná (necesitás ${skill.mpCost})`, "#6ba6ff"); return; }
+    const needsTarget = skill.type === "damage" || skill.type === "dot";
+    if (needsTarget && !currentTargetId) { hud.toast("Necesitás un objetivo", "#ffe066"); return; }
+
     net.sendUseSkill(skillId);
-
-    try {
-      const skill = getSkill(skillId);
-
-      // Encontrar el índice del slot en el kit
-      const slotIndex = kit.indexOf(skillId);
-      if (slotIndex >= 0) {
-        skillBar.triggerCooldown(slotIndex, skill.cooldownMs);
-      }
-
-      // Feedback por tipo de skill
-      if (skill.type === "heal") {
-        hud.toast("Te curaste", "#2ecc40");
-      } else if (skill.type === "buff") {
-        hud.toast(`¡${skill.name}!`, "#ffe066");
-      } else if (skill.type === "dot") {
-        hud.toast(`${skill.name} aplicado`, "#a0e");
-      }
-      // Para damage, no mostrar toast (o mensaje muy breve)
-    } catch {
-      // Skill desconocida, ignorar
-    }
+    // Cooldown local + veil en la barra.
+    cooldownUntil[skillId] = Date.now() + skill.cooldownMs;
+    const slotIndex = kit.indexOf(skillId);
+    if (slotIndex >= 0) skillBar.triggerCooldown(slotIndex, skill.cooldownMs);
   };
 
   const skillInput = new SkillInput(useSkill);
   skillInput.setSkills(kit);
   skillInput.attach(document.body);
   skillBar.setSkills(kit);
+  // onLevelUp reconstruye kit vía learnedSkillIds; mantener `kit` en sync para el índice del cooldown.
+  const origSetSkills = skillInput.setSkills.bind(skillInput);
+  skillInput.setSkills = (ids: string[]) => { kit = ids; origSetSkills(ids); };
 
   // Tecla "i" → alterna el panel de inventario. No conflictúa con "1"/Space
   // (Power Strike) ni con el resto de InputController (movimiento/click).

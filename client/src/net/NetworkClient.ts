@@ -81,6 +81,9 @@ export interface SelfCombatSnapshot {
   vit: number;
   ene: number;
   statPoints: number;
+  /** Control activo (Etapa 22): ms de aturdimiento / enraizamiento. */
+  stunMs: number;
+  rootMs: number;
   /** Clase del jugador local. */
   className: string;
   /** Stats de combate efectivos (base + equipo), para mostrar el impacto del gear. */
@@ -103,7 +106,7 @@ export interface RoomCallbacks {
   onDamage: (ev: DamageEvent) => void;
   onDeath: (entityId: string) => void;
   /** Disparado cuando el server sube de nivel al jugador local (mensaje dirigido `levelUp`). */
-  onLevelUp: (level: number) => void;
+  onLevelUp: (level: number, learned: string[]) => void;
   /** Disparado server-wide cuando una guild abate al jefe (broadcast `bossKilled`). */
   onBossKilled: (ev: BossKilledEvent) => void;
   /** Etapa 13: día nuevo (racha + recompensa + diaria asignada). */
@@ -177,7 +180,7 @@ export class NetworkClient {
 
     this.room.onMessage(MessageType.Damage, (data: DamageEvent) => cb.onDamage(data));
     this.room.onMessage(MessageType.Death, (data: DeathEvent) => cb.onDeath(data.entityId));
-    this.room.onMessage(MessageType.LevelUp, (data: LevelUpEvent) => cb.onLevelUp(data.level));
+    this.room.onMessage(MessageType.LevelUp, (data: LevelUpEvent) => cb.onLevelUp(data.level, data.learned ?? []));
     this.room.onMessage(MessageType.BossKilled, (data: BossKilledEvent) => cb.onBossKilled(data));
     this.room.onMessage(MessageType.DailyReset, (data: DailyResetEvent) => cb.onDailyReset(data));
     this.room.onMessage(MessageType.DailyComplete, (data: DailyCompleteEvent) => cb.onDailyComplete(data));
@@ -357,6 +360,8 @@ export class NetworkClient {
       vit: p.vit ?? 0,
       ene: p.ene ?? 0,
       statPoints: p.statPoints ?? 0,
+      stunMs: p.stunMs ?? 0,
+      rootMs: p.rootMs ?? 0,
       className: p.className ?? "knight",
       pAtk: p.pAtk ?? 0,
       pDef: p.pDef ?? 0,

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { expToNextLevel, gainExp, getMobExp, LEVEL_GROWTH, statsForLevel, statsForClass, type Leveled } from "./progression.js";
+import { expToNextLevel, gainExp, getMobExp, LEVEL_GROWTH, statsForLevel, statsForClass, MAX_LEVEL, type Leveled } from "./progression.js";
 import { PLAYER_COMBAT } from "./combat.js";
 import { getClass } from "./classes.js";
 
@@ -145,5 +145,20 @@ describe("gainExp class-aware", () => {
     const expected = statsForClass("rogue", 3);
     expect(rogue.maxHp).toBe(expected.maxHp);
     expect(rogue.pAtk).toBe(expected.pAtk);
+  });
+
+  it("no sube más allá del nivel máximo (Etapa 22)", () => {
+    const hero = p({ level: MAX_LEVEL });
+    const lvls = gainExp(hero, 999999, "knight");
+    expect(lvls).toBe(0);
+    expect(hero.level).toBe(MAX_LEVEL);
+    expect(hero.exp).toBe(0); // la exp sobrante se descarta en el tope
+    expect(expToNextLevel(MAX_LEVEL)).toBe(Infinity);
+  });
+
+  it("una avalancha de exp topea exactamente en el nivel máximo", () => {
+    const hero = p({ level: 1 });
+    gainExp(hero, 10_000_000, "mage");
+    expect(hero.level).toBe(MAX_LEVEL);
   });
 });

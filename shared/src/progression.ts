@@ -3,8 +3,11 @@ import { getClass } from "./classes.js";
 
 export const EXP_BASE = 100;
 export const EXP_POW = 1.5;
+/** Nivel máximo (Etapa 22, estilo L2). Al llegar, la exp deja de acumular. */
+export const MAX_LEVEL = 40;
 
 export function expToNextLevel(level: number): number {
+  if (level >= MAX_LEVEL) return Infinity; // tope: no hay siguiente nivel
   return Math.round(EXP_BASE * Math.pow(level, EXP_POW));
 }
 
@@ -57,9 +60,10 @@ export function statsForLevel(level: number): { maxHp: number; maxMp: number; pA
 }
 
 export function gainExp(p: Leveled, amount: number, className = "knight"): number {
+  if (p.level >= MAX_LEVEL) { p.exp = 0; return 0; } // ya en el tope
   p.exp += amount;
   let gained = 0;
-  while (p.exp >= expToNextLevel(p.level)) {
+  while (p.level < MAX_LEVEL && p.exp >= expToNextLevel(p.level)) {
     p.exp -= expToNextLevel(p.level);
     p.level += 1;
     const newStats = statsForClass(className, p.level);
@@ -69,6 +73,7 @@ export function gainExp(p: Leveled, amount: number, className = "knight"): numbe
     p.pDef = newStats.pDef;
     gained += 1;
   }
+  if (p.level >= MAX_LEVEL) p.exp = 0; // en el tope, la exp sobrante se descarta
   if (gained > 0) {
     p.hp = p.maxHp;
     p.mp = p.maxMp;

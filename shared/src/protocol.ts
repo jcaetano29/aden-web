@@ -53,6 +53,8 @@ export interface DeathEvent {
 
 export interface LevelUpEvent {
   level: number;
+  /** Etapa 22: skills recién aprendidos al llegar a este nivel. */
+  learned?: string[];
 }
 
 export interface InteractNpcMessage {
@@ -138,6 +140,8 @@ export interface SkillCastEvent {
   skillId: string;
   /** objetivo del efecto ("" para heal/buff sobre uno mismo). */
   targetId: string;
+  /** Etapa 22: monto de cura (o daño) para mostrar un número sobre el caster. */
+  amount?: number;
 }
 
 /** Cliente→server: gastar un punto de atributo (Etapa 21). attr ∈ str|agi|vit|ene. */

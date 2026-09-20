@@ -64,17 +64,17 @@ describe("skills y config defensiva", () => {
   });
   it("las 4 skills característica están definidas", () => {
     const skill = getSkill("shield_bash");
-    expect(skill.mpCost).toBe(8);
+    expect(skill.mpCost).toBe(10);
     expect(skill.cooldownMs).toBe(5000);
     expect(skill.factor).toBe(2.0);
 
-    expect(getSkill("fireball").mpCost).toBe(22);
-    expect(getSkill("fireball").factor).toBe(3.6);
+    expect(getSkill("fireball").mpCost).toBe(16);
+    expect(getSkill("fireball").factor).toBe(3.4);
 
     expect(getSkill("brutal_strike").mpCost).toBe(12);
     expect(getSkill("brutal_strike").factor).toBe(3.0);
 
-    expect(getSkill("backstab").mpCost).toBe(8);
+    expect(getSkill("backstab").mpCost).toBe(10);
     expect(getSkill("backstab").factor).toBe(2.8);
   });
 
@@ -140,5 +140,20 @@ describe("skills y config defensiva", () => {
       expect(typeof skill.dotMs).toBe("number");
       expect(skill.dotMs).toBeGreaterThan(0);
     });
+  });
+
+  it("Etapa 22: las mecánicas de counterplay están configuradas en las skills correctas", () => {
+    expect(getSkill("shield_bash").stunMs).toBeGreaterThan(0);
+    expect(getSkill("charge").stunMs).toBeGreaterThan(0);
+    expect(getSkill("ice_lance").rootMs).toBeGreaterThan(0);
+    expect(getSkill("frost_nova").rootMs).toBeGreaterThan(0);
+    expect(getSkill("charge").dash).toBe("toTarget");
+    expect(getSkill("shadowstep").dash).toBe("toTarget");
+    expect(getSkill("blink").dash).toBe("away");
+    expect(getSkill("blink").type).toBe("dash");
+    expect(getSkill("iron_will").cleanse).toBe(true);
+    expect(getSkill("vanish").cleanse).toBe(true);
+    expect(getSkill("bloodthirst").lifestealPct).toBeGreaterThan(0);
+    expect(getSkill("last_stand").healPct).toBeGreaterThan(0);
   });
 });

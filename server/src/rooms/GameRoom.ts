@@ -86,6 +86,8 @@ import {
   getClass,
   isValidClass,
   respawnForTemplate,
+  isSkillLearned,
+  newSkillsAtLevel,
   ATTACK_WINDUP_MS,
   computeDamage,
   applyPvpDeathPenalty,
@@ -335,10 +337,10 @@ export class GameRoom extends Room<GameState> {
     this.onMessage(MessageType.UseSkill, (client, msg: UseSkillMessage) => {
       const p = this.state.players.get(client.sessionId);
       if (!p || p.dead) return;
+      if (p.stunMs > 0) return; // Etapa 22: aturdido no puede castear
 
-      // Validate that skillId is in the class kit
-      const kit = getClass(p.className).skills;
-      if (!kit.includes(msg.skillId)) return;
+      // Etapa 22: sólo se puede castear un skill YA APRENDIDO al nivel actual.
+      if (!isSkillLearned(p.className, p.level, msg.skillId)) return;
 
       let skill;
       try {
@@ -351,46 +353,47 @@ export class GameRoom extends Room<GameState> {
       if (p.mp < skill.mpCost) return;
       if ((p.skillCooldowns.get(skill.id) ?? 0) > 0) return;
 
+      const atkCd = getClass(p.className).base.attackCooldownMs;
+      const spend = () => { p.mp -= skill.mpCost; p.skillCooldowns.set(skill.id, skill.cooldownMs); };
+      const applyCleanse = () => { if (skill.cleanse) { p.stunMs = 0; p.rootMs = 0; } };
+
       // Branch by skill type
       if (skill.type === "damage") {
         const t = p.targetId ? this.resolveTarget(p.targetId, p.mapId) : null;
         if (!t) return;
-        if (t.kind === "mob") {
-          const mob = t.entity;
-          if (!canAttack(p, mob, ATTACK_RANGE)) return;
-          p.mp -= skill.mpCost;
-          p.skillCooldowns.set(skill.id, skill.cooldownMs);
-          const variance = 0.9 + Math.random() * 0.2;
-          const dmg = resolveAttack(p, mob, skill.factor ?? 1, variance, getClass(p.className).base.attackCooldownMs);
-          this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId });
-          this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
-          if (mob.hp <= 0) this.killMob(mob, p.targetId, client.sessionId);
-        } else {
+        const gapCloser = skill.dash === "toTarget";
+        // Enganche: requiere ataque listo pero NO rango (el dash acerca); si no, canAttack normal.
+        const ready = gapCloser ? (p.attackCooldownMs <= 0 && t.entity.hp > 0) : canAttack(p, t.entity, ATTACK_RANGE);
+        if (!ready) return;
+        if (t.kind === "player") {
           const victim = t.entity;
           if (p.guildId !== "" && p.guildId === victim.guildId) return; // aliados no se pegan
           if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
-          if (!canAttack(p, victim, ATTACK_RANGE)) return;
-          p.mp -= skill.mpCost;
-          p.skillCooldowns.set(skill.id, skill.cooldownMs);
-          const variance = 0.9 + Math.random() * 0.2;
-          const dmg = resolveAttack(p, victim, skill.factor ?? 1, variance, getClass(p.className).base.attackCooldownMs);
-          this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId });
-          this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: victim.hp });
-          if (victim.hp <= 0) this.killPlayer(victim, p.targetId, client.sessionId);
+        }
+        if (gapCloser) this.dashToTarget(p, t.entity.x, t.entity.z);
+        spend();
+        const variance = 0.9 + Math.random() * 0.2;
+        const dmg = resolveAttack(p, t.entity, skill.factor ?? 1, variance, atkCd);
+        // Modificadores de counterplay sobre el objetivo.
+        if (skill.stunMs) t.entity.stunMs = Math.max(t.entity.stunMs, skill.stunMs);
+        if (skill.rootMs) t.entity.rootMs = Math.max(t.entity.rootMs, skill.rootMs);
+        if (skill.lifestealPct) p.hp = Math.min(p.maxHp, p.hp + Math.round(dmg * skill.lifestealPct));
+        this.markCombat(p);
+        if (t.kind === "player") this.markCombat(t.entity);
+        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId, amount: dmg });
+        this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: t.entity.hp });
+        if (t.entity.hp <= 0) {
+          if (t.kind === "mob") this.killMob(t.entity, p.targetId, client.sessionId);
+          else this.killPlayer(t.entity, p.targetId, client.sessionId);
         }
       } else if (skill.type === "heal") {
-        // Heal skill: no target needed
-        p.mp -= skill.mpCost;
-        p.skillCooldowns.set(skill.id, skill.cooldownMs);
-
+        spend();
         const healAmount = Math.round(p.maxHp * (skill.healPct ?? 0));
         p.hp = Math.min(p.maxHp, p.hp + healAmount);
-        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: "" });
+        applyCleanse();
+        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: "", amount: healAmount });
       } else if (skill.type === "buff") {
-        // Buff skill: no target needed, set buff on caster
-        p.mp -= skill.mpCost;
-        p.skillCooldowns.set(skill.id, skill.cooldownMs);
-
+        spend();
         if (skill.buffStat === "pAtk") {
           p.atkBuffMs = skill.buffMs ?? 0;
           p.atkBuffMult = skill.buffMult ?? 1;
@@ -398,22 +401,29 @@ export class GameRoom extends Room<GameState> {
           p.defBuffMs = skill.buffMs ?? 0;
           p.defBuffMult = skill.buffMult ?? 1;
         }
+        // Algunos buffs también curan (last_stand) / limpian / dan escape (vanish).
+        let healAmount = 0;
+        if (skill.healPct) { healAmount = Math.round(p.maxHp * skill.healPct); p.hp = Math.min(p.maxHp, p.hp + healAmount); }
+        applyCleanse();
+        if (skill.dash === "away") this.dashAway(p, skill.dashRange);
+        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: "", amount: healAmount || undefined });
+      } else if (skill.type === "dash") {
+        // Movilidad pura (blink): escape sin objetivo.
+        spend();
+        if (skill.dash === "away") this.dashAway(p, skill.dashRange);
+        applyCleanse();
         this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: "" });
       } else if (skill.type === "dot") {
         // DoT skill: requires mob target in range (mismo mapa)
         const mob = p.targetId ? this.state.mobs.get(p.targetId) : undefined;
         if (!mob || mob.dead || mob.mapId !== p.mapId) return;
         if (!canAttack(p, mob, ATTACK_RANGE)) return;
-
-        // All checks passed: spend resources
-        p.mp -= skill.mpCost;
-        p.skillCooldowns.set(skill.id, skill.cooldownMs);
-
-        // Apply poison to mob (replaces any previous poison)
+        spend();
         mob.dotMs = skill.dotMs ?? 0;
         mob.dotDps = skill.dotDps ?? 0;
         mob.dotAttackerId = client.sessionId;
         mob.dotAccumMs = 0;
+        this.markCombat(p);
         this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId });
       }
     });
@@ -628,6 +638,38 @@ export class GameRoom extends Room<GameState> {
     this.setSimulationInterval(() => this.tick(dt), 1000 / TICK_RATE);
   }
 
+  /** Etapa 22: marca a un jugador como "en combate" (corta la regen de HP 5 s). */
+  private markCombat(p: PlayerState): void {
+    p.msSinceCombat = 0;
+  }
+
+  /** Etapa 22: enganche — acerca al caster a rango de ataque del objetivo (clamp a bounds). */
+  private dashToTarget(p: PlayerState, tx: number, tz: number): void {
+    const dx = tx - p.x, dz = tz - p.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const stop = Math.max(0, d - ATTACK_RANGE * 0.8);
+    const raw = { x: p.x + (dx / d) * stop, z: p.z + (dz / d) * stop };
+    const c = clampToBounds(raw.x, raw.z, getZone(p.mapId).bounds);
+    p.x = p.targetX = c.x;
+    p.z = p.targetZ = c.z;
+    p.moving = false;
+  }
+
+  /** Etapa 22: escape — aleja al caster de su objetivo (o hacia atrás si no hay), clamp a bounds. */
+  private dashAway(p: PlayerState, range = 8): void {
+    let dirX = 0, dirZ = -1;
+    const t = p.targetId ? this.resolveTarget(p.targetId, p.mapId) : null;
+    if (t) {
+      const dx = p.x - t.entity.x, dz = p.z - t.entity.z;
+      const d = Math.hypot(dx, dz) || 1;
+      dirX = dx / d; dirZ = dz / d;
+    }
+    const c = clampToBounds(p.x + dirX * range, p.z + dirZ * range, getZone(p.mapId).bounds);
+    p.x = p.targetX = c.x;
+    p.z = p.targetZ = c.z;
+    p.moving = false;
+  }
+
   /** Anciano Rowan: campaña principal (asignar / entregar / avanzar). */
   private serveElder(p: PlayerState, client: Client): void {
     if (p.questId === "") {
@@ -680,6 +722,7 @@ export class GameRoom extends Room<GameState> {
 
   /** Otorga EXP a un jugador y envía LevelUp si sube de nivel (Etapa 4b-1: reutilizable en quests). */
   private grantExp(player: PlayerState, client: Client, amount: number) {
+    const before = player.level;
     const lvls = gainExp(player, amount, player.className);
     if (lvls > 0) {
       // Etapa 21: cada nivel otorga puntos de atributo para repartir.
@@ -689,7 +732,10 @@ export class GameRoom extends Room<GameState> {
       this.recomputeStats(player);
       player.hp = player.maxHp;
       player.mp = player.maxMp;
-      client.send(MessageType.LevelUp, { level: player.level });
+      // Etapa 22: skills recién aprendidos entre el nivel anterior y el nuevo.
+      const learned: string[] = [];
+      for (let lv = before + 1; lv <= player.level; lv++) learned.push(...newSkillsAtLevel(player.className, lv));
+      client.send(MessageType.LevelUp, { level: player.level, learned });
     }
   }
 
@@ -710,6 +756,9 @@ export class GameRoom extends Room<GameState> {
     mob.wanderCooldownMs = 0;
     mob.windupMs = 0;
     mob.windupTargetId = "";
+    mob.stunMs = 0;
+    mob.rootMs = 0;
+    mob.dotMs = 0;
 
     const c = getMobCombat(templateId);
     mob.hp = c.maxHp;
@@ -831,6 +880,7 @@ export class GameRoom extends Room<GameState> {
   tick(dt: number) {
     this.state.players.forEach((p) => {
       if (p.dead) return; // un jugador muerto no se mueve
+      if (p.stunMs > 0 || p.rootMs > 0) { p.moving = false; return; } // Etapa 22: aturdido/enraizado no se mueve
       advanceMovable(p, dt);
     });
 
@@ -850,8 +900,9 @@ export class GameRoom extends Room<GameState> {
         mob.moving = false;
         return; // Plantado mientras carga el ataque
       }
+      if (mob.stunMs > 0) { mob.moving = false; return; } // Etapa 22: aturdido no actúa
       stepMobAI(mob, playersByMap.get(mob.mapId) ?? [], AI_CONFIG, Math.random, dtMs);
-      advanceMovable(mob, dt, MOB_MOVE_SPEED);
+      if (mob.rootMs > 0) mob.moving = false; else advanceMovable(mob, dt, MOB_MOVE_SPEED); // enraizado no se mueve
     });
 
     // cooldowns de jugadores (ataque + skill) y buffs
@@ -885,6 +936,30 @@ export class GameRoom extends Room<GameState> {
           p.defBuffMult = 1;
         }
       }
+
+      // Etapa 22: decremento de control (stun/root).
+      if (p.stunMs > 0) p.stunMs = Math.max(0, p.stunMs - dtMs);
+      if (p.rootMs > 0) p.rootMs = Math.max(0, p.rootMs - dtMs);
+
+      // Etapa 22: regeneración de recursos (mantiene HP/MP enteros con acumuladores).
+      p.msSinceCombat += dtMs;
+      if (!p.dead) {
+        if (p.mp < p.maxMp) {
+          p.mpRegenAcc += Math.max(2, p.maxMp * 0.04) * dt;
+          const add = Math.floor(p.mpRegenAcc);
+          if (add > 0) { p.mp = Math.min(p.maxMp, p.mp + add); p.mpRegenAcc -= add; }
+        } else {
+          p.mpRegenAcc = 0;
+        }
+        // HP regenera sólo fuera de combate reciente (5 s sin dar/recibir daño).
+        if (p.hp < p.maxHp && p.msSinceCombat >= 5000) {
+          p.hpRegenAcc += Math.max(1, p.maxHp * 0.015) * dt;
+          const add = Math.floor(p.hpRegenAcc);
+          if (add > 0) { p.hp = Math.min(p.maxHp, p.hp + add); p.hpRegenAcc -= add; }
+        } else {
+          p.hpRegenAcc = 0;
+        }
+      }
     });
 
     // auto-attack del jugador sobre su target
@@ -897,6 +972,7 @@ export class GameRoom extends Room<GameState> {
         if (canAttack(p, mob, ATTACK_RANGE)) {
           const variance = 0.9 + Math.random() * 0.2;
           const dmg = resolveAttack(p, mob, 1, variance, getClass(p.className).base.attackCooldownMs);
+          this.markCombat(p);
           this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
           if (mob.hp <= 0) this.killMob(mob, p.targetId, sessionId);
         }
@@ -908,6 +984,8 @@ export class GameRoom extends Room<GameState> {
         if (canAttack(p, victim, ATTACK_RANGE)) {
           const variance = 0.9 + Math.random() * 0.2;
           const dmg = resolveAttack(p, victim, 1, variance, getClass(p.className).base.attackCooldownMs);
+          this.markCombat(p);
+          this.markCombat(victim);
           this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: victim.hp });
           if (victim.hp <= 0) this.killPlayer(victim, p.targetId, sessionId);
         }
@@ -917,6 +995,8 @@ export class GameRoom extends Room<GameState> {
     // ataque de mobs sobre el jugador que persiguen — dos fases: wind-up + impacto
     this.state.mobs.forEach((mob, mobId) => {
       if (mob.dead) return;
+      // Etapa 22: un mob aturdido no ataca y se le cancela el wind-up en curso.
+      if (mob.stunMs > 0) { mob.windupMs = 0; mob.windupTargetId = ""; return; }
 
       // Fase 2: resolver un wind-up en curso
       if (mob.windupMs > 0) {
@@ -937,6 +1017,7 @@ export class GameRoom extends Room<GameState> {
         const defMult = (target.defBuffMs > 0) ? target.defBuffMult : 1;
         const dmg = computeDamage(mob.pAtk, target.pDef * defMult, 1, variance);
         target.hp = Math.max(0, target.hp - dmg);
+        this.markCombat(target);
         this.broadcast(MessageType.Damage, { attackerId: mobId, targetId, amount: dmg, hp: target.hp });
         if (target.hp <= 0) {
           target.dead = true;
@@ -1034,6 +1115,9 @@ export class GameRoom extends Room<GameState> {
     // cooldowns/respawn de mobs
     this.state.mobs.forEach((mob, id) => {
       tickCooldown(mob, dtMs);
+      // Etapa 22: decremento de control del mob.
+      if (mob.stunMs > 0) mob.stunMs = Math.max(0, mob.stunMs - dtMs);
+      if (mob.rootMs > 0) mob.rootMs = Math.max(0, mob.rootMs - dtMs);
       if (mob.dead) {
         mob.respawnMs -= dtMs;
         if (mob.respawnMs <= 0) {
@@ -1061,6 +1145,9 @@ export class GameRoom extends Room<GameState> {
         p.hp = p.maxHp;
         p.mp = p.maxMp;
         p.dead = false;
+        p.stunMs = 0; // Etapa 22: respawn limpio de control
+        p.rootMs = 0;
+        p.msSinceCombat = 100000;
         // Etapa 15: respawnea en el punto de spawn de su mapa actual.
         const sp = getZone(p.mapId).spawn;
         p.x = p.targetX = sp.x;

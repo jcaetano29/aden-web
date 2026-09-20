@@ -41,7 +41,7 @@ export interface SkillConfig {
   name: string;
   mpCost: number;
   cooldownMs: number;
-  type: "damage" | "heal" | "buff" | "dot";
+  type: "damage" | "heal" | "buff" | "dot" | "dash";
   factor?: number;
   healPct?: number;
   buffStat?: "pAtk" | "pDef";
@@ -55,24 +55,58 @@ export interface SkillConfig {
   vfxColor?: number;
   /** true = skill de proyectil (viaja del caster al objetivo antes de impactar). */
   projectile?: boolean;
+  // ── Etapa 22: mecánicas de counterplay ──
+  /** Aturde al objetivo (ms): no se mueve ni castea. */
+  stunMs?: number;
+  /** Enraíza al objetivo (ms): no se mueve (puede castear). */
+  rootMs?: number;
+  /** Desplazamiento del caster: hacia el objetivo (enganche) o lejos (escape). */
+  dash?: "toTarget" | "away";
+  /** Distancia del dash "away" (unidades de mundo). */
+  dashRange?: number;
+  /** Limpia stun/root/veneno del caster. */
+  cleanse?: boolean;
+  /** Cura al caster por esta fracción del daño infligido (0..1). */
+  lifestealPct?: number;
 }
 
 export const POWER_STRIKE: SkillConfig = { id: "power_strike", name: "Golpe Poderoso", mpCost: 10, cooldownMs: 4000, type: "damage", factor: 2.5, vfxColor: 0xffe066 };
 
+// Etapa 22: 6 skills por clase con roles + counterplay. Números afinables.
 export const SKILLS: Record<string, SkillConfig> = {
   power_strike: POWER_STRIKE,
-  shield_bash: { id: "shield_bash", name: "Golpe de Escudo", mpCost: 8, cooldownMs: 5000, type: "damage", factor: 2.0, vfxColor: 0x9ecbff },
-  fireball: { id: "fireball", name: "Bola de Fuego", mpCost: 22, cooldownMs: 4500, type: "damage", factor: 3.6, vfxColor: 0xff6a2a, projectile: true },
+
+  // ── Caballero (tanque / control) ──
+  shield_bash: { id: "shield_bash", name: "Golpe de Escudo", mpCost: 10, cooldownMs: 5000, type: "damage", factor: 2.0, stunMs: 900, vfxColor: 0x9ecbff },
+  guard: { id: "guard", name: "Guardia", mpCost: 12, cooldownMs: 12000, type: "buff", buffStat: "pDef", buffMult: 1.6, buffMs: 6000, vfxColor: 0x4fa3ff },
+  second_wind: { id: "second_wind", name: "Segundo Aire", mpCost: 16, cooldownMs: 14000, type: "heal", healPct: 0.4, vfxColor: 0x66e08a },
+  shield_charge: { id: "shield_charge", name: "Carga con Escudo", mpCost: 16, cooldownMs: 9000, type: "damage", factor: 1.8, dash: "toTarget", rootMs: 1200, vfxColor: 0xbfe0ff },
+  iron_will: { id: "iron_will", name: "Voluntad de Hierro", mpCost: 18, cooldownMs: 18000, type: "buff", buffStat: "pDef", buffMult: 1.4, buffMs: 5000, cleanse: true, vfxColor: 0xffe066 },
+  last_stand: { id: "last_stand", name: "Última Resistencia", mpCost: 28, cooldownMs: 40000, type: "buff", buffStat: "pDef", buffMult: 2.0, buffMs: 8000, healPct: 0.25, vfxColor: 0xffd54f },
+
+  // ── Mago (kite / ranged) ──
+  fireball: { id: "fireball", name: "Bola de Fuego", mpCost: 16, cooldownMs: 3500, type: "damage", factor: 3.4, vfxColor: 0xff6a2a, projectile: true },
+  ice_lance: { id: "ice_lance", name: "Lanza de Hielo", mpCost: 14, cooldownMs: 3000, type: "damage", factor: 2.2, rootMs: 800, vfxColor: 0x66d0ff, projectile: true },
+  arcane_mend: { id: "arcane_mend", name: "Cura Arcana", mpCost: 20, cooldownMs: 12000, type: "heal", healPct: 0.32, vfxColor: 0x8fe0ff },
+  blink: { id: "blink", name: "Parpadeo", mpCost: 14, cooldownMs: 9000, type: "dash", dash: "away", dashRange: 9, vfxColor: 0xc9b0ff },
+  frost_nova: { id: "frost_nova", name: "Nova de Escarcha", mpCost: 24, cooldownMs: 12000, type: "damage", factor: 2.6, rootMs: 2000, vfxColor: 0xaef0ff },
+  meteor: { id: "meteor", name: "Meteoro", mpCost: 40, cooldownMs: 16000, type: "damage", factor: 5.5, vfxColor: 0xff7a2a, projectile: true },
+
+  // ── Bárbaro (enganche / sustain) ──
   brutal_strike: { id: "brutal_strike", name: "Golpe Brutal", mpCost: 12, cooldownMs: 4000, type: "damage", factor: 3.0, vfxColor: 0xff4040 },
-  backstab: { id: "backstab", name: "Puñalada", mpCost: 8, cooldownMs: 2500, type: "damage", factor: 2.8, vfxColor: 0xb96bff },
-  guard: { id: "guard", name: "Guardia", mpCost: 10, cooldownMs: 12000, type: "buff", buffStat: "pDef", buffMult: 1.6, buffMs: 6000, vfxColor: 0x4fa3ff },
-  second_wind: { id: "second_wind", name: "Segundo Aire", mpCost: 15, cooldownMs: 15000, type: "heal", healPct: 0.4, vfxColor: 0x66e08a },
-  ice_lance: { id: "ice_lance", name: "Lanza de Hielo", mpCost: 12, cooldownMs: 2500, type: "damage", factor: 2.2, vfxColor: 0x66d0ff, projectile: true },
-  arcane_mend: { id: "arcane_mend", name: "Cura Arcana", mpCost: 18, cooldownMs: 12000, type: "heal", healPct: 0.3, vfxColor: 0x8fe0ff },
-  rage: { id: "rage", name: "Furia", mpCost: 12, cooldownMs: 12000, type: "buff", buffStat: "pAtk", buffMult: 1.5, buffMs: 6000, vfxColor: 0xff5252 },
+  rage: { id: "rage", name: "Furia", mpCost: 14, cooldownMs: 12000, type: "buff", buffStat: "pAtk", buffMult: 1.5, buffMs: 6000, vfxColor: 0xff5252 },
   cleave: { id: "cleave", name: "Tajo", mpCost: 10, cooldownMs: 3000, type: "damage", factor: 2.4, vfxColor: 0xffa640 },
-  poison: { id: "poison", name: "Veneno", mpCost: 10, cooldownMs: 6000, type: "dot", dotDps: 12, dotMs: 5000, vfxColor: 0x8fdd4a },
-  evasion: { id: "evasion", name: "Evasión", mpCost: 8, cooldownMs: 10000, type: "buff", buffStat: "pDef", buffMult: 1.8, buffMs: 4000, vfxColor: 0xffffff },
+  charge: { id: "charge", name: "Embestida", mpCost: 16, cooldownMs: 10000, type: "damage", factor: 2.0, dash: "toTarget", stunMs: 1000, vfxColor: 0xffb060 },
+  bloodthirst: { id: "bloodthirst", name: "Sed de Sangre", mpCost: 16, cooldownMs: 8000, type: "damage", factor: 2.8, lifestealPct: 0.6, vfxColor: 0xcc2b2b },
+  rampage: { id: "rampage", name: "Masacre", mpCost: 30, cooldownMs: 40000, type: "buff", buffStat: "pAtk", buffMult: 1.9, buffMs: 8000, vfxColor: 0xff3030 },
+
+  // ── Pícaro (burst / evasión) ──
+  backstab: { id: "backstab", name: "Puñalada", mpCost: 10, cooldownMs: 2500, type: "damage", factor: 2.8, vfxColor: 0xb96bff },
+  poison: { id: "poison", name: "Veneno", mpCost: 12, cooldownMs: 6000, type: "dot", dotDps: 14, dotMs: 5000, vfxColor: 0x8fdd4a },
+  evasion: { id: "evasion", name: "Evasión", mpCost: 10, cooldownMs: 10000, type: "buff", buffStat: "pDef", buffMult: 1.8, buffMs: 4000, vfxColor: 0xffffff },
+  shadowstep: { id: "shadowstep", name: "Paso Sombrío", mpCost: 14, cooldownMs: 8000, type: "damage", factor: 2.4, dash: "toTarget", vfxColor: 0x9b6bff },
+  vanish: { id: "vanish", name: "Vanish", mpCost: 16, cooldownMs: 16000, type: "buff", buffStat: "pDef", buffMult: 1.6, buffMs: 3000, cleanse: true, dash: "away", dashRange: 7, vfxColor: 0x6a5a8a },
+  assassinate: { id: "assassinate", name: "Asesinato", mpCost: 28, cooldownMs: 14000, type: "damage", factor: 4.8, vfxColor: 0xd040ff },
 };
 
 export function getSkill(id: string): SkillConfig {

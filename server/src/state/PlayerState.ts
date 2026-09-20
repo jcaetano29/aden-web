@@ -55,6 +55,15 @@ export class PlayerState extends Schema {
   defBuffMs = 0;
   defBuffMult = 1;
 
+  // Etapa 22: control (sincronizado para que el cliente muestre el estado y bloquee input).
+  @type("number") stunMs = 0; // aturdido: no se mueve ni castea
+  @type("number") rootMs = 0; // enraizado: no se mueve (puede castear)
+  // Regen: ms desde el último daño dado/recibido (server-only) → HP regenera fuera de combate.
+  msSinceCombat = 100000;
+  // Acumuladores fraccionarios de regen (server-only) → HP/MP quedan enteros.
+  mpRegenAcc = 0;
+  hpRegenAcc = 0;
+
   // Etapa 3c: true una vez que onJoin terminó de aplicar (o no) el save cargado.
   // Server-only (NO @type) — usado para evitar que un save en curso (defaults de
   // nivel 1) pise el registro real si el jugador se desconecta o si el saveAll

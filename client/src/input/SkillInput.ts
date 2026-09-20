@@ -1,8 +1,7 @@
 /**
- * Input de habilidades: teclas 1/2/3 (y Space = slot 0) disparan
- * las skills del kit de la clase. Sólo envía la intención (`onUseSkill`) —
- * el server resuelve target/rango/MP/cooldown de forma autoritativa
- * (cliente no-autoritativo).
+ * Input de habilidades: teclas 1..6 (y Space = slot 0) disparan las skills
+ * APRENDIDAS de la clase. Sólo envía la intención (`onUseSkill`); el server
+ * resuelve target/rango/MP/cooldown/aprendizaje de forma autoritativa.
  */
 export class SkillInput {
   private skillIds: string[] = [];
@@ -11,32 +10,27 @@ export class SkillInput {
     private readonly onUseSkill: (skillId: string) => void,
   ) {}
 
-  /** Vincula las 3 skills de la clase a los slots 0/1/2 (teclas Space/1/2). */
+  /** Vincula las skills aprendidas a los slots 0..5 (teclas 1..6; Space = slot 0). */
   setSkills(ids: string[]) {
     this.skillIds = ids;
   }
 
   attach(dom: HTMLElement | Document) {
     dom.addEventListener("keydown", (e) => {
+      // No disparar skills mientras se tipea en un input (login/guild/etc.).
+      const ae = document.activeElement;
+      if (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement) return;
+
       const ev = e as KeyboardEvent;
       let slot: number | null = null;
 
-      // Space = slot 0
       if (ev.code === "Space" || ev.key === " ") {
         slot = 0;
-        e.preventDefault(); // evitar que la página se haga scroll
-      }
-      // Tecla 1 = slot 0
-      else if (ev.key === "1" || ev.code === "Digit1" || ev.code === "Numpad1") {
-        slot = 0;
-      }
-      // Tecla 2 = slot 1
-      else if (ev.key === "2" || ev.code === "Digit2" || ev.code === "Numpad2") {
-        slot = 1;
-      }
-      // Tecla 3 = slot 2
-      else if (ev.key === "3" || ev.code === "Digit3" || ev.code === "Numpad3") {
-        slot = 2;
+        e.preventDefault(); // evitar scroll de la página
+      } else {
+        // Teclas 1..6 → slots 0..5.
+        const n = parseInt(ev.key, 10);
+        if (n >= 1 && n <= 6) slot = n - 1;
       }
 
       if (slot !== null && this.skillIds[slot]) {
