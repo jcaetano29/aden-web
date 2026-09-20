@@ -1,3 +1,4 @@
+import { clothMat, woodMat, metalMat, leatherMat } from "./textures.js";
 import * as THREE from "three";
 import { TOWN, getZone } from "@aden/shared";
 
@@ -104,7 +105,7 @@ export class AmbientLife {
     root.position.set(x, 0, z);
     root.scale.setScalar(s);
     const flat = (color: number, rough = 0.9) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: rough });
-    const legMat = flat(opts.pants);
+    const legMat = leatherMat(opts.pants);
     const legs: THREE.Object3D[] = [];
     for (const lx of [-0.13, 0.13]) {
       const pivot = new THREE.Group();
@@ -116,18 +117,18 @@ export class AmbientLife {
       legs.push(pivot);
     }
     // Torso.
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.62, 0.3), flat(opts.shirt));
+    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.62, 0.3), clothMat(opts.shirt));
     torso.position.y = 0.9;
     root.add(torso);
     // Cinto.
-    const belt = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.1, 0.32), flat(0x3a2a18));
+    const belt = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.1, 0.32), leatherMat(0x3a2a18));
     belt.position.y = 0.62; root.add(belt);
     // Brazos.
     const arms: THREE.Object3D[] = [];
     for (const ax of [-0.33, 0.33]) {
       const pivot = new THREE.Group();
       pivot.position.set(ax, 1.14, 0);
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.52, 0.17), flat(opts.shirt));
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.52, 0.17), clothMat(opts.shirt));
       arm.position.y = -0.26;
       pivot.add(arm);
       root.add(pivot);
@@ -145,7 +146,7 @@ export class AmbientLife {
     const h = this.humanoid(x, z, { shirt: pick(SHIRT), pants: pick(PANTS), skin: pick(SKIN), hair: pick(HAIR), scale: rand(0.9, 1.08) });
     // A veces una capa/túnica sobre los hombros.
     if (Math.random() < 0.4) {
-      const cloak = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.9, 6, 1, true), new THREE.MeshStandardMaterial({ color: pick(SHIRT), flatShading: true, side: THREE.DoubleSide }));
+      const cloak = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.9, 6, 1, true), Object.assign(clothMat(pick(SHIRT)), { side: THREE.DoubleSide }));
       cloak.position.y = 0.95; h.root.add(cloak);
     }
     return this.critter(h.root, "pueblo", x, z, rand(10, 30), rand(1.1, 1.8), h.legs, h.arms, 0.03);
@@ -154,14 +155,14 @@ export class AmbientLife {
   private guard(x: number, z: number): Critter {
     const h = this.humanoid(x, z, { shirt: 0x555a66, pants: 0x33363d, skin: pick(SKIN), hair: pick(HAIR), scale: 1.08 });
     // Casco.
-    const helmet = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.22, 10), new THREE.MeshStandardMaterial({ color: 0x9aa0ad, metalness: 0.5, roughness: 0.5, flatShading: true }));
+    const helmet = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.22, 10), metalMat(0x9aa0ad));
     helmet.position.y = 1.4; h.root.add(helmet);
-    const crest = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 6), new THREE.MeshStandardMaterial({ color: 0xb23b3b, flatShading: true }));
+    const crest = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 6), clothMat(0xb23b3b));
     crest.position.y = 1.62; h.root.add(crest);
     // Lanza en la mano derecha.
-    const spear = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 6), new THREE.MeshStandardMaterial({ color: 0x5a3f24 }));
+    const spear = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 6), woodMat(0x5a3f24));
     spear.position.set(0.4, 1.0, 0.1); h.root.add(spear);
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.25, 6), new THREE.MeshStandardMaterial({ color: 0xc0c4cc, metalness: 0.6, roughness: 0.4 }));
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.25, 6), metalMat(0xc0c4cc));
     tip.position.set(0.4, 2.2, 0.1); h.root.add(tip);
     // Los guardias patrullan más lento y en un radio menor.
     return this.critter(h.root, "pueblo", x, z, rand(6, 12), rand(0.8, 1.1), h.legs, [h.arms[0]], 0.02);

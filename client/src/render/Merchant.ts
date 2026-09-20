@@ -1,3 +1,4 @@
+import { clothMat } from "./textures.js";
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { getNpc } from "@aden/shared";
@@ -26,7 +27,7 @@ export class Merchant {
     scene.add(this.object);
 
     // Túnica del Mercader: robe teal encapuchado, para distinguirlo del Anciano.
-    const robeMat = new THREE.MeshStandardMaterial({ color: 0x1b6f82, flatShading: true, roughness: 0.85 });
+    const robeMat = clothMat(0x1b6f82);
     const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.58, 1.5, 8), robeMat);
     robe.position.y = 0.75;
     this.object.add(robe);
@@ -35,7 +36,7 @@ export class Merchant {
     head.position.y = 1.7;
     this.object.add(head);
     // Turbante/capucha teal claro.
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x2a94ab, flatShading: true }));
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), clothMat(0x2a94ab));
     cap.position.y = 1.82;
     this.object.add(cap);
     // Fajín dorado.

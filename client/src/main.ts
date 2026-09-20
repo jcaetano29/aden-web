@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { preloadMaterialAtlas } from "./render/materialAtlas.js";
 import { Renderer } from "./render/Renderer.js";
 import { Environment } from "./render/Environment.js";
 import { AmbientLife } from "./render/AmbientLife.js";
@@ -39,6 +40,7 @@ import { getItem, getQuest, TOWN, distance2D, getClass, learnedSkillIds, getSkil
 
 async function main() {
   injectTheme(); // sistema de diseño (fuentes, tokens, clases) — antes de crear cualquier panel
+  await preloadMaterialAtlas();
   const app = document.getElementById("app")!;
   const renderer = new Renderer(app);
   const environment = new Environment(renderer.scene); // biomas por zona, niebla dinámica, props

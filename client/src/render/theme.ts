@@ -16,9 +16,9 @@ export const FONT_BODY = `'EB Garamond', 'Palatino Linotype', 'Georgia', serif`;
 /** Paleta central (también expuesta como variables CSS en :root). */
 export const COLORS = {
   ink: "#0c0a07",
-  stone1: "#241b12",
-  stone2: "#150f09",
-  stoneEdge: "#3d2e1c",
+  stone1: "#222a32",
+  stone2: "#10151c",
+  stoneEdge: "#525b63",
   gold: "#c9a24b",
   goldBright: "#f2d896",
   goldDeep: "#7a5c22",
@@ -84,8 +84,9 @@ const CSS = `
 /* ── Paneles: piedra oscura con filete de oro y doble borde ornamental ─────── */
 .aden-panel {
   background:
-    linear-gradient(180deg, rgba(0,0,0,0.15), rgba(0,0,0,0.35)),
-    linear-gradient(180deg, var(--aden-stone-1), var(--aden-stone-2));
+    linear-gradient(180deg, rgba(17,24,32,0.91), rgba(7,11,17,0.96)),
+    var(--aden-panel-texture, none) center / 256px repeat;
+  background-color: var(--aden-stone-2);
   border: 1px solid var(--aden-gold-deep);
   border-radius: 10px;
   box-shadow:

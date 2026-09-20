@@ -1,3 +1,4 @@
+import { woodMat, metalMat, crackedStoneMat } from "./textures.js";
 import * as THREE from "three";
 
 export interface WorldObjectSnapshot {
@@ -111,8 +112,8 @@ export class WorldObjectViews {
 
   private buildChest(mapId: string): OView {
     const root = new THREE.Group();
-    const wood = new THREE.MeshStandardMaterial({ color: 0x7a4a1e, flatShading: true });
-    const gold = new THREE.MeshStandardMaterial({ color: 0xd9a441, emissive: 0x5a3d00, emissiveIntensity: 0.4 });
+    const wood = woodMat(0x7a4a1e);
+    const gold = metalMat(0xd9a441);
     const base = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 1.0), wood);
     base.position.y = 0.45;
     const lid = new THREE.Mesh(new THREE.BoxGeometry(1.45, 0.35, 1.05), gold);
@@ -126,10 +127,10 @@ export class WorldObjectViews {
 
   private buildBarrel(mapId: string): OView {
     const root = new THREE.Group();
-    const mat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b, flatShading: true });
+    const mat = woodMat(0x6b4a2b);
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.42, 1.1, 10), mat);
     body.position.y = 0.55;
-    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.06, 6, 12), new THREE.MeshStandardMaterial({ color: 0x3a2a18 }));
+    const hoop = new THREE.Mesh(new THREE.TorusGeometry(0.52, 0.06, 6, 12), woodMat(0x3a2a18));
     hoop.rotation.x = Math.PI / 2;
     hoop.position.y = 0.55;
     root.add(body, hoop);
@@ -138,7 +139,7 @@ export class WorldObjectViews {
 
   private buildShrine(mapId: string): OView {
     const root = new THREE.Group();
-    const stone = new THREE.MeshStandardMaterial({ color: 0x8a8497, flatShading: true });
+    const stone = crackedStoneMat(0x8a8497);
     const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.6, 1.4, 8), stone);
     pillar.position.y = 0.7;
     const glow = new THREE.Mesh(

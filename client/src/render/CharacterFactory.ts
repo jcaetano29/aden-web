@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
 import { modelUrl } from "../assets/manifest.js";
+import { CharacterMaterial } from "./CharacterMaterial.js";
 
 interface LoadedModel {
   scene: THREE.Object3D;
@@ -30,6 +31,21 @@ export class CharacterFactory {
     await Promise.all(
       names.map(async (name) => {
         const gltf = await this.loader.loadAsync(modelUrl(name));
+        const materials = new Map<THREE.Material, THREE.Material>();
+        const finish = (source: THREE.Material): THREE.Material => {
+          if (!(source instanceof THREE.MeshStandardMaterial)) return source;
+          let material = materials.get(source);
+          if (!material) {
+            material = new CharacterMaterial().copy(source);
+            materials.set(source, material);
+          }
+          return material;
+        };
+        gltf.scene.traverse((object) => {
+          const mesh = object as THREE.Mesh;
+          if (!mesh.isMesh) return;
+          mesh.material = Array.isArray(mesh.material) ? mesh.material.map(finish) : finish(mesh.material);
+        });
         this.loaded.set(name, { scene: gltf.scene, animations: gltf.animations });
       }),
     );

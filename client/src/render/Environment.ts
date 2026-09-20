@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { ZONES, getZone, zoneAt, TOWN, SAFE_RADIUS, distance2D, type Zone } from "@aden/shared";
-import { stoneMat, woodMat, roofMat, thatchMat, plasterMat, cobbleMat, clothMat, crackedStoneMat } from "./textures.js";
+import { stoneMat, woodMat, roofMat, thatchMat, plasterMat, cobbleMat, clothMat, crackedStoneMat, terrainMat, metalMat, foliageMat, boneMat, texturedMaterial } from "./textures.js";
 
 /** RNG determinístico (mulberry32) con seed fija → todos los clientes ven el mismo mundo. */
 function mulberry32(seed: number): () => number {
@@ -13,67 +13,18 @@ function mulberry32(seed: number): () => number {
   };
 }
 
-// Cielo de atardecer "dark fantasy épico": cenit índigo profundo → horizonte dorado.
-/** Descompone 0xRRGGBB en [r,g,b] 0-255. */
-function rgb(n: number): [number, number, number] {
-  return [(n >> 16) & 0xff, (n >> 8) & 0xff, n & 0xff];
-}
-/** Mezcla un color hacia negro/blanco por un factor (-1 oscurece, +1 aclara). */
-function shade([r, g, b]: [number, number, number], f: number): string {
-  const t = f < 0 ? 0 : 255;
-  const a = Math.abs(f);
-  return `rgb(${Math.round(r + (t - r) * a)},${Math.round(g + (t - g) * a)},${Math.round(b + (t - b) * a)})`;
-}
-
-/**
- * Textura de suelo procedural (canvas, sin descargas) derivada del color del bioma:
- * base + manchas de tonos cercanos (más claros/oscuros) + motas finas. Le da grano
- * y variación al piso para que no se lea plano. Se repite (RepeatWrapping).
- */
-function makeBiomeTexture(base: number): THREE.CanvasTexture {
-  const size = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  const c = rgb(base);
-  ctx.fillStyle = `rgb(${c[0]},${c[1]},${c[2]})`;
-  ctx.fillRect(0, 0, size, size);
-  const rand = mulberry32(base ^ 0x9e3779b9);
-  // Manchas suaves de tonos cercanos.
-  const shades = [shade(c, 0.14), shade(c, -0.16), shade(c, 0.07), shade(c, -0.26), shade(c, -0.08)];
-  for (let i = 0; i < 240; i++) {
-    ctx.globalAlpha = 0.35 + rand() * 0.4;
-    ctx.fillStyle = shades[Math.floor(rand() * shades.length)];
-    const r = 4 + rand() * 16;
-    ctx.beginPath();
-    ctx.arc(rand() * size, rand() * size, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // Motas/grietas finas.
-  ctx.globalAlpha = 0.5;
-  for (let i = 0; i < 500; i++) {
-    ctx.fillStyle = rand() < 0.5 ? shade(c, -0.35) : shade(c, 0.2);
-    ctx.fillRect(rand() * size, rand() * size, 1 + rand(), 1 + rand());
-  }
-  ctx.globalAlpha = 1;
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.anisotropy = 4;
-  return tex;
-}
-
 const SKY_ZENITH = 0x101a33;
-const SKY_HORIZON = 0xe0a457;
+const SKY_HORIZON = 0x98a8b5;
 // Dirección del sol (rasante, bajo en el horizonte) → luz de hora dorada + sombras largas.
 const SUN_DIR = new THREE.Vector3(0.55, 0.42, 0.72).normalize();
 
 /** Intensidad del sol por zona (más oscuro cuanto más profundo/peligroso). */
 const SUN_INTENSITY: Record<string, number> = {
-  pueblo: 1.15,
-  bosque: 0.9,
-  ruinas: 0.6,
-  yermo: 0.8,
-  trono: 0.42,
+  pueblo: 1.65,
+  bosque: 1.2,
+  ruinas: 1.05,
+  yermo: 1.1,
+  trono: 0.85,
 };
 
 /**
@@ -106,10 +57,10 @@ export class Environment {
     const pueblo = getZone("pueblo").biome;
     this.addSky();
     // Luz de relleno hemisférica: cielo cálido dorado arriba, rebote tierra abajo.
-    this.hemi = new THREE.HemisphereLight(0xcdb68e, 0x3a2c1e, 0.75);
+    this.hemi = new THREE.HemisphereLight(0xb9d2ed, 0x403b30, 1.05);
     this.scene.add(this.hemi);
     // Sol de "hora dorada": clave cálida rasante que talla sombras largas.
-    this.sun = new THREE.DirectionalLight(0xffcf8a, SUN_INTENSITY.pueblo);
+    this.sun = new THREE.DirectionalLight(0xffe3bb, SUN_INTENSITY.pueblo);
     this.sun.position.copy(SUN_DIR).multiplyScalar(90);
     // Etapa 18: el sol proyecta sombras. La cámara de sombra es ortográfica y sigue
     // al jugador (updateMood) para mantener el frustum acotado alrededor de él.
@@ -123,7 +74,7 @@ export class Environment {
     this.scene.add(this.sunTarget);
     this.sun.target = this.sunTarget;
     // Ambiente cálido tenue (no lavar los negros del dusk).
-    this.scene.add(new THREE.AmbientLight(0xffe6c2, 0.2));
+    this.scene.add(new THREE.AmbientLight(0xc2ccdf, 0.35));
 
     this.fog = new THREE.Fog(pueblo.fog, pueblo.fogNear, pueblo.fogFar);
     this.scene.fog = this.fog;
@@ -228,9 +179,7 @@ export class Environment {
       const w = z.bounds.maxX - z.bounds.minX;
       const d = z.bounds.maxZ - z.bounds.minZ;
       const geo = new THREE.PlaneGeometry(w, d, 1, 1);
-      const tex = makeBiomeTexture(z.biome.ground);
-      tex.repeat.set(Math.max(2, Math.round(w / 22)), Math.max(2, Math.round(d / 22)));
-      const mat = new THREE.MeshStandardMaterial({ map: tex, color: 0xffffff, roughness: 0.95, metalness: 0.0 });
+      const mat = terrainMat(z.id, [w / 9, d / 9]);
       const plate = new THREE.Mesh(geo, mat);
       plate.rotation.x = -Math.PI / 2;
       plate.position.set(z.center.x, 0.02, z.center.z);
@@ -675,7 +624,7 @@ export class Environment {
   private rock(x: number, z: number, rng: () => number, color = 0x7a7d80): void {
     const rock = new THREE.Mesh(
       new THREE.IcosahedronGeometry(1, 0),
-      new THREE.MeshStandardMaterial({ color, flatShading: true }),
+      crackedStoneMat(color),
     );
     const s = 0.5 + rng() * 1.2;
     rock.scale.set(s, s * (0.6 + rng() * 0.5), s);
@@ -727,7 +676,7 @@ export class Environment {
     const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.36, 0.95, 10), woodMat(0x8a6a3c, [2, 1]));
     body.position.y = 0.48; g.add(body);
     for (const y of [0.2, 0.76]) {
-      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.08, 10), new THREE.MeshStandardMaterial({ color: 0x3a2a1a, metalness: 0.4, roughness: 0.6 }));
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.08, 10), metalMat(0x706a5d));
       ring.position.y = y; g.add(ring);
     }
     g.position.set(x, 0, z); g.rotation.y = rng() * Math.PI;
@@ -750,7 +699,7 @@ export class Environment {
 
   /** Saco de arpillera. */
   private sack(x: number, z: number, rng: () => number): void {
-    const sack = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.7, 8), new THREE.MeshStandardMaterial({ color: 0xbfa878, roughness: 1, flatShading: true }));
+    const sack = new THREE.Mesh(new THREE.CylinderGeometry(0.28, 0.34, 0.7, 8), clothMat(0xbfa878));
     sack.position.set(x, 0.35, z); sack.rotation.y = rng() * Math.PI;
     sack.scale.y = 0.9 + rng() * 0.2;
     this.scene.add(sack);
@@ -809,7 +758,7 @@ export class Environment {
     }
     // Matas de pasto que se mecen.
     const grassGeo = new THREE.ConeGeometry(0.18, 0.6, 4);
-    const grassMat = new THREE.MeshStandardMaterial({ color: 0x4f8d41, flatShading: true });
+    const grassMat = foliageMat(0x71854a);
     for (let i = 0; i < 72; i++) {
       const [x, zz] = this.spot(z, rng);
       const g = new THREE.Mesh(grassGeo, grassMat);
@@ -822,7 +771,7 @@ export class Environment {
 
   /** Arbusto: cúpula de icosaedro achatada. */
   private bush(x: number, z: number, rng: () => number, color: number): void {
-    const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7 + rng() * 0.5, 0), new THREE.MeshStandardMaterial({ color, flatShading: true }));
+    const bush = new THREE.Mesh(new THREE.IcosahedronGeometry(0.7 + rng() * 0.5, 0), foliageMat(color));
     bush.scale.y = 0.7;
     bush.position.set(x, 0.4, z);
     bush.rotation.set(rng(), rng(), rng());
@@ -833,9 +782,9 @@ export class Environment {
   /** Seta con tallo claro y sombrero rojo con motas. */
   private mushroom(x: number, z: number, rng: () => number): void {
     const g = new THREE.Group();
-    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.35, 6), new THREE.MeshStandardMaterial({ color: 0xe8e0cf, flatShading: true }));
+    const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.09, 0.35, 6), boneMat(0xe8e0cf));
     stem.position.y = 0.17; g.add(stem);
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xc0392b, flatShading: true }));
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.2, 8, 6, 0, Math.PI * 2, 0, Math.PI / 2), clothMat(0xc0392b));
     cap.position.y = 0.34; g.add(cap);
     g.position.set(x, 0, z); g.scale.setScalar(0.7 + rng() * 0.9);
     this.scene.add(g);
@@ -881,7 +830,7 @@ export class Environment {
 
   // ── Yermo Ceniciento: árboles muertos, rocas agrietadas, brasas ────────────
   private populateYermo(z: Zone, rng: () => number): void {
-    const deadMat = new THREE.MeshStandardMaterial({ color: 0x3b322c, flatShading: true });
+    const deadMat = woodMat(0x3b322c);
     for (let i = 0; i < 34; i++) {
       const [x, zz] = this.spot(z, rng);
       const tree = new THREE.Group();
@@ -906,8 +855,8 @@ export class Environment {
       this.rock(x, zz, rng, 0x4a3d38);
     }
     // Rocas de brasa que brillan (acento cálido).
-    const emberRock = new THREE.MeshStandardMaterial({
-      color: 0xff7a3c, emissive: 0xff4a10, emissiveIntensity: 0.7, flatShading: true,
+    const emberRock = texturedMaterial("lava", {
+      color: 0x918079, emissive: 0x8b200a, emissiveIntensity: 0.35, bumpScale: 0.08,
     });
     for (let i = 0; i < 13; i++) {
       const [x, zz] = this.spot(z, rng);
@@ -920,8 +869,8 @@ export class Environment {
 
   // ── Trono del Rey Nihil: pilares de hueso, trono, braseros — un LUGAR ──────
   private populateTrono(z: Zone, rng: () => number): void {
-    const bone = new THREE.MeshStandardMaterial({ color: 0xd9cfb0, flatShading: true });
-    const obsidian = new THREE.MeshStandardMaterial({ color: 0x1e1b26, flatShading: true });
+    const bone = boneMat();
+    const obsidian = texturedMaterial("lava", { color: 0x555568, bumpScale: 0.08 });
 
     // Pilares de hueso en dos hileras que flanquean el acceso (desde el sur).
     for (let i = 0; i < 5; i++) {
@@ -967,10 +916,10 @@ export class Environment {
     const tree = new THREE.Group();
     const trunk = new THREE.Mesh(
       new THREE.CylinderGeometry(0.3, 0.42, 2, 6),
-      new THREE.MeshStandardMaterial({ color: trunkColor }),
+      woodMat(trunkColor, [1, 3]),
     );
     trunk.position.y = 1;
-    const leafMat = new THREE.MeshStandardMaterial({ color: leaf, flatShading: true });
+    const leafMat = foliageMat(leaf, [3, 2]);
     const c1 = new THREE.Mesh(new THREE.ConeGeometry(1.7, 2.4, 7), leafMat);
     c1.position.y = 2.9;
     const c2 = new THREE.Mesh(new THREE.ConeGeometry(1.15, 1.9, 7), leafMat);
@@ -1067,7 +1016,7 @@ export class Environment {
     this.curSun += (targetSun - this.curSun) * k;
     this.sun.intensity = this.curSun;
     // La luz hemisférica también toma el tinte del bioma (cielo).
-    this.hemi.color.lerp(new THREE.Color(b.fog), k * 0.6);
+    this.hemi.color.lerp(new THREE.Color(b.fog).lerp(new THREE.Color(0xb9d2ed), 0.65), k * 0.6);
 
     // Brasas del Yermo: ascienden y se reciclan al llegar arriba.
     if (this.embers) {

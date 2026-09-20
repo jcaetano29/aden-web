@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { terrainMat } from "./textures.js";
 import { CSS2DRenderer } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
@@ -29,43 +30,6 @@ const VignetteShader = {
 import { MAP_BOUNDS } from "@aden/shared";
 import { smoothTowards } from "./motion.js";
 
-/**
- * Textura de pasto procedural (canvas, sin descargas): base verde con manchas
- * y motas de tonos cercanos para dar variación y que el piso no se vea plano.
- * Se repite (RepeatWrapping) para cubrir el mapa con detalle fino.
- */
-function makeGrassTexture(): THREE.Texture {
-  const size = 256;
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = size;
-  const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = "#4a7c3a";
-  ctx.fillRect(0, 0, size, size);
-  // manchas suaves más claras/oscuras
-  const blobs = ["#568a42", "#3f6e32", "#5f9247", "#436a35"];
-  for (let i = 0; i < 220; i++) {
-    ctx.fillStyle = blobs[Math.floor(Math.random() * blobs.length)];
-    const r = 3 + Math.random() * 10;
-    ctx.beginPath();
-    ctx.arc(Math.random() * size, Math.random() * size, r, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // briznas cortas (líneas finas) para textura de pasto
-  for (let i = 0; i < 400; i++) {
-    ctx.strokeStyle = Math.random() < 0.5 ? "#3c6630" : "#5f9247";
-    ctx.lineWidth = 1;
-    const x = Math.random() * size, y = Math.random() * size;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + (Math.random() - 0.5) * 3, y - 3 - Math.random() * 3);
-    ctx.stroke();
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(24, 24);
-  return tex;
-}
-
 export class Renderer {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -88,7 +52,7 @@ export class Renderer {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.2;
+    this.renderer.toneMappingExposure = 1.12;
     container.appendChild(this.renderer.domElement);
 
     // CSS2DRenderer para nameplates: capa DOM superpuesta al canvas WebGL,
@@ -111,13 +75,12 @@ export class Renderer {
     // raycast de click-to-move, así que debe abarcar toda el área caminable. Los
     // biomas por zona (Environment) se pintan como discos ENCIMA de este plano;
     // no interfieren con el picking porque `pickGround` sólo raycastea `this.ground`.
-    const grass = makeGrassTexture();
+
     const worldW = MAP_BOUNDS.maxX - MAP_BOUNDS.minX;
     const worldD = MAP_BOUNDS.maxZ - MAP_BOUNDS.minZ;
-    grass.repeat.set(worldW / 4, worldD / 4);
     this.ground = new THREE.Mesh(
       new THREE.PlaneGeometry(worldW, worldD),
-      new THREE.MeshStandardMaterial({ map: grass, color: 0xffffff }),
+      terrainMat("pueblo", [worldW / 9, worldD / 9]),
     );
     this.ground.rotation.x = -Math.PI / 2;
     this.ground.position.set(
@@ -134,9 +97,9 @@ export class Renderer {
     this.composer.addPass(new RenderPass(this.scene, this.camera));
     const bloom = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.75, // strength: brasas, oro, cristales y el sol florecen más
+      0.38, // strength: brasas, oro, cristales y el sol florecen más
       0.6, // radius
-      0.78, // threshold
+      1.05, // threshold
     );
     this.composer.addPass(bloom);
     this.composer.addPass(new OutputPass());

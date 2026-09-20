@@ -1,3 +1,4 @@
+import { clothMat, woodMat } from "./textures.js";
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { ELDER_NAME, getNpc } from "@aden/shared";
@@ -28,7 +29,7 @@ export class Npc {
     scene.add(this.object);
 
     // Túnica del Anciano: cono ancho abajo (robe) + capucha, low-poly encapuchado.
-    const robeMat = new THREE.MeshStandardMaterial({ color: 0x6b5230, flatShading: true, roughness: 0.9 });
+    const robeMat = clothMat(0x6b5230);
     const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.6, 1.5, 8), robeMat);
     robe.position.y = 0.75;
     this.object.add(robe);
@@ -45,7 +46,7 @@ export class Npc {
     beard.position.set(0, 1.5, 0.14); beard.rotation.x = Math.PI;
     this.object.add(beard);
     // Bastón con orbe brillante (acento cálido + luz tenue).
-    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.0, 6), new THREE.MeshStandardMaterial({ color: 0x4a3418 }));
+    const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.05, 2.0, 6), woodMat(0x4a3418));
     staff.position.set(0.42, 1.0, 0.1);
     this.object.add(staff);
     const orb = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 10), new THREE.MeshStandardMaterial({ color: 0xffd98a, emissive: 0xffb347, emissiveIntensity: 1.2 }));

@@ -1,3 +1,4 @@
+import { clothMat, woodMat, metalMat } from "./textures.js";
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { getNpc, type NpcRole } from "@aden/shared";
@@ -39,7 +40,7 @@ export class ServiceNpc {
     this.object.rotation.y = Math.PI;
     scene.add(this.object);
 
-    const robeMat = new THREE.MeshStandardMaterial({ color: style.robe, flatShading: true, roughness: 0.9 });
+    const robeMat = clothMat(style.robe);
     const robe = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.6, 1.5, 8), robeMat);
     robe.position.y = 0.75;
     this.object.add(robe);
@@ -47,7 +48,7 @@ export class ServiceNpc {
     head.position.y = 1.7;
     this.object.add(head);
     // Gorro/capucha del color de acento del rol.
-    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshStandardMaterial({ color: style.cap, flatShading: true }));
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(0.27, 10, 8, 0, Math.PI * 2, 0, Math.PI / 2), clothMat(style.cap));
     cap.position.y = 1.82;
     this.object.add(cap);
 
@@ -60,14 +61,14 @@ export class ServiceNpc {
       this.object.add(new THREE.PointLight(style.accent, 0.5, 6, 2).translateY(2.05).translateX(0.42));
     } else if (def.role === "smith") {
       // Yunque a un costado.
-      const anvilMat = new THREE.MeshStandardMaterial({ color: 0x2a2a30, metalness: 0.6, roughness: 0.5, flatShading: true });
+      const anvilMat = metalMat(0x2a2a30);
       const anvil = new THREE.Group();
       const base = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.35, 0.3), anvilMat); base.position.y = 0.35; anvil.add(base);
       const top = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.2, 0.35), anvilMat); top.position.y = 0.6; anvil.add(top);
       const horn = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.35, 6), anvilMat); horn.rotation.z = -Math.PI / 2; horn.position.set(0.55, 0.6, 0); anvil.add(horn);
       anvil.position.set(0.7, 0, 0.2); this.object.add(anvil);
       // Martillo en la mano.
-      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 6), new THREE.MeshStandardMaterial({ color: 0x5a3f24 }));
+      const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.6, 6), woodMat(0x5a3f24));
       handle.position.set(0.4, 1.0, 0.15); handle.rotation.z = 0.5; this.object.add(handle);
       const hammerHead = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.14, 0.14), anvilMat); hammerHead.position.set(0.6, 1.2, 0.15); this.object.add(hammerHead);
       // Chispas emissivas sobre el yunque.
@@ -75,13 +76,13 @@ export class ServiceNpc {
       spark.position.set(0.7, 0.75, 0.2); this.object.add(spark);
     } else {
       // Capitán: casco con cresta + lanza + estandarte.
-      const helmet = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.2, 10), new THREE.MeshStandardMaterial({ color: 0x9aa0ad, metalness: 0.5, roughness: 0.5, flatShading: true }));
+      const helmet = new THREE.Mesh(new THREE.CylinderGeometry(0.24, 0.24, 0.2, 10), metalMat(0x9aa0ad));
       helmet.position.y = 1.86; this.object.add(helmet);
-      const crest = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.34, 6), new THREE.MeshStandardMaterial({ color: 0xb23b3b, flatShading: true }));
+      const crest = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.34, 6), clothMat(0xb23b3b));
       crest.position.y = 2.1; this.object.add(crest);
-      const spear = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.4, 6), new THREE.MeshStandardMaterial({ color: 0x5a3f24 }));
+      const spear = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.4, 6), woodMat(0x5a3f24));
       spear.position.set(0.42, 1.1, 0.1); this.object.add(spear);
-      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.26, 6), new THREE.MeshStandardMaterial({ color: 0xc0c4cc, metalness: 0.6, roughness: 0.4 }));
+      const tip = new THREE.Mesh(new THREE.ConeGeometry(0.08, 0.26, 6), metalMat(0xc0c4cc));
       tip.position.set(0.42, 2.4, 0.1); this.object.add(tip);
     }
 

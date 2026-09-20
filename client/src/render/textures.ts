@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { surfaceMaps, type SurfaceKind } from "./materialAtlas.js";
 
 /**
  * Texturas PROCEDURALES (canvas, sin descargas) para darle grano y materialidad al
@@ -287,10 +288,12 @@ function genCrackedStone(base: number): Gen {
   return g;
 }
 
-type Kind = "stone" | "wood" | "roof" | "thatch" | "plaster" | "cobble" | "cloth" | "cracked";
+type Kind = SurfaceKind;
 const GENERATORS: Record<Kind, (base: number) => Gen> = {
   stone: genStone, wood: genWood, roof: genRoof, thatch: genThatch,
   plaster: genPlaster, cobble: genCobble, cloth: genCloth, cracked: genCrackedStone,
+  grass: genPlaster, earth: genPlaster, gravel: genCobble, lava: genCrackedStone,
+  metal: genPlaster, leather: genCloth, leaves: genThatch, bone: genPlaster,
 };
 
 // Caché de la textura BASE (repeat 1,1). Clonamos para cada material.
@@ -339,7 +342,10 @@ export function texturedMaterial(kind: Kind, opts: MatOpts = {}): THREE.MeshStan
     color = 0x888888, repeat = [1, 1], roughness = 0.9, metalness = 0.0,
     bumpScale = 0.06, flatShading = false, tint = 0xffffff, emissive = 0x000000, emissiveIntensity = 0,
   } = opts;
-  const base = baseTex(kind, color);
+  // Headless simulations construct world objects too; texture generation is visual only.
+  if (typeof document === "undefined") return new THREE.MeshStandardMaterial({ color, roughness, metalness, emissive, emissiveIntensity });
+  const atlas = surfaceMaps(kind);
+  const base = atlas ?? baseTex(kind, color);
   const map = base.color.clone();
   map.needsUpdate = true;
   map.repeat.set(repeat[0], repeat[1]);
@@ -347,6 +353,15 @@ export function texturedMaterial(kind: Kind, opts: MatOpts = {}): THREE.MeshStan
     map, color: tint, roughness, metalness, flatShading,
     emissive, emissiveIntensity,
   });
+  if (atlas) {
+    // Keep natural material colours; retain strong identity for cloth and metals.
+    const hue = new THREE.Color(color);
+    if (kind !== "cloth" && kind !== "metal") hue.lerp(new THREE.Color(0xffffff), 0.78);
+    mat.color.multiply(hue);
+    mat.roughnessMap = atlas.roughness.clone();
+    mat.roughnessMap.repeat.set(...repeat);
+    mat.roughnessMap.needsUpdate = true;
+  }
   if (base.bump) {
     const bump = base.bump.clone();
     bump.needsUpdate = true;
@@ -374,3 +389,16 @@ export const clothMat = (color = 0x8a2b2b, repeat: [number, number] = [1, 1], em
   texturedMaterial("cloth", { color, repeat, roughness: 0.8, emissive, emissiveIntensity: emissive ? 0.25 : 0 });
 export const crackedStoneMat = (color = 0x8a8497, repeat: [number, number] = [1, 1], flat = false) =>
   texturedMaterial("cracked", { color, repeat, roughness: 0.98, bumpScale: 0.08, flatShading: flat });
+
+export const metalMat = (color = 0xb2bdc9, repeat: [number, number] = [1, 1]) =>
+  texturedMaterial("metal", { color, repeat, metalness: 0.65, roughness: 0.52, bumpScale: 0.018 });
+export const leatherMat = (color = 0x72503b) =>
+  texturedMaterial("leather", { color, roughness: 0.85, bumpScale: 0.025 });
+export const foliageMat = (color = 0x69764b, repeat: [number, number] = [2, 2]) =>
+  texturedMaterial("leaves", { color, repeat, roughness: 0.95, bumpScale: 0.035 });
+export const boneMat = (color = 0xd9cfb0) =>
+  texturedMaterial("bone", { color, roughness: 0.82, bumpScale: 0.025 });
+export function terrainMat(zone: string, repeat: [number, number]): THREE.MeshStandardMaterial {
+  const kind: Kind = ({ pueblo: "grass", bosque: "earth", ruinas: "gravel", yermo: "lava", trono: "cracked" } as Record<string, Kind>)[zone] ?? "grass";
+  return texturedMaterial(kind, { color: 0xbfc3b4, repeat, roughness: 1, bumpScale: 0.12 });
+}

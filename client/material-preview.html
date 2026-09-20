@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aden · Revisión de materiales</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;overflow:hidden;background:#111720;color:#ece2c9;font:14px Georgia,serif}
+  nav{position:fixed;z-index:3;top:22px;left:24px;padding:18px 22px;background:#101720ed;border:1px solid #8d7850;box-shadow:0 12px 40px #0008;max-width:calc(100vw - 48px)}
+  small{letter-spacing:3px;color:#c6ab72}h1{font-size:22px;font-weight:400;margin:10px 0 14px}
+  button{font:inherit;background:#25303b;color:#ddd1b8;border:1px solid #665b46;padding:8px 12px;margin:3px;cursor:pointer}button[aria-pressed=true]{background:#a38955;color:#101720}
+  #status{margin-top:12px;color:#b0bac2;font:12px system-ui}
+</style>
+<div id="app"></div><nav><small>ADEN / MATERIALES</small><h1>Acero, piedra y ceniza</h1><div id="controls"></div><div id="status">Preparando texturas…</div></nav>
+<script type="module">
+  import { Renderer } from '/src/render/Renderer.ts';
+  import { Environment } from '/src/render/Environment.ts';
+  import { CharacterFactory } from '/src/render/CharacterFactory.ts';
+  import { preloadMaterialAtlas } from '/src/render/materialAtlas.ts';
+  import { MODEL_NAMES, MOB_MODEL_NAMES } from '/src/assets/manifest.ts';
+  import { selectClip } from '/src/render/animation.ts';
+  await preloadMaterialAtlas();
+  const renderer = new Renderer(document.querySelector('#app'));
+  const environment = new Environment(renderer.scene);
+  const factory = new CharacterFactory();
+  await factory.preload([...MODEL_NAMES,...MOB_MODEL_NAMES]);
+  const characters = [...MODEL_NAMES,...MOB_MODEL_NAMES].map((name,i)=>{
+    const c = factory.create(name); c.root.position.set((i-2.5)*2.3,0,8);
+    renderer.scene.add(c.root); c.play(selectClip(c.clipNames,'idle') || c.clipNames[0]); return c;
+  });
+  const locations = { 'Pueblo':[0,0], 'Bosque':[300,0], 'Ruinas':[0,300], 'Yermo':[300,300], 'Trono':[600,150], 'Personajes':[0,8] };
+  let location='Pueblo'; let frames=0;
+  for(const name of Object.keys(locations)) {
+    const b=document.createElement('button');b.textContent=name;
+    b.onclick=()=>{location=name; document.querySelectorAll('button').forEach(el=>el.setAttribute('aria-pressed',String(el===b)));};
+    b.setAttribute('aria-pressed',String(name===location));document.querySelector('#controls').append(b);
+  }
+  let last=performance.now();
+  function frame(now){
+    const dt=Math.min((now-last)/1000,0.05);last=now;
+    const [x,z]=locations[location]; const close=location==='Personajes';
+    renderer.camera.position.set(x,close?4:25,z+(close?12:29));renderer.camera.lookAt(x,close?1.1:0,z);
+    environment.updateMood(x,z,dt);characters.forEach(c=>c.mixer.update(dt));renderer.render();frames++;
+    document.querySelector('#status').textContent=location+' · Materiales del juego · '+(close?'4 clases y 2 enemigos':'Vista de escenario');
+    document.body.dataset.ready='true';document.body.dataset.frames=frames;requestAnimationFrame(frame);
+  }requestAnimationFrame(frame);
+</script>
+</html>
