@@ -125,9 +125,9 @@ export interface RoomCallbacks {
 export class NetworkClient {
   private room!: Room;
 
-  async connect(name: string, password: string, className: string, cb: RoomCallbacks): Promise<void> {
+  async connect(name: string, password: string, className: string, cb: RoomCallbacks, mode = ""): Promise<void> {
     const client = new Client(SERVER_URL);
-    this.room = await client.joinOrCreate("game", { name, password, className });
+    this.room = await client.joinOrCreate("game", { name, password, className, mode });
     const selfId = this.room.sessionId;
 
     const snap = (p: any): PlayerSnapshot => ({

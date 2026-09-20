@@ -951,6 +951,29 @@ describe("GameRoom", () => {
       expect(p.statPoints).toBeGreaterThan(pts0);
     });
 
+    it("modo login: rechaza una cuenta inexistente", async () => {
+      const room = await colyseus.createRoom("game", {});
+      await expect(colyseus.connectTo(room, { name: "Fantasma", password: "clave1", mode: "login" })).rejects.toBeDefined();
+    });
+
+    it("modo login: entra a una cuenta existente con la contraseña correcta", async () => {
+      const room = await colyseus.createRoom("game", {});
+      // Crear la cuenta primero.
+      await colyseus.connectTo(room, { name: "Vuelve", password: "clave1", className: "mage", mode: "create" });
+      await room.waitForNextPatch();
+      // Volver a entrar con login.
+      const c = await colyseus.connectTo(room, { name: "Vuelve", password: "clave1", mode: "login" });
+      await room.waitForNextPatch();
+      expect(room.state.players.get(c.sessionId)?.name).toBe("Vuelve");
+    });
+
+    it("modo create: rechaza un nombre ya tomado", async () => {
+      const room = await colyseus.createRoom("game", {});
+      await colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "knight", mode: "create" });
+      await room.waitForNextPatch();
+      await expect(colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "rogue", mode: "create" })).rejects.toBeDefined();
+    });
+
     it("entregar una misión con recompensa de equipo la agrega al inventario", async () => {
       const room = await colyseus.createRoom("game", {});
       const c = await colyseus.connectTo(room, { name: "Botin", className: "knight" });

@@ -106,7 +106,7 @@ import { stepMobAI } from "../systems/MobAISystem.js";
 import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
 import { createPersistence } from "../persistence/createPersistence.js";
 import type { PersistenceService, CharacterRank, GuildRank } from "../persistence/PersistenceService.js";
-import { toCharacterSave, inventoryRecordToEntries } from "../persistence/CharacterSave.js";
+import { toCharacterSave, inventoryRecordToEntries, type CharacterSave } from "../persistence/CharacterSave.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 
 /** Intervalo de guardado periódico de personajes (Etapa 3c). */
@@ -1072,35 +1072,58 @@ export class GameRoom extends Room<GameState> {
   }
 
   /**
-   * Etapa 21: autenticación. El nombre ES la cuenta. Si la cuenta existe, verifica
-   * la contraseña (rechaza si no coincide); si no existe, la registra (cuenta nueva
-   * o reclamo de un personaje viejo sin cuenta). Devuelve truthy para permitir el
-   * join. Lanzar rechaza el join con el mensaje (el cliente lo muestra y reintenta).
+   * Etapa 21: autenticación. El nombre ES la cuenta. El cliente indica el `mode`:
+   *  - "login": la cuenta DEBE existir y la contraseña coincidir → cargás tu personaje.
+   *  - "create": el nombre NO debe estar tomado → registra la cuenta nueva.
+   * Sin `mode` (compat/tests): comportamiento tolerante (verifica si existe, registra
+   * si no). Devuelve truthy para permitir el join; lanzar rechaza con el mensaje.
    */
-  async onAuth(_client: Client, options: { name?: string; password?: string; className?: string }) {
+  async onAuth(_client: Client, options: { name?: string; password?: string; className?: string; mode?: string }) {
     const name = (options?.name ?? "").trim();
     const password = options?.password ?? "";
+    const mode = options?.mode ?? "";
     if (name.length < 1 || name.length > 16) throw new Error("Nombre inválido (1-16 caracteres).");
     const acct = await this.persistence.loadAccount(name);
-    if (acct && acct.passwordHash) {
-      // Cuenta protegida: exige la contraseña correcta (protege el progreso).
-      if (!verifyPassword(password, acct.passwordHash, acct.passwordSalt)) {
-        throw new Error("Contraseña incorrecta.");
+    const hasAccount = !!(acct && acct.passwordHash);
+
+    if (mode === "login") {
+      // Volver a entrar: la cuenta tiene que existir y la contraseña coincidir.
+      if (!hasAccount || !verifyPassword(password, acct!.passwordHash, acct!.passwordSalt)) {
+        throw new Error("No existe esa cuenta o la contraseña es incorrecta.");
       }
-    } else if (password.length >= 4) {
-      // Registro: crea la cuenta (o reclama un personaje viejo sin cuenta).
+    } else if (mode === "create") {
+      // Crear personaje: el nombre no puede estar tomado.
+      if (hasAccount) throw new Error("Ese nombre ya está en uso. Usá «Entrar».");
+      if (password.length < 4) throw new Error("La contraseña necesita al menos 4 caracteres.");
       const { hash, salt } = hashPassword(password);
       await this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt });
+    } else {
+      // Sin modo explícito (compat/tests): verifica si existe, registra si no.
+      if (hasAccount) {
+        if (!verifyPassword(password, acct!.passwordHash, acct!.passwordSalt)) {
+          throw new Error("Contraseña incorrecta.");
+        }
+      } else if (password.length >= 4) {
+        const { hash, salt } = hashPassword(password);
+        await this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt });
+      }
     }
-    // Sin cuenta y sin contraseña válida → invitado (no persiste cuenta). El cliente
-    // real siempre exige contraseña (≥4) en la pantalla de creación.
-    return { name };
+    // Precargar el personaje guardado (si existe) para que onJoin lo aplique de forma
+    // SÍNCRONA antes de insertar al jugador → el primer snapshot ya trae la clase/stats
+    // correctas (sin el parpadeo "knight" del load async) y sin la race save-before-load.
+    const save = await this.persistence.load(name);
+    return { name, save };
   }
 
   async onJoin(client: Client, options: { name?: string; className?: string }) {
+    // Save precargado por onAuth (síncrono acá). En login trae la clase real del
+    // personaje; en create es null y se usa la clase elegida.
+    const preSave = (client.auth as { save?: CharacterSave | null } | undefined)?.save ?? null;
     const player = new PlayerState();
     player.name = options?.name ?? "Adventurer";
-    const className = isValidClass(options?.className) ? options.className! : "knight";
+    const className = preSave?.className && isValidClass(preSave.className)
+      ? preSave.className
+      : (isValidClass(options?.className) ? options.className! : "knight");
     player.className = className;
     const st = statsForClass(className, 1);
     player.hp = st.maxHp;
@@ -1134,10 +1157,9 @@ export class GameRoom extends Room<GameState> {
     player.z = player.targetZ = townSpawn.z;
     this.state.players.set(client.sessionId, player);
 
-    // Etapa 3c: cargar el save (si existe) y aplicarlo sobre el player ya insertado en el
-    // estado. Mientras el load está en curso, el jugador ya es válido con los defaults de
-    // nivel 1 seteados arriba (R-E3c-2: onJoin async, se actualiza al resolver la promesa).
-    const save = await this.persistence.load(player.name);
+    // Etapa 3c/21: el save ya viene precargado por onAuth (client.auth) → se aplica de
+    // forma síncrona, sin segunda lectura ni race save-before-load.
+    const save = preSave;
     if (save) {
       player.className = save.className ?? "knight";
       player.level = save.level;

@@ -241,7 +241,7 @@ async function main() {
     const creds = await classSelect.create(loginError);
     className = creds.className;
     try {
-      await net.connect(creds.name, creds.password, creds.className, netCallbacks);
+      await net.connect(creds.name, creds.password, creds.className, netCallbacks, creds.mode);
       connected = true;
     } catch (err) {
       if (isAuthError(err)) {
@@ -253,6 +253,11 @@ async function main() {
       return;
     }
   }
+
+  // En modo "Entrar", la clase la trae el personaje guardado: esperar el estado del
+  // self y leer su clase real antes de armar el kit de skills.
+  for (let i = 0; i < 120 && !net.getSelf(); i++) await new Promise((r) => setTimeout(r, 16));
+  className = net.getSelf()?.className || className || "knight";
 
   // Mostrar la premisa narrativa una sola vez, ya conectado.
   await storyCard.show();

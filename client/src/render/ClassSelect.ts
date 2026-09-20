@@ -9,27 +9,41 @@ const CLASS_STYLE: Record<string, { accent: string; glyph: string; role: string 
   rogue: { accent: "#6fd06a", glyph: "🗡", role: "Rápido — ataca seguido" },
 };
 
+export type LoginMode = "login" | "create";
+
+export interface LoginResult {
+  name: string;
+  className: string;
+  password: string;
+  mode: LoginMode;
+}
+
 /**
- * Pantalla de creación de personaje: overlay cinematográfico con el nombre del
- * mundo, un campo de nombre y 4 cards de clase (una por clase). Reemplaza al
- * viejo `prompt()` nativo. `create()` resuelve a { name, className } cuando el
- * jugador confirma con "Entrar a Aden".
+ * Pantalla de acceso: dos modos con pestañas — "Entrar" (nombre + contraseña, para
+ * volver con tu personaje) y "Crear personaje" (nombre + contraseña + clase). En
+ * modo Entrar NO se elige clase (la clase la trae tu personaje guardado). `create()`
+ * resuelve con { name, className, password, mode } al confirmar.
  */
 export class ClassSelect {
   private readonly root: HTMLDivElement;
-  private resolver: ((v: { name: string; className: string; password: string }) => void) | null = null;
+  private resolver: ((v: LoginResult) => void) | null = null;
   private selected: string | null = null;
+  private mode: LoginMode = "login";
   private readonly cards = new Map<string, HTMLDivElement>();
   private readonly nameInput: HTMLInputElement;
   private readonly passwordInput: HTMLInputElement;
   private readonly errorDiv: HTMLDivElement;
   private readonly enterBtn: HTMLButtonElement;
+  private readonly loginTab: HTMLButtonElement;
+  private readonly createTab: HTMLButtonElement;
+  private readonly pickLabel: HTMLDivElement;
+  private readonly cardContainer: HTMLDivElement;
 
   constructor(parent: HTMLElement = document.body) {
     this.root = document.createElement("div");
     this.root.style.cssText =
       "position:fixed;inset:0;display:none;flex-direction:column;justify-content:center;align-items:center;" +
-      "pointer-events:auto;z-index:2000;gap:18px;padding:32px;overflow-y:auto;" +
+      "pointer-events:auto;z-index:2000;gap:14px;padding:32px;overflow-y:auto;" +
       "background:radial-gradient(120% 90% at 50% -10%, #241706 0%, #0c0a07 55%, #050403 100%);" +
       `font-family:${FONT_BODY};color:${COLORS.text};`;
     this.root.className = "aden-scroll";
@@ -41,14 +55,25 @@ export class ClassSelect {
     const title = document.createElement("h1");
     title.textContent = "ADEN";
     title.className = "aden-title";
-    title.style.cssText +=
-      "font-size:64px;letter-spacing:10px;margin:0;text-align:center;line-height:1;";
+    title.style.cssText += "font-size:60px;letter-spacing:10px;margin:0;text-align:center;line-height:1;";
     const rule = document.createElement("div");
-    rule.style.cssText = `height:2px;width:200px;background:linear-gradient(90deg,transparent,${COLORS.gold},transparent);margin:2px 0 6px;`;
+    rule.style.cssText = `height:2px;width:200px;background:linear-gradient(90deg,transparent,${COLORS.gold},transparent);margin:2px 0 4px;`;
 
-    const subtitle = document.createElement("div");
-    subtitle.textContent = "Forjá tu héroe y defendé el reino de los no-muertos.";
-    subtitle.style.cssText = `font-style:italic;font-size:16px;color:${COLORS.parchment};text-align:center;`;
+    // Pestañas de modo: Entrar / Crear personaje.
+    const tabs = document.createElement("div");
+    tabs.style.cssText = "display:flex;gap:8px;margin-top:2px;";
+    this.loginTab = document.createElement("button");
+    this.loginTab.textContent = "Entrar";
+    this.createTab = document.createElement("button");
+    this.createTab.textContent = "Crear personaje";
+    for (const t of [this.loginTab, this.createTab]) {
+      t.style.cssText =
+        `font-family:${FONT_DISPLAY};font-size:14px;letter-spacing:1px;padding:7px 18px;cursor:pointer;` +
+        "background:transparent;border:1px solid #4a380f;border-radius:8px;color:#b9a06a;transition:all 0.15s;";
+    }
+    this.loginTab.addEventListener("click", () => this.setMode("login"));
+    this.createTab.addEventListener("click", () => this.setMode("create"));
+    tabs.append(this.loginTab, this.createTab);
 
     // Campo de nombre.
     const nameWrap = document.createElement("div");
@@ -71,7 +96,7 @@ export class ClassSelect {
     this.nameInput.addEventListener("blur", () => {
       this.nameInput.style.boxShadow = "inset 0 2px 6px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,162,75,0.15)";
     });
-    // Campo de contraseña (la cuenta = tu nombre; protege tu progreso).
+    // Campo de contraseña.
     const passLabel = document.createElement("div");
     passLabel.textContent = "CONTRASEÑA";
     passLabel.style.cssText = `font-family:${FONT_DISPLAY};font-size:11px;letter-spacing:3px;color:${COLORS.textDim};margin-top:10px;`;
@@ -87,75 +112,75 @@ export class ClassSelect {
     this.passwordInput.addEventListener("blur", () => {
       this.passwordInput.style.boxShadow = "inset 0 2px 6px rgba(0,0,0,0.7), 0 0 0 1px rgba(201,162,75,0.15)";
     });
-    const hint = document.createElement("div");
-    hint.textContent = "Con nombre nuevo se crea tu cuenta. Con uno existente, entrás con tu contraseña.";
-    hint.style.cssText = `font-size:11px;color:${COLORS.textDim};max-width:300px;text-align:center;line-height:1.3;`;
     this.errorDiv = document.createElement("div");
-    this.errorDiv.style.cssText = `min-height:16px;font-size:13px;color:#ff6b6b;font-weight:600;text-align:center;`;
-    nameWrap.append(nameLabel, this.nameInput, passLabel, this.passwordInput, hint, this.errorDiv);
+    this.errorDiv.style.cssText = "min-height:16px;font-size:13px;color:#ff6b6b;font-weight:600;text-align:center;max-width:320px;";
+    nameWrap.append(nameLabel, this.nameInput, passLabel, this.passwordInput, this.errorDiv);
 
-    const pickLabel = document.createElement("div");
-    pickLabel.textContent = "ELEGÍ TU CLASE";
-    pickLabel.style.cssText = `font-family:${FONT_DISPLAY};font-size:11px;letter-spacing:3px;color:${COLORS.textDim};margin-top:8px;`;
+    this.pickLabel = document.createElement("div");
+    this.pickLabel.textContent = "ELEGÍ TU CLASE";
+    this.pickLabel.style.cssText = `font-family:${FONT_DISPLAY};font-size:11px;letter-spacing:3px;color:${COLORS.textDim};margin-top:4px;`;
 
-    const cardContainer = document.createElement("div");
-    cardContainer.style.cssText =
+    this.cardContainer = document.createElement("div");
+    this.cardContainer.style.cssText =
       "display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;max-width:820px;width:100%;";
 
     for (const classId of CLASS_ORDER) {
       const classDef = CLASSES[classId];
       if (!classDef) continue;
       const st = CLASS_STYLE[classId] ?? { accent: COLORS.gold, glyph: "◆", role: "" };
-
       const card = document.createElement("div");
       card.className = "aden-panel";
       card.style.cssText =
         "padding:20px 16px;cursor:pointer;text-align:center;min-height:150px;" +
         "display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;" +
         "transition:transform 0.15s ease, box-shadow 0.15s ease;";
-
       const glyph = document.createElement("div");
       glyph.textContent = st.glyph;
       glyph.style.cssText = `font-size:34px;color:${st.accent};text-shadow:0 0 12px ${st.accent}88;line-height:1;`;
-
       const cardTitle = document.createElement("div");
       cardTitle.textContent = classDef.name;
       cardTitle.style.cssText = `font-family:${FONT_DISPLAY};font-size:20px;font-weight:700;color:${COLORS.goldBright};letter-spacing:0.5px;`;
-
       const cardDesc = document.createElement("div");
       cardDesc.textContent = st.role;
       cardDesc.style.cssText = `font-size:14px;color:${COLORS.textDim};line-height:1.35;`;
-
       card.append(glyph, cardTitle, cardDesc);
-
-      card.addEventListener("mouseenter", () => {
-        if (this.selected !== classId) card.style.transform = "translateY(-3px)";
-      });
-      card.addEventListener("mouseleave", () => {
-        if (this.selected !== classId) card.style.transform = "translateY(0)";
-      });
+      card.addEventListener("mouseenter", () => { if (this.selected !== classId) card.style.transform = "translateY(-3px)"; });
+      card.addEventListener("mouseleave", () => { if (this.selected !== classId) card.style.transform = "translateY(0)"; });
       card.addEventListener("click", () => this.selectCard(classId, st.accent));
-
       this.cards.set(classId, card);
-      cardContainer.appendChild(card);
+      this.cardContainer.appendChild(card);
     }
 
     this.enterBtn = document.createElement("button");
-    this.enterBtn.textContent = "Entrar a Aden";
     applyButton(this.enterBtn);
     this.enterBtn.style.marginTop = "8px";
     this.enterBtn.style.padding = "12px 34px";
     this.enterBtn.style.fontSize = "18px";
-    this.enterBtn.disabled = true;
-    this.enterBtn.style.opacity = "0.5";
-    this.enterBtn.style.cursor = "not-allowed";
     this.enterBtn.addEventListener("click", () => this.confirm());
-    const onEnter = (e: KeyboardEvent) => { if (e.key === "Enter" && this.selected) this.confirm(); };
+
+    const onEnter = (e: KeyboardEvent) => { if (e.key === "Enter") this.confirm(); };
     this.nameInput.addEventListener("keydown", onEnter);
     this.passwordInput.addEventListener("keydown", onEnter);
+    this.nameInput.addEventListener("input", () => this.refreshButton());
+    this.passwordInput.addEventListener("input", () => this.refreshButton());
 
-    this.root.append(eyebrow, title, rule, subtitle, nameWrap, pickLabel, cardContainer, this.enterBtn);
+    this.root.append(eyebrow, title, rule, tabs, nameWrap, this.pickLabel, this.cardContainer, this.enterBtn);
     parent.appendChild(this.root);
+    this.setMode("login");
+  }
+
+  private setMode(mode: LoginMode): void {
+    this.mode = mode;
+    const on = `background:linear-gradient(180deg,rgba(201,162,75,0.25),rgba(201,162,75,0.08));color:${COLORS.goldBright};border-color:${COLORS.gold};`;
+    const off = "background:transparent;color:#b9a06a;border-color:#4a380f;";
+    this.loginTab.style.cssText = this.loginTab.style.cssText.replace(/background:[^;]*;|color:[^;]*;|border-color:[^;]*;/g, "") + (mode === "login" ? on : off);
+    this.createTab.style.cssText = this.createTab.style.cssText.replace(/background:[^;]*;|color:[^;]*;|border-color:[^;]*;/g, "") + (mode === "create" ? on : off);
+    // La clase sólo se elige al crear.
+    const showClass = mode === "create";
+    this.pickLabel.style.display = showClass ? "" : "none";
+    this.cardContainer.style.display = showClass ? "" : "none";
+    this.errorDiv.textContent = "";
+    this.refreshButton();
   }
 
   private selectCard(classId: string, accent: string): void {
@@ -163,38 +188,42 @@ export class ClassSelect {
     for (const [id, card] of this.cards) {
       const active = id === classId;
       card.style.transform = active ? "translateY(-4px) scale(1.02)" : "translateY(0)";
-      card.style.boxShadow = active
-        ? `0 10px 34px rgba(0,0,0,0.66), 0 0 0 2px ${accent}, 0 0 22px ${accent}66`
-        : "";
+      card.style.boxShadow = active ? `0 10px 34px rgba(0,0,0,0.66), 0 0 0 2px ${accent}, 0 0 22px ${accent}66` : "";
     }
-    this.enterBtn.disabled = false;
-    this.enterBtn.style.opacity = "1";
-    this.enterBtn.style.cursor = "pointer";
+    this.refreshButton();
+  }
+
+  /** Habilita/deshabilita el botón y ajusta su texto según el modo y los campos. */
+  private refreshButton(): void {
+    this.enterBtn.textContent = this.mode === "login" ? "Entrar a Aden" : "Crear personaje";
+    const nameOk = this.nameInput.value.trim().length > 0;
+    const passOk = this.passwordInput.value.length >= 4;
+    const classOk = this.mode === "login" || this.selected !== null;
+    const ready = nameOk && passOk && classOk;
+    this.enterBtn.disabled = !ready;
+    this.enterBtn.style.opacity = ready ? "1" : "0.5";
+    this.enterBtn.style.cursor = ready ? "pointer" : "not-allowed";
   }
 
   private confirm(): void {
-    if (!this.selected || !this.resolver) return;
-    const name = this.nameInput.value.trim() || "Adventurer";
+    if (!this.resolver) return;
+    const name = this.nameInput.value.trim();
     const password = this.passwordInput.value;
-    if (password.length < 4) {
-      this.errorDiv.textContent = "La contraseña necesita al menos 4 caracteres.";
-      this.passwordInput.focus();
-      return;
-    }
-    this.resolver({ name, className: this.selected, password });
+    if (name.length < 1) { this.errorDiv.textContent = "Escribí un nombre."; this.nameInput.focus(); return; }
+    if (password.length < 4) { this.errorDiv.textContent = "La contraseña necesita al menos 4 caracteres."; this.passwordInput.focus(); return; }
+    if (this.mode === "create" && !this.selected) { this.errorDiv.textContent = "Elegí una clase."; return; }
+    this.resolver({ name, password, mode: this.mode, className: this.mode === "create" ? this.selected! : "" });
     this.hide();
   }
 
-  /**
-   * Muestra la pantalla y resuelve con nombre + clase + contraseña. `errorMsg`
-   * muestra un error arriba del botón (p.ej. "Contraseña incorrecta") al reintentar.
-   */
-  async create(errorMsg = ""): Promise<{ name: string; className: string; password: string }> {
+  /** Muestra la pantalla y resuelve con la elección. `errorMsg` se muestra al reintentar. */
+  async create(errorMsg = ""): Promise<LoginResult> {
     return new Promise((resolve) => {
       this.resolver = resolve;
       this.errorDiv.textContent = errorMsg;
       this.passwordInput.value = "";
       this.root.style.display = "flex";
+      this.refreshButton();
       setTimeout(() => (this.nameInput.value ? this.passwordInput : this.nameInput).focus(), 50);
     });
   }
