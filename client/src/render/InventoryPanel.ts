@@ -12,6 +12,7 @@ import {
   type EquipSlot,
 } from "@aden/shared";
 import { COLORS, FONT_DISPLAY, FONT_BODY } from "./theme.js";
+import "./InventoryPanel.css";
 import { itemIcon } from './ItemModels.js';
 
 export interface InventoryPanelCallbacks {
@@ -32,12 +33,9 @@ export interface InventoryView {
 }
 
 /**
- * Panel de inventario + EQUIPO (tecla "i"). Muestra los stats de combate efectivos,
- * un paperdoll de 3 slots (arma/armadura/accesorio) con lo equipado + "Quitar", y la
- * lista del inventario con los nombres de equipo coloreados por rareza y un botón
- * "Equipar"/"Usar" según el tipo. Sólo refleja el estado sincronizado — nunca lo muta
- * (el server es autoritativo). Un signature-guard evita redibujar cada frame (si no,
- * los botones parpadean y se pierde el hover).
+ * Equipo distribuido por posición corporal, grilla de objetos y ficha de selección.
+ * Sólo refleja el estado sincronizado: el servidor valida todas las acciones.
+ * La firma evita redibujar cada frame y conserva la selección entre actualizaciones.
  */
 export class InventoryPanel {
   private readonly root: HTMLDivElement;
@@ -45,28 +43,28 @@ export class InventoryPanel {
   private visible = false;
   private readonly cb: InventoryPanelCallbacks;
   private lastSig = "";
+  private selected = "";
 
   constructor(parent: HTMLElement = document.body, cb: InventoryPanelCallbacks = {}) {
     this.cb = cb;
     this.root = document.createElement("div");
-    this.root.className = "aden-panel aden-scroll aden-fadein";
-    this.root.style.cssText =
-      // top:200 → debajo del minimapa para no superponerse.
-      "position:fixed;right:14px;top:200px;display:none;pointer-events:none;z-index:1000;" +
-      `width:min(390px,calc(100vw - 28px));max-height:60vh;overflow-y:auto;font-family:${FONT_BODY};` +
-      `font-size:13px;color:${COLORS.text};padding:12px 14px;user-select:none;`;
-
-    const title = document.createElement("div");
-    title.textContent = "⚔ Inventario y Equipo";
-    title.style.cssText = `font-family:${FONT_DISPLAY};font-weight:700;font-size:16px;color:${COLORS.goldBright};margin-bottom:8px;letter-spacing:0.5px;`;
-    this.root.appendChild(title);
-    const lootRule=document.createElement('div');
-    lootRule.textContent='Botín público: acercate o hacé clic. Lo obtiene el primer intento válido; cualquiera vivo y en alcance puede recogerlo. No afecta inventarios ajenos ni premios directos.';
-    lootRule.style.cssText='font-size:11px;line-height:1.4;color:#c3bbab;margin-bottom:8px';
-    this.root.appendChild(lootRule);
-
-    this.body = document.createElement("div");
-    this.body.style.cssText = "display:flex;flex-direction:column;gap:3px;";
+    this.root.className = "inventory-panel";
+    this.root.style.cssText = `display:none;font-family:${FONT_BODY};`;
+    this.root.setAttribute('role', 'region');
+    this.root.setAttribute('aria-label', 'Inventario y equipo');
+    const heading = document.createElement('div');
+    heading.className = 'inventory-heading';
+    const title = document.createElement('h2');
+    title.textContent = 'Inventario';
+    title.style.fontFamily = FONT_DISPLAY;
+    const close = document.createElement('button');
+    close.className = 'inventory-close';
+    close.textContent = '×';
+    close.setAttribute('aria-label', 'Cerrar inventario');
+    close.addEventListener('click', () => this.toggle());
+    heading.append(title, close);
+    this.root.appendChild(heading);
+    this.body = document.createElement('div');
     this.root.appendChild(this.body);
 
     parent.appendChild(this.root);
@@ -95,12 +93,6 @@ export class InventoryPanel {
     btn.addEventListener("mouseleave", () => { btn.style.filter = "none"; });
     btn.addEventListener("click", onClick);
     return btn;
-  }
-
-  private row(): HTMLDivElement {
-    const r = document.createElement("div");
-    r.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:6px;";
-    return r;
   }
 
   private equipmentTargets(view: InventoryView): { id: string; name: string }[] {
@@ -175,120 +167,163 @@ export class InventoryPanel {
     const sig = this.sig(view);
     if (sig === this.lastSig) return;
     this.lastSig = sig;
-    this.body.innerHTML = "";
+    const focusedKey = this.root.contains(document.activeElement)
+      ? (document.activeElement as HTMLElement)?.dataset.selectionKey : undefined;
+    this.body.replaceChildren();
     const setCounts = new Map<string, number>();
-    for (const id of Object.values(view.equipment)) {
-      if (!id) continue;
-      try {
-        const setId = getItem(id).setId;
-        if (setId) setCounts.set(setId, (setCounts.get(setId) ?? 0) + 1);
-      } catch { /* invalid synchronized entry */ }
+    const entries = view.entries.filter(entry => {
+      try { getItem(entry.itemTemplateId); return entry.qty > 0; } catch { return false; }
+    });
+    const equipped = EQUIP_SLOTS.filter(slot => {
+      try { return !!view.equipment[slot] && !!getItem(view.equipment[slot]); } catch { return false; }
+    });
+    for (const slot of equipped) {
+      const set = getItem(view.equipment[slot]).setId;
+      if (set) setCounts.set(set, (setCounts.get(set) ?? 0) + 1);
     }
+    const keys = [...entries.map(e => 'item:' + e.itemTemplateId), ...equipped.map(slot => 'slot:' + slot)];
+    if (!keys.includes(this.selected)) this.selected = keys[0] ?? '';
+    const stats = document.createElement('div');
+    stats.className = 'inventory-stats';
+    for (const text of ['Ataque ' + view.stats.pAtk, 'Defensa ' + view.stats.pDef]) {
+      const stat = document.createElement('span'); stat.textContent = text; stats.appendChild(stat);
+    }
+    this.body.appendChild(stats);
 
-    // ── Stats efectivos ────────────────────────────────────────────────
-    const stat = document.createElement("div");
-    stat.textContent = `⚔ Ataque ${view.stats.pAtk}   🛡 Defensa ${view.stats.pDef}`;
-    stat.style.cssText = "opacity:0.95;margin-bottom:2px;";
-    this.body.appendChild(stat);
-
-    // ── Paperdoll: 3 slots de equipo ───────────────────────────────────
-    const equipHeader = document.createElement("div");
-    equipHeader.textContent = "Equipo";
-    equipHeader.style.cssText = `font-family:${FONT_DISPLAY};font-weight:600;color:${COLORS.gold};margin-top:4px;letter-spacing:1px;font-size:12px;`;
-    this.body.appendChild(equipHeader);
-
+    const select = (key: string) => {
+      this.selected = key;
+      this.lastSig = '';
+      this.update(view);
+      this.body.querySelectorAll<HTMLButtonElement>('[data-selection-key]').forEach(button => {
+        if (button.dataset.selectionKey === key) button.focus({ preventScroll: true });
+      });
+    };
+    const equipment = document.createElement('div');
+    equipment.className = 'inventory-equipment';
+    equipment.setAttribute('aria-label', 'Equipo');
     for (const slot of EQUIP_SLOTS) {
-      const r = this.row();
-      const equippedId = view.equipment[slot];
-      const info = document.createElement("div");
-      info.style.cssText = "min-width:0;flex:1;";
-      const label = document.createElement("div");
-      if (equippedId) {
-        try {
-          const item = getItem(equippedId);
-          r.appendChild(itemIcon(equippedId));
-          label.textContent = `${SLOT_LABELS[slot]}: ${item.name}`;
-          label.style.color = RARITY_COLORS[item.rarity ?? "common"];
-        } catch {
-          label.textContent = `${SLOT_LABELS[slot]}: —`;
+      const button = document.createElement('button');
+      button.className = 'inventory-slot';
+      button.dataset.equipSlot = slot;
+      button.dataset.selectionKey = 'slot:' + slot;
+      button.setAttribute('aria-pressed', String(this.selected === 'slot:' + slot));
+      const id = equipped.includes(slot) ? view.equipment[slot] : '';
+      if (id) button.appendChild(itemIcon(id));
+      else button.appendChild(this.slotSilhouette(slot));
+      const label = document.createElement('span');
+      label.className = 'inventory-slot-label';
+      label.textContent = SLOT_LABELS[slot];
+      button.appendChild(label);
+      button.title = id ? SLOT_LABELS[slot] + ': ' + getItem(id).name : SLOT_LABELS[slot] + ': vacío';
+      button.setAttribute('aria-label', button.title);
+      button.disabled = !id;
+      button.addEventListener('click', () => select('slot:' + slot));
+      equipment.appendChild(button);
+    }
+    this.body.appendChild(equipment);
+    for (const [set, count] of setCounts) {
+      const line = document.createElement('div');
+      line.className = 'inventory-set';
+      line.textContent = 'Conjunto ' + set.replaceAll('_', ' ') + ': ' + count + ' piezas';
+      this.body.appendChild(line);
+    }
+    const heading = document.createElement('div');
+    heading.className = 'inventory-section-label';
+    const label = document.createElement('span'); label.textContent = 'Objetos';
+    const count = document.createElement('span'); count.textContent = entries.length + (entries.length === 1 ? ' objeto' : ' objetos');
+    heading.append(label, count); this.body.appendChild(heading);
+    const grid = document.createElement('div');
+    grid.className = 'inventory-grid';
+    grid.setAttribute('aria-label', 'Objetos del inventario');
+    for (const entry of entries) {
+      const button = document.createElement('button');
+      button.className = 'inventory-cell';
+      button.dataset.inventoryItem = entry.itemTemplateId;
+      button.dataset.selectionKey = 'item:' + entry.itemTemplateId;
+      button.setAttribute('aria-pressed', String(this.selected === 'item:' + entry.itemTemplateId));
+      button.title = entry.name + (entry.qty > 1 ? ' ×' + entry.qty : '');
+      button.setAttribute('aria-label', button.title);
+      button.appendChild(itemIcon(entry.itemTemplateId));
+      if (entry.qty > 1) {
+        const qty = document.createElement('span'); qty.className = 'inventory-quantity'; qty.textContent = String(entry.qty); button.appendChild(qty);
+      }
+      button.addEventListener('click', () => select('item:' + entry.itemTemplateId));
+      grid.appendChild(button);
+    }
+    const cells = Math.max(64, Math.ceil(entries.length / 8) * 8);
+    for (let i = entries.length; i < cells; i++) {
+      const empty = document.createElement('div'); empty.className = 'inventory-empty-cell'; empty.setAttribute('aria-hidden', 'true'); grid.appendChild(empty);
+    }
+    this.body.appendChild(grid);
+    const inspector = document.createElement('div');
+    inspector.className = 'inventory-inspector';
+    inspector.setAttribute('aria-label', 'Objeto seleccionado');
+    const slot = this.selected.startsWith('slot:') ? this.selected.slice(5) : '';
+    const id = slot ? view.equipment[slot] : this.selected.slice(5);
+    if (id) {
+      const item = getItem(id);
+      const name = document.createElement('div');
+      name.className = 'inventory-inspector-name'; name.textContent = item.name;
+      name.style.color = RARITY_COLORS[item.rarity ?? 'common'];
+      inspector.append(name, this.details(id, setCounts));
+      const actions = document.createElement('div'); actions.className = 'inventory-actions';
+      if (slot) actions.appendChild(this.makeBtn('Quitar', '#d9a441', () => this.cb.onUnequip?.(slot)));
+      else if (item.type === 'equipment') {
+        const reason = this.equipReason(id, view);
+        const equip = this.makeBtn(reason ? 'Equipar · ' + reason : 'Equipar', '#bca164', () => this.cb.onEquip?.(id));
+        equip.disabled = !!reason;
+        if (reason) { equip.title = reason; equip.style.opacity = '0.5'; equip.style.cursor = 'not-allowed'; }
+        actions.appendChild(equip);
+      } else if (item.type === 'consumable' && item.category === 'joya') {
+        const target = document.createElement('select');
+        target.dataset.jewelTarget = '';
+        target.title = 'Objeto que recibirá la mejora';
+        target.setAttribute('aria-label', target.title);
+        target.style.cssText = 'font-size:12px;background:#171b16;color:#ddceb0;border:1px solid #75694c;pointer-events:auto;padding:3px;';
+        for (const option of this.equipmentTargets(view)) {
+          const el = document.createElement('option'); el.value = option.id; el.textContent = option.name; target.appendChild(el);
         }
-      } else {
-        label.textContent = `${SLOT_LABELS[slot]}: —`;
-        label.style.opacity = "0.5";
+        const use = this.makeBtn('Usar', '#a6be7d', () => this.cb.onUseItem?.(id, target.value));
+        use.disabled = target.options.length === 0;
+        if (use.disabled) { use.textContent = 'Sin objetivo'; use.style.opacity = '0.5'; }
+        actions.append(target, use);
+      } else if (item.type === 'consumable' && (item.heal || item.mana || item.useEffect || item.learnSkill)) {
+        actions.appendChild(this.makeBtn('Usar', '#a6be7d', () => this.cb.onUseItem?.(id)));
       }
-      info.appendChild(label);
-      if (equippedId) info.appendChild(this.details(equippedId, setCounts));
-      r.appendChild(info);
-      if (equippedId) {
-        r.appendChild(this.makeBtn("Quitar", "#d9a441", () => this.cb.onUnequip?.(slot)));
-      }
-      this.body.appendChild(r);
-    }
-    for (const [setId, count] of setCounts) {
-      const setLine = document.createElement("div");
-      setLine.textContent = `Conjunto ${setId.replaceAll("_", " ")}: ${count} piezas`;
-      setLine.style.cssText = `font-size:11px;color:${COLORS.gold};margin-top:2px;`;
-      this.body.appendChild(setLine);
-    }
+      inspector.appendChild(actions);
+    } else inspector.textContent = 'Inventario vacío. Recogé objetos para verlos aquí.';
+    this.body.appendChild(inspector);
+    const hint = document.createElement('p'); hint.className = 'inventory-hint';
+    hint.textContent = 'Seleccioná un objeto para ver sus atributos. [I] Cerrar';
+    this.body.appendChild(hint);
+    const loot = document.createElement('p'); loot.className = 'inventory-hint';
+    loot.textContent = 'Botín público: acercate o hacé clic. Lo recoge el primer jugador vivo en alcance.';
+    this.body.appendChild(loot);
+    if (focusedKey) this.body.querySelectorAll<HTMLButtonElement>('[data-selection-key]').forEach(button => {
+      if (button.dataset.selectionKey === focusedKey) button.focus({ preventScroll: true });
+    });
+  }
 
-    // ── Divisor ────────────────────────────────────────────────────────
-    const hr = document.createElement("div");
-    hr.style.cssText = `height:1px;background:linear-gradient(90deg,transparent,${COLORS.goldDeep},transparent);margin:6px 0;`;
-    this.body.appendChild(hr);
-
-    // ── Inventario ─────────────────────────────────────────────────────
-    if (view.entries.length === 0) {
-      const empty = document.createElement("div");
-      empty.textContent = "(inventario vacío)";
-      empty.style.cssText = "opacity:0.6;";
-      this.body.appendChild(empty);
-      return;
-    }
-    for (const e of view.entries) {
-      try {
-        const item = getItem(e.itemTemplateId);
-        const r = this.row();
-        r.appendChild(itemIcon(e.itemTemplateId));
-        r.style.alignItems = "flex-start";
-        const info = document.createElement("div");
-        info.style.cssText = "min-width:0;flex:1;";
-        const label = document.createElement("div");
-        label.textContent = `${e.name}${e.qty > 1 ? ` x${e.qty}` : ""}`;
-        if (item.type === "equipment") label.style.color = RARITY_COLORS[item.rarity ?? "common"];
-        info.append(label, this.details(e.itemTemplateId, setCounts));
-        r.appendChild(info);
-
-        if (item.type === "consumable" && item.category === "joya") {
-          const targetWrap = document.createElement("div");
-          targetWrap.style.cssText = "display:flex;flex-direction:column;gap:4px;align-items:stretch;max-width:126px;";
-          const select = document.createElement("select");
-          select.dataset.jewelTarget = "";
-          select.title = "Objeto que recibirá la mejora";
-          select.style.cssText = "max-width:126px;font-size:11px;background:#171009;color:#ddceb0;border:1px solid #4a380f;pointer-events:auto;";
-          for (const target of this.equipmentTargets(view)) {
-            const option = document.createElement("option");
-            option.value = target.id;
-            option.textContent = target.name;
-            select.appendChild(option);
-          }
-          const use = this.makeBtn("Usar", "#2ecc40", () => this.cb.onUseItem?.(e.itemTemplateId, select.value));
-          use.disabled = select.options.length === 0;
-          if (use.disabled) { use.textContent = "Sin objetivo"; use.style.opacity = "0.5"; use.style.cursor = "not-allowed"; }
-          targetWrap.append(select, use);
-          r.appendChild(targetWrap);
-        } else if (item.type === "consumable" && (item.heal || item.mana || item.useEffect || item.learnSkill)) {
-          r.appendChild(this.makeBtn("Usar", "#2ecc40", () => this.cb.onUseItem?.(e.itemTemplateId)));
-        } else if (item.type === "equipment") {
-          const reason = this.equipReason(e.itemTemplateId, view);
-          const button = this.makeBtn(reason ? `Equipar · ${reason}` : "Equipar", "#4da6ff", () => this.cb.onEquip?.(e.itemTemplateId));
-          if (reason) { button.disabled = true; button.title = reason; button.style.opacity = "0.5"; button.style.cursor = "not-allowed"; }
-          r.appendChild(button);
-        }
-        this.body.appendChild(r);
-      } catch {
-        // Ignorar ítems con id inválido
-      }
-    }
+  private slotSilhouette(slot: EquipSlot): SVGSVGElement {
+    const paths: Record<EquipSlot, string> = {
+      weapon: 'M17 3 7 23l4 2L22 5ZM5 21l9 5M9 25l-3 6',
+      shield: 'M6 5 16 2l10 3v11c0 7-10 14-10 14S6 23 6 16ZM16 5v22',
+      helmet: 'M6 25V13a10 10 0 0 1 20 0v12l-7 3v-9h-6v9ZM7 14h18',
+      armor: 'm10 3-8 7 5 6 4-3-2 16h14l-2-16 4 3 5-6-8-7-6 4Z',
+      pants: 'M8 3h16l2 26h-8l-2-16-2 16H6ZM8 8h16',
+      boots: 'M7 4h7v17l-3 7H2v-6l5-3ZM21 4h7v17l-3 7h-9v-6l5-3Z',
+      gloves: 'm7 28-4-11 3-2 3 4V5h3v10-12h3v12-10h3v12-8h3v13l-4 6Z',
+      accessory: 'M6 4c-4 19 24 19 20 0M12 23l4-4 4 4-4 7Z',
+      ring: 'M24 19a8 8 0 1 1-16 0 8 8 0 0 1 16 0ZM11 7l5-5 5 5-5 6Z',
+      wings: 'M16 26C9 12 3 29 2 5l14 11L30 5c-1 24-7 7-14 21ZM16 16v12',
+      pet: 'm7 12-3-9 10 5h4l10-5-3 9 2 9-11 9L5 21ZM9 16h4m6 0h4m-10 7h6',
+    };
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('viewBox', '0 0 32 32'); svg.setAttribute('aria-hidden', 'true');
+    svg.classList.add('inventory-slot-symbol');
+    const path = document.createElementNS(svg.namespaceURI, 'path');
+    path.setAttribute('d', paths[slot]); path.setAttribute('fill', 'none'); path.setAttribute('stroke', 'currentColor'); path.setAttribute('stroke-width', '1.5');
+    svg.appendChild(path); return svg;
   }
 
   remove() {

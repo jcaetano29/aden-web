@@ -15,6 +15,46 @@ function view(over: Partial<Parameters<InventoryPanel["update"]>[0]> = {}) {
 }
 
 describe("InventoryPanel (Equipo)", () => {
+  it("selecciona objetos de la grilla sin equiparlos y mantiene la selección al sincronizar", () => {
+    const onEquip = vi.fn();
+    const panel = new InventoryPanel(document.body, { onEquip });
+    panel.toggle();
+    const entries = [
+      { itemTemplateId: "iron_sword", qty: 1, name: "Espada de Hierro" },
+      { itemTemplateId: "aden_punal_del_umbral", qty: 1, name: "Puñal del Umbral" },
+    ];
+    panel.update(view({ entries }));
+    const cell = document.querySelector<HTMLButtonElement>('[data-inventory-item="aden_punal_del_umbral"]');
+    expect(cell).not.toBeNull();
+    cell!.click();
+    expect(onEquip).not.toHaveBeenCalled();
+    panel.update(view({ entries, stats: { pAtk: 25, pDef: 15 } }));
+    expect(document.querySelector('[data-inventory-item="aden_punal_del_umbral"]')?.getAttribute('aria-pressed')).toBe('true');
+    [...document.querySelectorAll('button')].find(b => b.textContent === 'Equipar')!.click();
+    expect(onEquip).toHaveBeenCalledWith('aden_punal_del_umbral');
+  });
+
+  it("permite seleccionar una ranura equipada para quitar su objeto", () => {
+    const onUnequip = vi.fn();
+    const panel = new InventoryPanel(document.body, { onUnequip });
+    panel.toggle();
+    panel.update(view({ entries: [{ itemTemplateId: 'iron_sword', qty: 1, name: 'Espada' }], equipment: { helmet: 'aden_yelmo_de_la_senda_del_alba' } }));
+    const slot = document.querySelector<HTMLButtonElement>('[data-equip-slot="helmet"]');
+    expect(slot).not.toBeNull();
+    slot!.click();
+    [...document.querySelectorAll('button')].find(b => b.textContent === 'Quitar')!.click();
+    expect(onUnequip).toHaveBeenCalledWith('helmet');
+  });
+
+  it("actualiza la ficha si el objeto seleccionado desaparece e ignora ids inválidos", () => {
+    const panel = new InventoryPanel(document.body);
+    panel.toggle();
+    panel.update(view({ entries: [{ itemTemplateId: 'iron_sword', qty: 1, name: 'Espada' }] }));
+    panel.update(view({ entries: [{ itemTemplateId: 'invalid-item', qty: 1, name: 'Inválido' }], equipment: { helmet: 'invalid-item' } }));
+    expect(document.querySelector('.inventory-inspector')?.textContent).toContain('Inventario vacío');
+    expect(document.querySelectorAll('[data-inventory-item]')).toHaveLength(0);
+    expect([...document.querySelectorAll('button')].some(b => b.textContent === 'Equipar')).toBe(false);
+  });
   it("un ítem de equipo en el inventario muestra el botón Equipar y dispara onEquip", () => {
     const onEquip = vi.fn();
     const panel = new InventoryPanel(document.body, { onEquip });
