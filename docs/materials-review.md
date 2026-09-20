@@ -16,7 +16,7 @@ pantalla de entrada, renderizado WebGL, animaciones idle y errores de consola en
 las cinco zonas y los seis modelos. Esto no sustituye una prueba multijugador de
 combate ni una medición de FPS en el equipo final del jugador.
 
-Validación realizada: TypeScript sin errores, 59 pruebas del cliente aprobadas,
+Validación realizada: TypeScript sin errores, 68 pruebas del cliente aprobadas,
 build de producción correcto y seis vistas verificadas en Chrome/WebGL2 a
 1440 × 960 sin errores de shaders ni JavaScript. Las fuentes externas de Google
 estaban bloqueadas por el entorno de prueba; se usó la tipografía de respaldo.
@@ -28,3 +28,20 @@ Los materiales reutilizan las fuentes del atlas; la repetición es por material.
 
 Los personajes mantienen su geometría low-poly. Este cambio renueva superficies,
 relieve, telas, metales, terrenos e iluminación; no reemplaza modelos ni rigging.
+
+## Mapas y respawn
+
+`MapDressing` añade grupos de árboles con copas, sotobosque, rocas, columnas,
+refugios y capillas laterales. Los grupos repetidos se dibujan mediante
+InstancedMesh por zona. El trazado reserva espacio para el eje principal, la
+llegada, el centro de combate y los objetos interactivos. La población anterior
+también respeta los nuevos caminos. El pueblo incorpora viviendas y jardines en
+el sector sur; el piso central del templo queda a nivel del terreno caminable.
+
+El botón **Probar muerte y respawn** ejecuta una secuencia sobre el esqueleto real:
+camina, muere, su cuerpo se retira bajo el suelo y reaparece dos metros más allá.
+La verificación automática comprueba la posición exacta `[7.75, 0, 8]` y que sólo
+quede activa la animación `Idle`. Las pruebas de regresión cubren la interrupción
+de la muerte por cambios de movimiento, eventos duplicados/tardíos y el reinicio
+de pose sin interpolación desde el cadáver. No se cambiaron tiempos de respawn,
+estadísticas, cantidad de enemigos ni reglas del servidor.

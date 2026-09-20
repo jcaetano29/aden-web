@@ -13,7 +13,7 @@ export interface Character {
   root: THREE.Object3D;
   mixer: THREE.AnimationMixer;
   clipNames: string[];
-  play(name: string): void;
+  play(name: string, immediate?: boolean): void;
   /**
    * Reproduce `name` una sola vez (LoopOnce + clampWhenFinished, queda clavado
    * en el último frame) y llama a `onFinished` cuando termina. Si se llama de
@@ -80,15 +80,23 @@ export class CharacterFactory {
       root,
       mixer,
       clipNames: model.animations.map((c) => c.name),
-      play(name: string) {
+      play(name: string, immediate = false) {
         const next = actions.get(name);
-        if (!next || next === current) return;
+        if (!next || (next === current && !immediate)) return;
+        if (immediate) {
+          mixer.stopAllAction();
+          current = null;
+        }
         next.setLoop(THREE.LoopRepeat, Infinity);
-        next.reset().fadeIn(0.2).play();
+        next.clampWhenFinished = false;
+        next.reset().setEffectiveWeight(1).setEffectiveTimeScale(1);
+        if (!immediate) next.fadeIn(0.2);
+        next.play();
         if (current) current.fadeOut(0.2);
         current = next;
         onceAction = null;
         onceCallback = null;
+        if (immediate) mixer.update(0);
       },
       playOnce(name: string, onFinished: () => void) {
         const next = actions.get(name);

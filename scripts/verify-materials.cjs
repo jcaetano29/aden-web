@@ -27,7 +27,17 @@ const fs = require('node:fs');
     await page.waitForFunction(n => Number(document.body.dataset.frames) > Number(n)+20, start);
     await page.screenshot({path: `artifacts/materials/${location.toLowerCase()}.png`});
   }
-  const report = { errors, resourceWarnings, scenes: 6, viewport: '1440x960', renderer: await page.evaluate(()=>{
+  await page.getByRole('button',{name:'Probar muerte y respawn',exact:true}).click();
+  await page.waitForSelector('body[data-respawn=dead]');
+  await page.screenshot({path:'artifacts/materials/death.png'});
+  await page.waitForSelector('body[data-respawn=respawned]',{timeout:30000});
+  const respawn = await page.evaluate(()=>window.respawnReview());
+  if(respawn.position[0]!==7.75 || respawn.position[1]!==0 || respawn.position[2]!==8)
+    errors.push({message:'Respawn did not snap to the exact server position',respawn});
+  if(respawn.actions.some(name=>/death|hit|attack/i.test(name)) || !respawn.actions.some(name=>/idle/i.test(name)))
+    errors.push({message:'Respawn retained a combat/death animation',respawn});
+  await page.screenshot({path:'artifacts/materials/respawn.png'});
+  const report = { errors, resourceWarnings, respawn, scenes: 6, viewport: '1440x960', renderer: await page.evaluate(()=>{
     const gl=document.querySelector('canvas').getContext('webgl2');return gl?.getParameter(gl.VERSION);
   }) };
   fs.writeFileSync('artifacts/materials/report.json',JSON.stringify(report,null,2));

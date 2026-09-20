@@ -100,7 +100,7 @@ export class EntityViews {
     const wasDead = this.playerDead.get(id) ?? false;
     this.playerDead.set(id, state.dead);
     if (wasDead && !state.dead) {
-      this.views.get(id)?.resetAnimation();
+      this.views.get(id)?.respawn(state);
     }
     // Refrescar el texto del nameplate si cambió el guildTag (crear/unirse/salir de guild).
     const prevTag = this.playerGuildTag.get(id) ?? "";
@@ -151,6 +151,7 @@ export class EntityViews {
     this.mobRootToId.set(view.object, id);
     this.mobDead.set(id, snap.dead);
     this.mobMap.set(id, snap.mapId ?? "");
+    if (snap.dead) view.playOnce("death");
     view.object.visible = (snap.mapId ?? "") === this.currentMapId;
 
     // Nameplate: jefe final en rojo, mini-jefe de zona en violeta — ambos con nombre.
@@ -191,6 +192,11 @@ export class EntityViews {
     this.mobHealthBars.get(id)?.update(snap.hp, snap.maxHp);
     const wasDead = this.mobDead.get(id) ?? false;
     this.mobDead.set(id, snap.dead);
+    // State patches also drive death (e.g. joining after the Death event).
+    if (snap.dead) {
+      this.mobViews.get(id)?.playOnce("death");
+      this.mobHealthBars.get(id)?.setVisible(false);
+    }
     // Si el mob objetivo acaba de morir, el server ya no aceptará/mantendrá
     // este target: limpiamos el resaltado de inmediato en vez de esperar al
     // evento Death (que además puede no estar cableado aún, ver Task 6).
@@ -201,12 +207,12 @@ export class EntityViews {
     // pose de muerte clavada por playOnce("death").
     if (wasDead && !snap.dead) {
       this.mobHealthBars.get(id)?.setVisible(true);
-      this.mobViews.get(id)?.resetAnimation();
+      this.mobViews.get(id)?.respawn(snap);
     }
     // Telegraph ring: mostrar si hay wind-up activo
     const ring = this.mobTelegraphRings.get(id);
     if (ring) {
-      ring.visible = snap.windupMs > 0;
+      ring.visible = !snap.dead && snap.windupMs > 0;
     }
   }
 
@@ -246,6 +252,8 @@ export class EntityViews {
     this.mobViews.get(mobId)?.playOnce("death");
     this.mobHealthBars.get(mobId)?.setVisible(false);
     this.mobDead.set(mobId, true);
+    const ring = this.mobTelegraphRings.get(mobId);
+    if (ring) ring.visible = false;
     if (this.currentTargetId === mobId) this.setTargetHighlight(null);
   }
 

@@ -34,6 +34,8 @@ export class CharacterView {
   private targetRing: THREE.Mesh | null = null;
   private selfRing: THREE.Mesh | null = null;
   private ringT = 0;
+  private dead = false;
+  private deathTime = 0;
 
   constructor(private readonly character: Character) {
     this.idleClip = selectClip(character.clipNames, "idle");
@@ -63,6 +65,15 @@ export class CharacterView {
 
   update(dt: number) {
     const root = this.character.root;
+    if (this.dead) {
+      this.character.mixer.update(dt);
+      this.deathTime += dt;
+      // Let the fall finish, then remove the corpse below the ground. Keep the
+      // root's visibility reserved for map filtering in EntityViews.
+      const sink = Math.min(1, Math.max(0, (this.deathTime - 2.5) / 1.2));
+      root.position.y = -3 * root.scale.y * sink * sink * (3 - 2 * sink);
+      return;
+    }
     // Etapa 15: si el salto es enorme (warp entre mapas / respawn a otro mapa),
     // teletransportar en vez de deslizar por el vacío entre regiones.
     const jump = Math.hypot(this.state.x - root.position.x, this.state.z - root.position.z);
@@ -156,6 +167,12 @@ export class CharacterView {
    * `moving` al terminar.
    */
   playOnce(kind: "attack" | "hit" | "death") {
+    if (this.dead) return;
+    if (kind === "death") {
+      this.dead = true;
+      this.deathTime = 0;
+      this.removeTargetRing();
+    }
     const clip = selectClip(this.character.clipNames, kind);
     if (!clip) return;
     this.lastMoving = this.state.moving;
@@ -164,6 +181,7 @@ export class CharacterView {
       return;
     }
     this.character.playOnce(clip, () => {
+      if (this.dead) return;
       const back = this.state.moving ? this.walkClip : this.idleClip;
       if (back) this.character.play(back);
       this.lastMoving = this.state.moving;
@@ -175,9 +193,20 @@ export class CharacterView {
    * respawn para salir de la pose de muerte clavada por `playOnce("death")`.
    */
   resetAnimation() {
+    this.dead = false;
+    this.deathTime = 0;
+    this.character.root.position.y = 0;
     const clip = this.state.moving ? this.walkClip : this.idleClip;
-    if (clip) this.character.play(clip);
+    if (clip) this.character.play(clip, true);
     this.lastMoving = this.state.moving;
+  }
+
+  /** A respawn is a discontinuity, even when the spawn is only a few metres away. */
+  respawn(state: ServerState): void {
+    this.snapTo(state.x, state.z);
+    this.setServerState(state);
+    this.desiredYaw = null;
+    this.resetAnimation();
   }
 
   dispose() {

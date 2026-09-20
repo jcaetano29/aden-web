@@ -1,5 +1,6 @@
 import * as THREE from "three";
-import { ZONES, getZone, zoneAt, TOWN, SAFE_RADIUS, distance2D, type Zone } from "@aden/shared";
+import { addMapDressing } from "./MapDressing.js";
+import { ZONES, WORLD_OBJECTS, getZone, zoneAt, TOWN, SAFE_RADIUS, distance2D, type Zone } from "@aden/shared";
 import { stoneMat, woodMat, roofMat, thatchMat, plasterMat, cobbleMat, clothMat, crackedStoneMat, terrainMat, metalMat, foliageMat, boneMat, texturedMaterial } from "./textures.js";
 
 /** RNG determinístico (mulberry32) con seed fija → todos los clientes ven el mismo mundo. */
@@ -87,6 +88,7 @@ export class Environment {
     this.paintBiomes();
     this.structures();
     this.populate();
+    addMapDressing(this.scene);
     this.addMotes();
     this.enableShadows();
   }
@@ -122,6 +124,7 @@ export class Environment {
     this.scene.traverse((o) => {
       const m = o as THREE.Mesh;
       if (!m.isMesh || m === this.skyMesh) return;
+      if (m.userData.noCastShadow) { m.castShadow = false; m.receiveShadow = true; return; }
       // Los suelos sólo RECIBEN sombra (no la proyectan): evita auto-sombra y ahorra.
       if (m.userData.ground) { m.castShadow = false; m.receiveShadow = true; return; }
       m.castShadow = true; m.receiveShadow = true;
@@ -272,6 +275,16 @@ export class Environment {
     // Corral con vallas y algunos props de vida.
     this.fence(cx - 30, cz + 8, cx - 30, cz - 6);
     this.fence(cx - 30, cz - 6, cx - 18, cz - 6);
+    // Southern residential quarter and garden lanes give the arrival a lived-in scale.
+    for (const side of [-1, 1]) {
+      this.house(cx + side * 23, cz + 24, side * Math.PI / 2, 0xc9b991, 0x566274, false);
+      this.road(cx + side * 5, cz + 24, cx + side * 20, cz + 24, 3);
+      this.lamp(cx + side * 11, cz + 26);
+      this.banner(cx + side * 12, cz + 22, 3.5, 0x772f3f);
+      this.woodPile(cx + side * 27, cz + 20, mulberry32(side + 80));
+      this.fence(cx + side * 15, cz + 30, cx + side * 27, cz + 30);
+      for (let i = 0; i < 5; i++) this.bush(cx + side * (15 + i * 2.4), cz + 32, mulberry32(i + 74), 0x567142);
+    }
   }
 
   /** Muralla de piedra alrededor del pueblo (octógono), con hueco de portón al sur. */
@@ -551,8 +564,9 @@ export class Environment {
     const g = new THREE.Group();
     const stone = crackedStoneMat(0x8a8497, [4, 1], true);
     const colStone = crackedStoneMat(0x8a8497, [1, 3], true);
-    const platform = new THREE.Mesh(new THREE.BoxGeometry(30, 1, 20), stone);
-    platform.position.y = 0.5;
+    const platform = new THREE.Mesh(new THREE.BoxGeometry(30, 0.06, 20), cobbleMat(0x87818c, [5, 3]));
+    platform.position.y = 0.025;
+    platform.userData.ground = true;
     g.add(platform);
     // dos hileras de columnas (algunas rotas)
     for (let i = 0; i < 6; i++) {
@@ -616,9 +630,15 @@ export class Environment {
   /** Punto aleatorio dentro de los bounds del mapa, con un margen desde el borde. */
   private spot(z: Zone, rng: () => number, _innerFrac = 0.15): [number, number] {
     const m = 6; // margen desde el borde
-    const x = z.bounds.minX + m + rng() * (z.bounds.maxX - z.bounds.minX - 2 * m);
-    const zz = z.bounds.minZ + m + rng() * (z.bounds.maxZ - z.bounds.minZ - 2 * m);
-    return [x, zz];
+    for (let attempt = 0; attempt < 128; attempt++) {
+      const x = z.bounds.minX + m + rng() * (z.bounds.maxX - z.bounds.minX - 2 * m);
+      const zz = z.bounds.minZ + m + rng() * (z.bounds.maxZ - z.bounds.minZ - 2 * m);
+      if (!z.safe && (Math.abs(x-z.center.x)<7 || Math.abs(zz-z.center.z)<5 || Math.hypot(x-z.center.x,zz-z.center.z)<18)) continue;
+      if (Math.hypot(x-z.spawn.x,zz-z.spawn.z)<9) continue;
+      if (WORLD_OBJECTS.some(o=>o.mapId===z.id && Math.hypot(x-o.x,zz-o.z)<6)) continue;
+      return [x, zz];
+    }
+    return [z.bounds.minX + m, z.bounds.minZ + m];
   }
 
   private rock(x: number, z: number, rng: () => number, color = 0x7a7d80): void {

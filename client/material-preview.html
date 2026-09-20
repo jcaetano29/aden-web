@@ -14,6 +14,7 @@
   import { Renderer } from '/src/render/Renderer.ts';
   import { Environment } from '/src/render/Environment.ts';
   import { CharacterFactory } from '/src/render/CharacterFactory.ts';
+  import { CharacterView } from '/src/render/CharacterView.ts';
   import { preloadMaterialAtlas } from '/src/render/materialAtlas.ts';
   import { MODEL_NAMES, MOB_MODEL_NAMES } from '/src/assets/manifest.ts';
   import { selectClip } from '/src/render/animation.ts';
@@ -26,6 +27,7 @@
     const c = factory.create(name); c.root.position.set((i-2.5)*2.3,0,8);
     renderer.scene.add(c.root); c.play(selectClip(c.clipNames,'idle') || c.clipNames[0]); return c;
   });
+  const views=characters.map(c=>{const v=new CharacterView(c);v.snapTo(c.root.position.x,c.root.position.z);return v;});
   const locations = { 'Pueblo':[0,0], 'Bosque':[300,0], 'Ruinas':[0,300], 'Yermo':[300,300], 'Trono':[600,150], 'Personajes':[0,8] };
   let location='Pueblo'; let frames=0;
   for(const name of Object.keys(locations)) {
@@ -33,12 +35,33 @@
     b.onclick=()=>{location=name; document.querySelectorAll('button').forEach(el=>el.setAttribute('aria-pressed',String(el===b)));};
     b.setAttribute('aria-pressed',String(name===location));document.querySelector('#controls').append(b);
   }
+  let demoTime=null;
+  const demoButton=document.createElement('button');demoButton.textContent='Probar muerte y respawn';
+  demoButton.onclick=()=>{
+    location='Personajes';demoTime=0;
+    views[5].respawn({x:5.75,z:8,targetX:4,targetZ:8,moving:true});
+    document.body.dataset.respawn='walking';
+  };
+  document.querySelector('#controls').append(demoButton);
+  window.respawnReview=()=>({position:views[5].object.position.toArray(),
+    actions:characters[5].mixer._actions.filter(a=>a.isRunning()).map(a=>a.getClip().name)});
   let last=performance.now();
   function frame(now){
     const dt=Math.min((now-last)/1000,0.05);last=now;
     const [x,z]=locations[location]; const close=location==='Personajes';
     renderer.camera.position.set(x,close?4:25,z+(close?12:29));renderer.camera.lookAt(x,close?1.1:0,z);
-    environment.updateMood(x,z,dt);characters.forEach(c=>c.mixer.update(dt));renderer.render();frames++;
+    if(demoTime!==null) {
+      demoTime+=dt;
+      if(demoTime>0.8 && document.body.dataset.respawn==='walking') {
+        views[5].playOnce('death');views[5].setServerState({x:5.75,z:8,targetX:5.75,targetZ:8,moving:false});
+        document.body.dataset.respawn='dead';
+      }
+      if(demoTime>5) {
+        views[5].respawn({x:7.75,z:8,targetX:7.75,targetZ:8,moving:false});
+        document.body.dataset.respawn='respawned';demoTime=null;
+      }
+    }
+    environment.updateMood(x,z,dt);views.forEach(v=>v.update(dt));renderer.render();frames++;
     document.querySelector('#status').textContent=location+' · Materiales del juego · '+(close?'4 clases y 2 enemigos':'Vista de escenario');
     document.body.dataset.ready='true';document.body.dataset.frames=frames;requestAnimationFrame(frame);
   }requestAnimationFrame(frame);
