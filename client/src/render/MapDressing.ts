@@ -1,44 +1,8 @@
+export { dressingLayout } from "@aden/shared";
 import * as THREE from "three";
-import { ZONES, WORLD_OBJECTS, type Zone } from "@aden/shared";
+import { ZONES, STRUCTURE_BOXES, STRUCTURE_SIZE, dressingLayout, type Zone } from "@aden/shared";
 import { woodMat, foliageMat, crackedStoneMat, stoneMat, clothMat, metalMat, texturedMaterial } from "./textures.js";
 
-interface Placement { x: number; z: number; scale: number; yaw: number; kind: "tree" | "rock" | "shrub"; }
-function random(seed: number): () => number {
-  return () => {
-    seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-    return seed / 4294967296;
-  };
-}
-
-/** Clustered, reproducible decoration. The main route, central arena, spawn and
- * interactables reserve space before any props are emitted. No gameplay state. */
-export function dressingLayout(zone: Zone): Placement[] {
-  if (zone.id === "cripta") return []; // The dungeon uses authored chambers, not scattered scenery.
-  const rng = random(Array.from(zone.id).reduce((n,c)=>n*31+c.charCodeAt(0),8421));
-  const objects = WORLD_OBJECTS.filter(o=>o.mapId===zone.id);
-  const out: Placement[] = [];
-  const count = zone.safe ? 260 : zone.id === "bosque" ? 880 : 520;
-  for (let attempt=0; attempt<count*12 && out.length<count; attempt++) {
-    // Alternating groves and scattered low detail avoids a uniform carpet.
-    const cluster = attempt % 8;
-    const angle = cluster * Math.PI / 4 + 0.24;
-    const radius = zone.safe ? 52 : 34 + (cluster%2)*12;
-    const dx = Math.cos(angle)*radius + (rng()-0.5)*27;
-    const dz = Math.sin(angle)*radius + (rng()-0.5)*27;
-    const x = zone.center.x+dx, z = zone.center.z+dz;
-    if (Math.abs(dx)>60 || Math.abs(dz)>60 || Math.abs(dx)<7 || Math.abs(dz)<5) continue;
-    if (Math.hypot(dx,dz)<(zone.safe?46:19)) continue;
-    if (!zone.safe && [-1,1].some(side=>[-1,1].some(row=>Math.hypot(dx-side*25,dz-row*26)<10))) continue;
-    if (Math.hypot(x-zone.spawn.x,z-zone.spawn.z)<10) continue;
-    if (objects.some(o=>Math.hypot(x-o.x,z-o.z)<7)) continue;
-    const roll=rng();
-    const kind = roll < (zone.id === "bosque" ? 0.3 : zone.safe ? 0.25 : 0.12) ? "tree" : roll<0.52 ? "rock" : "shrub";
-    // Keep large trees/columns from overlapping one another inside a grove.
-    if (kind === "tree" && out.some(p=>p.kind==="tree" && Math.hypot(p.x-x,p.z-z)<3.5)) continue;
-    out.push({x,z,scale:0.65+rng()*0.8,yaw:rng()*Math.PI*2,kind});
-  }
-  return out;
-}
 
 function instances(scene: THREE.Scene, name: string, geometry: THREE.BufferGeometry,
   material: THREE.Material, poses: Array<{x:number;y:number;z:number;sx:number;sy:number;sz:number;yaw:number}>, shadow=true) {
@@ -66,7 +30,7 @@ export function addMapDressing(scene: THREE.Scene): void {
     const rocks=layout.filter(p=>p.kind==="rock");
     const shrubs=layout.filter(p=>p.kind==="shrub");
     const stone=crackedStoneMat(burnt?0x504b48:0x909186,[1,1]);
-    instances(scene,`${zone.id}-grove-trunks`,new THREE.CylinderGeometry(forest||burnt?0.18:0.55,forest||burnt?0.34:0.72,1,7),
+    instances(scene,`${zone.id}-grove-trunks`,new THREE.CylinderGeometry(forest||burnt?0.18:0.55,forest||burnt?0.34:STRUCTURE_SIZE.dressingColumnRadius,1,7),
       forest||burnt?woodMat(0x63513b,[1,3]):stone,
       trees.map(p=>({x:p.x,z:p.z,y:p.scale*2.5,sx:p.scale,sy:p.scale*5,sz:p.scale,yaw:p.yaw})));
     if (forest) {
@@ -120,32 +84,11 @@ function landmarks(scene: THREE.Scene, zone: Zone): void {
   const timber=woodMat(0x63503c,[2,1]);
   const cloth=clothMat(zone.id==="bosque"?0x65764a:zone.id==="trono"?0x812e39:0x58436e);
   const iron=metalMat(0x85837b);
-  function box(g:THREE.Group,x:number,y:number,z:number,w:number,h:number,d:number,material:THREE.Material) {
-    const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);mesh.position.set(x,y,z);g.add(mesh);return mesh;
-  }
-  // Four authored pockets flank the clear central arena and its approach.
-  for (const side of [-1,1]) for (const row of [-1,1]) {
-    const g=new THREE.Group();g.position.set(zone.center.x+side*25,0,zone.center.z+row*26);
-    if(zone.id==="bosque") {
-      // Abandoned hunting shelters, stacked supplies and a watch platform.
-      for(const x of [-3,3]) for(const z of [-2,2]) box(g,x,1.8,z,0.22,3.6,0.22,timber);
-      const roof=box(g,0,3.5,0,7,0.15,5,cloth);roof.rotation.z=side*0.12;
-      for(let i=0;i<3;i++) box(g,-2+i*1.1,0.55,-1,0.9,1.1,0.8,timber);
-      box(g,0,0.45,2.5,4.4,0.18,0.7,timber);
-    } else {
-      // Broken side chapels: low walls, pillars, tombs and a banner mark destinations.
-      box(g,0,0.8,-4,12,1.6,0.9,stone);
-      box(g,side*5,1.1,0,0.9,2.2,8,stone);
-      for(const x of [-4,4]) {
-        box(g,x,2.2,-3,1.1,4.4,1.1,stone);box(g,x,4.5,-3,1.8,0.4,1.8,stone);
-        box(g,x,0.6,1,1.8,1.2,3,stone);
-      }
-      box(g,0,2.6,-3,0.12,5.2,0.12,iron);box(g,0.75,3.7,-3,1.4,2,0.08,cloth);
-    }
-    // Avoid burying a chest or shrine if authored locations change in shared data.
-    if(WORLD_OBJECTS.some(o=>o.mapId===zone.id && Math.hypot(o.x-g.position.x,o.z-g.position.z)<12)) {
-      g.traverse(o=>{if(o instanceof THREE.Mesh)o.geometry.dispose();});continue;
-    }
-    g.name=`${zone.id}-landmark`;scene.add(g);
+  const materials={stone,timber,cloth,iron};
+  for(const p of STRUCTURE_BOXES.filter(p=>p.mapId===zone.id)) {
+    const mesh=new THREE.Mesh(new THREE.BoxGeometry(p.width,p.height,p.depth),materials[p.material as keyof typeof materials]);
+    mesh.position.set(p.x,p.y,p.z);mesh.rotation.y=p.rotation;
+    if(p.solid)mesh.userData.structureId=p.id;
+    mesh.name=zone.id+'-landmark';scene.add(mesh);
   }
 }

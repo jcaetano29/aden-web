@@ -1,15 +1,16 @@
-import { clothMat, woodMat, metalMat, leatherMat } from "./textures.js";
 import * as THREE from "three";
-import { TOWN, getZone } from "@aden/shared";
+import { TOWN, getZone, nearestWalkable, findPath, clipMovement, type Point2 } from "@aden/shared";
+import type { CharacterFactory, Character } from "./CharacterFactory.js";
+import { selectClip } from "./animation.js";
 
 /**
  * Vida ambiental PURAMENTE DECORATIVA: aldeanos y guardias que deambulan por el
  * pueblo + fauna por los mapas (gallinas en el pueblo, ciervos en el bosque,
- * cuervos en ruinas/yermo). No hay red ni colisión: cada criatura elige un punto
+ * cuervos en ruinas/yermo). Sin red; cada criatura consulta las colisiones compartidas y elige un punto
  * cercano, camina hacia él con un balanceo de piernas/brazos, y al llegar elige
  * otro. Se ocultan cuando el jugador no está en su mapa (perf + coherencia).
  *
- * Figuras low-poly (cajas + esferas), sin cargar modelos, para no pesar.
+ * Aldeanos y guardias articulados reutilizan los modelos locales; fauna procedural.
  */
 
 interface Critter {
@@ -27,6 +28,8 @@ interface Critter {
   arms: THREE.Object3D[];
   pecker?: THREE.Object3D; // cabeza/pico que picotea (fauna)
   peckBaseY: number;
+  path: Point2[];
+  character?: Character;
   bob: number; // amplitud de bob vertical al caminar
 }
 
@@ -37,16 +40,13 @@ function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
-const SKIN = [0xe0b48c, 0xc9925f, 0xffcfa3, 0xa9714b, 0xf1c27d];
 const SHIRT = [0x8a4b3b, 0x3b5f8a, 0x4f7a4a, 0x8a7a3b, 0x6a4a7a, 0x7a3b3b, 0x3b7a7a];
-const PANTS = [0x4a3a2a, 0x33404a, 0x3a3a3a, 0x5a4a2a];
-const HAIR = [0x2a1a0a, 0x4a3018, 0x6a5030, 0x111111, 0x8a6a3a];
 
 export class AmbientLife {
   private readonly critters: Critter[] = [];
   private currentMap = "pueblo";
 
-  constructor(private readonly scene: THREE.Scene) {
+  constructor(private readonly scene: THREE.Scene, private readonly factory: Pick<CharacterFactory, "create">) {
     this.populateTown();
     this.populateWild();
   }
@@ -55,6 +55,9 @@ export class AmbientLife {
     // AmbientLife se crea después de Environment.enableShadows() → activamos sombras aquí.
     c.root.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.castShadow = true; });
     this.scene.add(c.root);
+    const safe = nearestWalkable(c.mapId, c.root.position);
+    c.root.position.x = c.homeX = c.tx = safe.x;
+    c.root.position.z = c.homeZ = c.tz = safe.z;
     this.critters.push(c);
   }
 
@@ -96,77 +99,38 @@ export class AmbientLife {
 
   // ── Constructores de figuras ───────────────────────────────────────────────
 
-  /** Humanoide low-poly base: piernas, torso, brazos, cabeza. Devuelve refs animables. */
-  private humanoid(x: number, z: number, opts: { shirt: number; pants: number; skin: number; hair: number; scale?: number }): {
-    root: THREE.Group; legs: THREE.Object3D[]; arms: THREE.Object3D[];
-  } {
-    const s = opts.scale ?? 1;
+  /** Townsfolk share articulated rigs with heroes, with isolated materials. */
+  private townsperson(x: number, z: number, guard: boolean): Critter {
+    const character = this.factory.create(guard ? "Knight" : "Rogue");
     const root = new THREE.Group();
     root.position.set(x, 0, z);
-    root.scale.setScalar(s);
-    const flat = (color: number, rough = 0.9) => new THREE.MeshStandardMaterial({ color, flatShading: true, roughness: rough });
-    const legMat = leatherMat(opts.pants);
-    const legs: THREE.Object3D[] = [];
-    for (const lx of [-0.13, 0.13]) {
-      const pivot = new THREE.Group();
-      pivot.position.set(lx, 0.55, 0);
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.55, 0.24), legMat);
-      leg.position.y = -0.27;
-      pivot.add(leg);
-      root.add(pivot);
-      legs.push(pivot);
+    character.root.scale.setScalar(guard ? 0.94 : rand(0.82, 0.92));
+    root.add(character.root);
+    const tint = new THREE.Color(guard ? 0x9aadc1 : pick(SHIRT));
+    character.root.traverse(object => {
+      if (!(object instanceof THREE.Mesh)) return;
+      const finish = (source: THREE.Material) => {
+        const mat = source.clone();
+        if (mat instanceof THREE.MeshStandardMaterial && !object.name.startsWith("hero_")) {
+          mat.color.lerp(tint, guard ? 0.12 : 0.28);
+        }
+        return mat;
+      };
+      object.material = Array.isArray(object.material) ? object.material.map(finish) : finish(object.material);
+    });
+    if (!guard) {
+      const dagger = character.root.getObjectByName("Rogue_Dagger");
+      if (dagger) dagger.visible = false;
     }
-    // Torso.
-    const torso = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.62, 0.3), clothMat(opts.shirt));
-    torso.position.y = 0.9;
-    root.add(torso);
-    // Cinto.
-    const belt = new THREE.Mesh(new THREE.BoxGeometry(0.52, 0.1, 0.32), leatherMat(0x3a2a18));
-    belt.position.y = 0.62; root.add(belt);
-    // Brazos.
-    const arms: THREE.Object3D[] = [];
-    for (const ax of [-0.33, 0.33]) {
-      const pivot = new THREE.Group();
-      pivot.position.set(ax, 1.14, 0);
-      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.52, 0.17), clothMat(opts.shirt));
-      arm.position.y = -0.26;
-      pivot.add(arm);
-      root.add(pivot);
-      arms.push(pivot);
-    }
-    // Cabeza + pelo.
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.19, 10, 10), flat(opts.skin, 0.7));
-    head.position.y = 1.4; root.add(head);
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.2, 10, 8, 0, Math.PI * 2, 0, Math.PI / 1.7), flat(opts.hair));
-    hair.position.y = 1.44; root.add(hair);
-    return { root, legs, arms };
+    const idle = selectClip(character.clipNames, "idle");
+    if (idle) character.play(idle, true);
+    const c = this.critter(root, "pueblo", x, z, guard ? rand(6,12) : rand(10,30), guard ? rand(.8,1.1) : rand(1.1,1.8), [], [], 0);
+    c.character = character;
+    return c;
   }
 
-  private villager(x: number, z: number): Critter {
-    const h = this.humanoid(x, z, { shirt: pick(SHIRT), pants: pick(PANTS), skin: pick(SKIN), hair: pick(HAIR), scale: rand(0.9, 1.08) });
-    // A veces una capa/túnica sobre los hombros.
-    if (Math.random() < 0.4) {
-      const cloak = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.9, 6, 1, true), Object.assign(clothMat(pick(SHIRT)), { side: THREE.DoubleSide }));
-      cloak.position.y = 0.95; h.root.add(cloak);
-    }
-    return this.critter(h.root, "pueblo", x, z, rand(10, 30), rand(1.1, 1.8), h.legs, h.arms, 0.03);
-  }
-
-  private guard(x: number, z: number): Critter {
-    const h = this.humanoid(x, z, { shirt: 0x555a66, pants: 0x33363d, skin: pick(SKIN), hair: pick(HAIR), scale: 1.08 });
-    // Casco.
-    const helmet = new THREE.Mesh(new THREE.CylinderGeometry(0.21, 0.21, 0.22, 10), metalMat(0x9aa0ad));
-    helmet.position.y = 1.4; h.root.add(helmet);
-    const crest = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.3, 6), clothMat(0xb23b3b));
-    crest.position.y = 1.62; h.root.add(crest);
-    // Lanza en la mano derecha.
-    const spear = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 2.2, 6), woodMat(0x5a3f24));
-    spear.position.set(0.4, 1.0, 0.1); h.root.add(spear);
-    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.25, 6), metalMat(0xc0c4cc));
-    tip.position.set(0.4, 2.2, 0.1); h.root.add(tip);
-    // Los guardias patrullan más lento y en un radio menor.
-    return this.critter(h.root, "pueblo", x, z, rand(6, 12), rand(0.8, 1.1), h.legs, [h.arms[0]], 0.02);
-  }
+  private villager(x: number, z: number): Critter { return this.townsperson(x, z, false); }
+  private guard(x: number, z: number): Critter { return this.townsperson(x, z, true); }
 
   private chicken(x: number, z: number): Critter {
     const root = new THREE.Group();
@@ -237,15 +201,17 @@ export class AmbientLife {
     return {
       root, mapId, homeX: x, homeZ: z, radius, speed,
       tx: x, tz: z, phase: Math.random() * Math.PI * 2, idle: rand(0, 2),
-      legs, arms, peckBaseY: 0, bob,
+      legs, arms, peckBaseY: 0, bob, path: [],
     };
   }
 
   private newTarget(c: Critter): void {
     const a = Math.random() * Math.PI * 2;
     const r = Math.random() * c.radius;
-    c.tx = c.homeX + Math.cos(a) * r;
-    c.tz = c.homeZ + Math.sin(a) * r;
+    const target = nearestWalkable(c.mapId, { x: c.homeX + Math.cos(a) * r, z: c.homeZ + Math.sin(a) * r });
+    c.path = findPath(c.mapId, c.root.position, target);
+    const first = c.path.shift() ?? { x: c.root.position.x, z: c.root.position.z };
+    c.tx = first.x; c.tz = first.z;
   }
 
   /** Actualiza movimiento y animación. Llamar cada frame con el mapa actual del jugador. */
@@ -263,12 +229,16 @@ export class AmbientLife {
       let moving = false;
       if (c.idle > 0) {
         c.idle -= dt;
-      } else if (dist > 0.4) {
+      } else if (dist > 0.01) {
         moving = true;
         const vx = (dx / dist) * c.speed;
         const vz = (dz / dist) * c.speed;
-        c.root.position.x += vx * dt;
-        c.root.position.z += vz * dt;
+        const travel = Math.min(dist, c.speed * dt);
+        const next = clipMovement(c.mapId, c.root.position, { x: c.root.position.x + dx / dist * travel, z: c.root.position.z + dz / dist * travel });
+        if (Math.hypot(next.x - c.root.position.x, next.z - c.root.position.z) < 0.0001) {
+          c.path = []; c.tx = next.x; c.tz = next.z; moving = false;
+        }
+        c.root.position.x = next.x; c.root.position.z = next.z;
         // Encarar la dirección de movimiento (suave).
         const targetYaw = Math.atan2(vx, vz);
         let dyaw = targetYaw - c.root.rotation.y;
@@ -276,10 +246,16 @@ export class AmbientLife {
         while (dyaw < -Math.PI) dyaw += Math.PI * 2;
         c.root.rotation.y += dyaw * Math.min(1, dt * 8);
       } else {
-        c.idle = rand(0.8, 3.5);
-        this.newTarget(c);
+        const next = c.path.shift();
+        if (next) { c.tx = next.x; c.tz = next.z; }
+        else { c.idle = rand(0.8, 3.5); this.newTarget(c); }
       }
 
+      if (c.character) {
+        const clip = selectClip(c.character.clipNames, moving ? "walk" : "idle");
+        if (clip) c.character.play(clip);
+        c.character.mixer.update(dt);
+      }
       if (moving) {
         c.phase += dt * c.speed * 5;
         const swing = Math.sin(c.phase) * 0.5;

@@ -46,10 +46,10 @@ async function main() {
   const app = document.getElementById("app")!;
   const renderer = new Renderer(app);
   const environment = new Environment(renderer.scene); // biomas por zona, niebla dinámica, props
-  const ambient = new AmbientLife(renderer.scene); // aldeanos/guardias/fauna que deambulan (decorativo)
 
   const factory = new CharacterFactory();
   await factory.preload([...MODEL_NAMES, ...MOB_MODEL_NAMES]);
+  const ambient = new AmbientLife(renderer.scene, factory);
 
   const nameplates = new Nameplates();
   const views = new EntityViews(renderer.scene, factory, nameplates);
@@ -68,12 +68,12 @@ async function main() {
   const adventure = new AdventureTracker();
   const hazards = new HazardViews(renderer.scene);
   const skillBar = new SkillBar();
-  const npc = new Npc(renderer.scene, renderer.css2d);
-  const merchant = new Merchant(renderer.scene, renderer.css2d);
+  const npc = new Npc(renderer.scene, renderer.css2d, factory);
+  const merchant = new Merchant(renderer.scene, renderer.css2d, factory);
   // Etapa 20: NPCs de servicio nuevos (Sanadora / Herrero / Capitán).
-  const healer = new ServiceNpc(renderer.scene, renderer.css2d, "healer");
-  const smith = new ServiceNpc(renderer.scene, renderer.css2d, "smith");
-  const captain = new ServiceNpc(renderer.scene, renderer.css2d, "captain");
+  const healer = new ServiceNpc(renderer.scene, renderer.css2d, "healer", factory);
+  const smith = new ServiceNpc(renderer.scene, renderer.css2d, "smith", factory);
+  const captain = new ServiceNpc(renderer.scene, renderer.css2d, "captain", factory);
   const shopPanel = new ShopPanel((itemId) => {
     net.sendBuyItem(itemId);
   });

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { getItem, createItemInstance, rollItemOptions, canEquipItem, upgradeItem, getZone, getSkill, CATALOG_ITEMS, type Loadout } from '@aden/shared';
+import { getItem, createItemInstance, rollItemOptions, canEquipItem, upgradeItem, getZone, getSkill, nearestWalkable, CATALOG_ITEMS, type Loadout } from '@aden/shared';
 import { PlayerState } from '../state/PlayerState.js';
 import { InventoryItemState } from '../state/InventoryItemState.js';
 
@@ -65,7 +65,7 @@ export function useInventoryItem(p:PlayerState,id:string,targetId?:string,rng:()
     if(p.mp>=p.maxMp)return false;p.mp=Math.min(p.maxMp,p.mp+item.mana);
   } else if(item.useEffect==='town_portal') {
     if(p.mapId==='pueblo' || p.stunMs>0)return false;
-    const spawn=getZone('pueblo').spawn;p.mapId='pueblo';p.x=p.targetX=spawn.x;p.z=p.targetZ=spawn.z;p.moving=false;p.targetId='';p.poisonMs=0;p.poisonAccumMs=0;
+    const spawn=nearestWalkable('pueblo',getZone('pueblo').spawn);p.mapId='pueblo';p.x=p.targetX=spawn.x;p.z=p.targetZ=spawn.z;p.moving=false;p.targetId='';p.poisonMs=0;p.poisonAccumMs=0;
   } else if(item.useEffect==='antidote') {
     if(p.poisonMs<=0)return false;p.poisonMs=0;p.poisonDps=0;
   } else if(item.useEffect==='ale') {

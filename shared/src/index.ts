@@ -22,3 +22,5 @@ export * from "./guilds.js";
 export * from "./npcs.js";
 export * from "./bounties.js";
 export * from "./stats.js";
+export * from "./structures.js";
+export * from "./navigation.js";

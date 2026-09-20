@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aden · Habitantes del pueblo</title>
+<style>body{margin:0;background:#151b22;color:#eadfc9;font:14px Georgia}nav{position:fixed;top:18px;left:18px;z-index:3;background:#151b22e8;padding:16px;border:1px solid #8d7850}button{padding:9px;background:#303c46;color:#eadfc9;border:1px solid #8d7850;margin:3px}h1{font-size:22px;font-weight:400}</style>
+<div id="app"></div><nav><h1>Habitantes del pueblo</h1><button id="front">Comparación frontal</button><button id="game">Cámara de juego</button><button id="rear">Equipo y capas</button><p>Rowan · Mercader · Sanadora · Herrero · Capitán</p></nav>
+<script type="module">
+import * as THREE from 'three';
+import {Renderer} from '/src/render/Renderer.ts';
+import {CharacterFactory} from '/src/render/CharacterFactory.ts';
+import {Npc} from '/src/render/Npc.ts';
+import {Merchant} from '/src/render/Merchant.ts';
+import {ServiceNpc} from '/src/render/ServiceNpc.ts';
+const renderer=new Renderer(document.querySelector('#app'));
+renderer.scene.background=new THREE.Color(0x151b22);
+renderer.scene.add(new THREE.HemisphereLight(0xdce9ff,0x63513d,2));
+const key=new THREE.DirectionalLight(0xffe4bf,3);key.position.set(4,8,6);renderer.scene.add(key);
+const rim=new THREE.DirectionalLight(0x9dbaff,2);rim.position.set(-5,4,-5);renderer.scene.add(rim);
+const factory=new CharacterFactory();await factory.preload(['Mage','Rogue','Barbarian','Knight']);
+const npcs=[new Npc(renderer.scene,renderer.css2d,factory),new Merchant(renderer.scene,renderer.css2d,factory),...['healer','smith','captain'].map(id=>new ServiceNpc(renderer.scene,renderer.css2d,id,factory))];
+npcs.forEach((npc,i)=>{npc.object.position.set((i-2)*3,0,0);npc.object.rotation.y=0;});
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshStandardMaterial({color:0x343b3a,roughness:1}));ground.rotation.x=-Math.PI/2;ground.position.y=.005;renderer.scene.add(ground);
+function camera(mode){npcs.forEach((npc,i)=>npc.object.position.x=(i-2)*(mode==='game'?7:3));renderer.camera.zoom=mode==='game'?1:2;renderer.camera.updateProjectionMatrix();renderer.camera.position.set(...(mode==='game'?[0,22,22]:mode==='rear'?[0,5,-18]:[0,4,18]));renderer.camera.lookAt(0,1.4,0);}
+document.querySelector('#front').onclick=()=>camera('front');document.querySelector('#game').onclick=()=>camera('game');document.querySelector('#rear').onclick=()=>camera('rear');camera('front');
+let last=performance.now();function frame(now){const dt=Math.min((now-last)/1000,.05);last=now;npcs.forEach(npc=>npc.update(dt));renderer.render();renderer.css2d.render(renderer.scene,renderer.camera);document.body.dataset.ready='true';requestAnimationFrame(frame);}requestAnimationFrame(frame);
+</script></html>

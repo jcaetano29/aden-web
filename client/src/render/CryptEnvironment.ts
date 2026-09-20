@@ -1,3 +1,4 @@
+import { STRUCTURE_BOXES } from "@aden/shared";
 import * as THREE from "three";
 import { stoneMat, crackedStoneMat, cobbleMat } from "./textures.js";
 
@@ -16,19 +17,12 @@ export function addCryptEnvironment(scene: THREE.Scene): THREE.Group {
   box(900, .025, 0, 7, .05, 94, path).userData.ground = true;
   for (const [index, z] of [28, -1, -34].entries()) {
     const chamber = box(900, .04, z, 38, .08, 26, floor); chamber.name = `crypt-room-${index + 1}`; chamber.userData.ground = true;
-    // Side ruins mark each room; absent front walls preserve isometric visibility.
-    for (const x of [879, 921]) {
-      box(x, .35, z, .8, .7, 24, stone);
-      for (const dz of [-10, 10]) {
-        const pillar = box(x, 2.1, z + dz, 1.3, 4.2, 1.3, stone); pillar.castShadow = true;
-        box(x, 4.3, z + dz, 1.9, .3, 1.9, stone);
-        box(x, 4.65, z + dz, .6, .45, .6, index === 2 ? gold : blue);
-      }
-    }
   }
-  for (const z of [14, -18]) for (const x of [895, 905]) {
-    box(x, 1.4, z, .65, 2.8, .65, stone);
-    box(x, 2.9, z, .8, .35, .8, gold);
+  const materials={stone,gold,blue};
+  for(const p of STRUCTURE_BOXES.filter(p=>p.mapId==='cripta')) {
+    const mesh=box(p.x,p.y,p.z,p.width,p.height,p.depth,materials[p.material as keyof typeof materials]);
+    mesh.rotation.y=p.rotation;mesh.castShadow=true;
+    if(p.solid)mesh.userData.structureId=p.id;
   }
   // Dashed golden route and two lateral branches guide players to the seals.
   for (let z = 41; z >= -32; z -= 5) box(900, .09, z, .4, .02, 1.6, gold).userData.ground = true;

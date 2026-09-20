@@ -8,6 +8,7 @@ import { InventoryItemState } from "../state/InventoryItemState.js";
 import { CATALOG_ITEMS, createItemInstance } from '@aden/shared';
 import { grantItem } from '../systems/ItemSystem.js';
 import { toCharacterSave } from '../persistence/CharacterSave.js';
+import { isWalkable } from '@aden/shared';
 
 describe("GameRoom", () => {
   let colyseus: ColyseusTestServer;
@@ -20,6 +21,63 @@ describe("GameRoom", () => {
   });
   beforeEach(async () => {
     await colyseus.cleanup();
+  });
+
+  it('el movimiento por red rodea la fuente y nunca entra en su volumen', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const client = await colyseus.connectTo(room, { name: 'RutaSolida' });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = 0; p.z = 10;
+    client.send(MessageType.MoveTo, { x: 0, z: -10 });
+    await room.waitForNextPatch();
+    for (let i = 0; i < 200 && p.moving; i++) {
+      room.tick(0.1);
+      expect(isWalkable('pueblo', p)).toBe(true);
+      expect(Math.hypot(p.x, p.z)).toBeGreaterThan(3.6);
+    }
+    expect(p.x).toBeCloseTo(0);
+    expect(p.z).toBeCloseTo(-10);
+  });
+
+  it('Parpadeo se detiene ante la fuente aunque el destino esté al otro lado', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const client = await colyseus.connectTo(room, { name: 'BlinkSolido', className: 'mage' });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.level = 30; p.mp = 999; p.x = 0; p.z = 6; p.targetId = ''; p.moving = false;
+    client.send(MessageType.UseSkill, { skillId: 'blink' });
+    await room.waitForNextPatch();
+    expect(p.z).toBeLessThan(6);
+    expect(p.z).toBeGreaterThan(3.6);
+    expect(isWalkable('pueblo', p)).toBe(true);
+    expect(p.targetZ).toBe(p.z);
+  });
+
+  it('reubica apariciones dentro de edificios a un punto transitable', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const mob = room.spawnMob('spawn-solid', 'skeleton_minion', 0, 0, 'pueblo');
+    expect(isWalkable('pueblo', mob)).toBe(true);
+    expect(mob.homeX).toBe(mob.x);
+    expect(mob.homeZ).toBe(mob.z);
+  });
+
+  it('rechaza una carga bloqueada sin mover gratis al jugador ni aplicar daño', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const client = await colyseus.connectTo(room, { name: 'CargaSolida', className: 'barbarian' });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.level = 30; p.mp = 30; p.x = 0; p.z = 6; p.moving = false;
+    const mob = room.spawnMob('charge-wall', 'skeleton_minion', 0, -6, 'pueblo');
+    mob.stunMs = 10000;
+    p.targetId = 'charge-wall';
+    const hp = mob.hp;
+    client.send(MessageType.UseSkill, { skillId: 'charge' });
+    await room.waitForNextPatch();
+    expect(p.x).toBe(0); expect(p.z).toBe(6);
+    expect(p.mp).toBe(30);
+    expect(p.skillCooldowns.get('charge') ?? 0).toBe(0);
+    expect(mob.hp).toBe(hp);
   });
 
   it('valida provisiones por distancia y visitas por viaje real; cierra la campaña sin repetir premio', async () => {
@@ -137,8 +195,8 @@ describe("GameRoom", () => {
     const c=await colyseus.connectTo(room,{name:'RangerCatalog',className:'ranger'});await room.waitForNextPatch();
     const p=room.state.players.get(c.sessionId)!;
     expect(getItem(p.equipment.get('weapon')!).ammo).toBe('arrow');
-    p.mapId='bosque';p.x=100;p.z=0;p.moving=false;
-    const mob=room.spawnMob('range-test','skeleton_minion',108,0,'bosque');mob.hp=500;mob.maxHp=500;mob.stunMs=10000;
+    p.mapId='bosque';p.x=300;p.z=0;p.moving=false;
+    const mob=room.spawnMob('range-test','skeleton_minion',308,0,'bosque');mob.hp=500;mob.maxHp=500;mob.stunMs=10000;
     p.targetId='range-test';
     const ammo=[...p.inventory.keys()].find(id=>getItem(id).category==='municion')!;
     const before=p.inventory.get(ammo)!.qty;
@@ -196,9 +254,9 @@ describe("GameRoom", () => {
   it('el reflejo letal conserva IDs y no revive al jugador con recuperación por baja',async()=>{
     const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'ReflectCatalog'});await room.waitForNextPatch();
     const p=room.state.players.get(c.sessionId)!;
-    p.mapId='bosque';p.x=p.targetX=100;p.z=p.targetZ=0;p.moving=false;p.hp=20;p.msSinceCombat=0;
+    p.mapId='bosque';p.x=p.targetX=300;p.z=p.targetZ=0;p.moving=false;p.hp=20;p.msSinceCombat=0;
     p.itemEffects.reflect=.3;p.itemEffects.hpOnKill=.125;
-    const mob=room.spawnMob('reflect-test','skeleton_minion',100,0,'bosque');mob.hp=1;mob.pAtk=1000;mob.windupMs=1;mob.windupTargetId=c.sessionId;
+    const mob=room.spawnMob('reflect-test','skeleton_minion',300,0,'bosque');mob.hp=1;mob.pAtk=1000;mob.windupMs=1;mob.windupTargetId=c.sessionId;
     room.tick(.01);
     expect(mob.dead).toBe(true);expect(p.dead).toBe(true);expect(p.hp).toBe(0);
   });
@@ -1245,9 +1303,9 @@ describe("GameRoom", () => {
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
       p.level = 15; // charge se aprende a nivel 15
-      p.x = p.targetX = 0; p.z = p.targetZ = 0; p.moving = false;
+      p.x = p.targetX = 0; p.z = p.targetZ = 14; p.moving = false;
       const mob = adjacentMob(room, p);
-      mob.x = 8; mob.z = 0; // lejos, fuera de rango de ataque
+      mob.x = mob.homeX = 8; mob.z = mob.homeZ = 14; // lejos, en una calle transitable
       p.targetId = "cc-mob";
       const distBefore = Math.hypot(mob.x - p.x, mob.z - p.z);
       c.send(MessageType.UseSkill, { skillId: "charge" });

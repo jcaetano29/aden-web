@@ -50,6 +50,8 @@ import {
   isValidGuildName,
   TICK_RATE,
   clampToBounds,
+  nearestWalkable,
+  clipMovement,
   SPAWN_ZONES,
   MOB_MOVE_SPEED,
   AI_CONFIG,
@@ -316,6 +318,7 @@ export class GameRoom extends Room<GameState> {
     this.onMessage(MessageType.MoveTo, (client, msg: MoveToMessage) => {
       const player = this.state.players.get(client.sessionId);
       if (!player || player.dead) return;
+      if (!msg || !Number.isFinite(msg.x) || !Number.isFinite(msg.z)) return;
       // Etapa 15: el movimiento se clampea a los bounds del MAPA ACTUAL (no se camina afuera).
       const target = clampToBounds(msg.x, msg.z, getZone(player.mapId).bounds);
       player.targetX = target.x;
@@ -372,7 +375,7 @@ export class GameRoom extends Room<GameState> {
           if (p.guildId !== "" && p.guildId === victim.guildId) return; // aliados no se pegan
           if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
         }
-        if (gapCloser) this.dashToTarget(p, t.entity.x, t.entity.z);
+        if (gapCloser && !this.dashToTarget(p, t.entity.x, t.entity.z)) return;
         if(['aimed_shot','snaring_shot','piercing_shot','item_volley'].includes(skill.id)) {
           const weapon=p.equipment.get('weapon');if(!weapon || !getItem(weapon).ammo || !consumeAmmo(p))return;
         }
@@ -568,8 +571,9 @@ export class GameRoom extends Room<GameState> {
       if (!canEnterZone(zone, p.level)) return; // nivel insuficiente
       resetDungeon(p);
       p.mapId = zone.id;
-      p.x = p.targetX = zone.spawn.x;
-      p.z = p.targetZ = zone.spawn.z;
+      const arrival = nearestWalkable(zone.id, zone.spawn);
+      p.x = p.targetX = arrival.x;
+      p.z = p.targetZ = arrival.z;
       p.moving = false;
       p.targetId = "";
       advanceQuest(p,'visit',zone.id);
@@ -623,15 +627,21 @@ export class GameRoom extends Room<GameState> {
   }
 
   /** Etapa 22: enganche — acerca al caster a rango de ataque del objetivo (clamp a bounds). */
-  private dashToTarget(p: PlayerState, tx: number, tz: number): void {
+  private dashToTarget(p: PlayerState, tx: number, tz: number): boolean {
+    // Reject atomically: a blocked charge must neither move for free nor hit
+    // through a thin wall merely because the target is within melee range.
+    const sight = clipMovement(p.mapId, p, { x: tx, z: tz }, 0);
+    if (Math.hypot(sight.x - tx, sight.z - tz) > 0.001) return false;
     const dx = tx - p.x, dz = tz - p.z;
     const d = Math.hypot(dx, dz) || 1;
     const stop = Math.max(0, d - ATTACK_RANGE * 0.8);
     const raw = { x: p.x + (dx / d) * stop, z: p.z + (dz / d) * stop };
-    const c = clampToBounds(raw.x, raw.z, getZone(p.mapId).bounds);
+    const c = clipMovement(p.mapId, p, raw);
+    if (Math.hypot(c.x - raw.x, c.z - raw.z) > 0.001) return false;
     p.x = p.targetX = c.x;
     p.z = p.targetZ = c.z;
     p.moving = false;
+    return true;
   }
 
   /** Etapa 22: escape — aleja al caster de su objetivo (o hacia atrás si no hay), clamp a bounds. */
@@ -643,7 +653,7 @@ export class GameRoom extends Room<GameState> {
       const d = Math.hypot(dx, dz) || 1;
       dirX = dx / d; dirZ = dz / d;
     }
-    const c = clampToBounds(p.x + dirX * range, p.z + dirZ * range, getZone(p.mapId).bounds);
+    const c = clipMovement(p.mapId, p, { x: p.x + dirX * range, z: p.z + dirZ * range });
     p.x = p.targetX = c.x;
     p.z = p.targetZ = c.z;
     p.moving = false;
@@ -723,6 +733,8 @@ export class GameRoom extends Room<GameState> {
 
   /** Crea (o resetea al respawnear) un mob con posición/home/target y stats de combate. */
   spawnMob(id: string, templateId: string, x: number, z: number, mapId: string): MobState {
+    const position = nearestWalkable(mapId, { x, z });
+    x = position.x; z = position.z;
     const mob = this.state.mobs.get(id) ?? new MobState();
     mob.templateId = templateId;
     mob.mapId = mapId;
@@ -1174,7 +1186,7 @@ export class GameRoom extends Room<GameState> {
         p.rootMs = 0;
         p.msSinceCombat = 100000;
         // Etapa 15: respawnea en el punto de spawn de su mapa actual.
-        const sp = getZone(p.mapId).spawn;
+        const sp = nearestWalkable(p.mapId, getZone(p.mapId).spawn);
         p.x = p.targetX = sp.x;
         p.z = p.targetZ = sp.z;
         p.moving = false;
@@ -1264,7 +1276,7 @@ export class GameRoom extends Room<GameState> {
     player.guildName = "";
     // Etapa 15: arranca en el pueblo, en su punto de spawn.
     player.mapId = TOWN_ZONE_ID;
-    const townSpawn = getZone(TOWN_ZONE_ID).spawn;
+    const townSpawn = nearestWalkable(TOWN_ZONE_ID, getZone(TOWN_ZONE_ID).spawn);
     player.x = player.targetX = townSpawn.x;
     player.z = player.targetZ = townSpawn.z;
     this.state.players.set(client.sessionId, player);
@@ -1287,7 +1299,7 @@ export class GameRoom extends Room<GameState> {
       let loadedMap = save.mapId ?? TOWN_ZONE_ID;
       try { getZone(loadedMap); } catch { loadedMap = TOWN_ZONE_ID; }
       player.mapId = loadedMap;
-      const sp = getZone(loadedMap).spawn;
+      const sp = nearestWalkable(loadedMap, getZone(loadedMap).spawn);
       player.x = player.targetX = sp.x;
       player.z = player.targetZ = sp.z;
       player.gold = save.gold ?? 0;

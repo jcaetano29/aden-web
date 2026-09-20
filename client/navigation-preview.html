@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aden · Estructuras y navegación</title>
+<style>body{margin:0;background:#151b22;color:#eadfc9;font:14px Georgia}nav{position:fixed;top:12px;left:12px;z-index:3;background:#151b22ed;padding:12px;border:1px solid #8d7850;max-width:460px}button{padding:8px;background:#303c46;color:#eadfc9;border:1px solid #8d7850;margin:3px}h1{font-size:18px}</style>
+<div id="app"></div><nav><h1>Estructuras y navegación</h1>
+<button id="town">Pueblo</button><button id="crypt">Cripta</button><button id="solids">Mostrar colisiones</button>
+<button id="route">Rodear fuente / recorrer cripta</button><button id="gate">Cruzar portón</button>
+<button id="follow">Cámara del personaje</button>
+<p id="status">Cargando escenario…</p></nav>
+<script type="module">
+import * as THREE from 'three';
+import { findPath, clipMovement, isWalkable, getZone, STRUCTURE_OBSTACLES } from '@aden/shared';
+import { Renderer } from '/src/render/Renderer.ts';
+import { Environment } from '/src/render/Environment.ts';
+import { CharacterFactory } from '/src/render/CharacterFactory.ts';
+import { Npc } from '/src/render/Npc.ts';
+import { Merchant } from '/src/render/Merchant.ts';
+import { ServiceNpc } from '/src/render/ServiceNpc.ts';
+import { AmbientLife } from '/src/render/AmbientLife.ts';
+import { preloadMaterialAtlas } from '/src/render/materialAtlas.ts';
+await preloadMaterialAtlas();
+const renderer = new Renderer(document.querySelector('#app'));
+const environment = new Environment(renderer.scene);
+const factory = new CharacterFactory();
+await factory.preload(['Mage','Rogue','Barbarian','Knight']);
+const npcs = [new Npc(renderer.scene,renderer.css2d,factory), new Merchant(renderer.scene,renderer.css2d,factory), ...['healer','smith','captain'].map(id=>new ServiceNpc(renderer.scene,renderer.css2d,id,factory))];
+const ambient = new AmbientLife(renderer.scene,factory);
+const actor = factory.create('Knight');renderer.scene.add(actor.root);
+const overlay = new THREE.Group();overlay.visible=false;renderer.scene.add(overlay);
+for(const obstacle of STRUCTURE_OBSTACLES){
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(obstacle.width,.12,obstacle.depth),new THREE.MeshBasicMaterial({color:0xff7055,wireframe:true,depthTest:false}));
+  mesh.position.set(obstacle.x,.16,obstacle.z);mesh.rotation.y=obstacle.rotation;overlay.add(mesh);
+}
+let map='pueblo', path=[], failed=false, line, follow=false;
+const status=document.querySelector('#status');
+function select(id){
+  map=id;path=[];failed=false;const zone=getZone(id);
+  actor.root.position.set(zone.spawn.x,0,zone.spawn.z);
+  npcs.forEach(n=>n.object.visible=id==='pueblo');
+  environment.updateMood(zone.center.x,zone.center.z,100);
+  renderer.camera.position.set(zone.center.x,60,zone.center.z+58);renderer.camera.lookAt(zone.center.x,0,zone.center.z);
+  status.textContent='Clic en el suelo para trazar una ruta.';
+}
+function routeTo(target){
+  path=findPath(map,actor.root.position,target);
+  if(line){renderer.scene.remove(line);line.geometry.dispose();line.material.dispose();}
+  const points=[actor.root.position,...path].map(p=>new THREE.Vector3(p.x,.22,p.z));
+  line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(points),new THREE.LineBasicMaterial({color:0xffde78,depthTest:false}));renderer.scene.add(line);
+}
+document.querySelector('#town').onclick=()=>select('pueblo');document.querySelector('#crypt').onclick=()=>select('cripta');
+document.querySelector('#solids').onclick=()=>overlay.visible=!overlay.visible;
+document.querySelector('#follow').onclick=()=>{follow=!follow;if(!follow)select(map);};
+document.querySelector('#route').onclick=()=>{select(map);routeTo(map==='pueblo'?{x:0,z:-14}:{x:900,z:-37});};
+document.querySelector('#gate').onclick=()=>{select('pueblo');routeTo({x:0,z:54});};
+document.querySelector('canvas').addEventListener('pointerdown',event=>{
+  const ray=new THREE.Raycaster();ray.setFromCamera(new THREE.Vector2(event.clientX/innerWidth*2-1,1-event.clientY/innerHeight*2),renderer.camera);
+  const point=new THREE.Vector3();if(ray.ray.intersectPlane(new THREE.Plane(new THREE.Vector3(0,1,0),0),point))routeTo(point);
+});
+select('pueblo');let last=performance.now();
+function frame(now){
+  const dt=Math.min((now-last)/1000,.05);last=now;
+  const target=path[0];
+  if(target){
+    const from=actor.root.position,dx=target.x-from.x,dz=target.z-from.z,d=Math.hypot(dx,dz),step=Math.min(d,5*dt);
+    const next=d>0?clipMovement(map,from,{x:from.x+dx/d*step,z:from.z+dz/d*step}):target;
+    actor.root.position.set(next.x,0,next.z);actor.root.rotation.y=Math.atan2(dx,dz);
+    if(Math.hypot(next.x-target.x,next.z-target.z)<.001)path.shift();
+  }
+  failed ||= !isWalkable(map,actor.root.position);
+  actor.play(target?'Walk':'Idle');actor.mixer.update(dt);
+  npcs.forEach(n=>n.update(dt));ambient.update(dt,map);environment.updateMood(actor.root.position.x,actor.root.position.z,dt);
+  status.textContent=`${failed?'ERROR: dentro de sólido':'OK: posición transitable'} · ${path.length?'recorriendo ruta':'detenido'} · ${actor.root.position.x.toFixed(1)}, ${actor.root.position.z.toFixed(1)}`;
+  if(follow)renderer.followTarget(actor.root.position.x,actor.root.position.z,dt);
+  renderer.render();renderer.css2d.render(renderer.scene,renderer.camera);requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+</script></html>

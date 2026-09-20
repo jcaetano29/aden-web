@@ -1,3 +1,4 @@
+import { AUTHORED_STRUCTURES, STRUCTURE_SIZE, TOWN_FENCES } from "@aden/shared";
 import { addCryptEnvironment } from "./CryptEnvironment.js";
 import * as THREE from "three";
 import { addMapDressing } from "./MapDressing.js";
@@ -199,29 +200,22 @@ export class Environment {
   private structures(): void {
     this.buildTown();
 
-    // Bosque (300,0): torre de vigía en ruinas + arco de entrada + campamento.
-    this.tower(340, -30, 9, 0x8a8497);
-    this.arch(300, 55, 0, 0x6b6577, 1.2);
-    this.tower(262, 30, 6, 0x7a7d80);
-    this.campfireCamp(276, -8);
-    this.arch(300, -58, 0, 0x5f5a52, 1.0);
-
-    // Ruinas (0,300): gran templo caído — plataforma + columnatas + arco.
-    this.templeHall(0, 300);
-    this.arch(0, 355, 0, 0x9b7fd4, 1.6);
-    this.tower(-40, 268, 7, 0x6a5f80, true);
-    this.arch(40, 300, Math.PI / 2, 0x7a6f90, 1.1);
-
-    // Yermo (300,300): campo de obeliscos de obsidiana + torre quemada + ruina.
-    this.obeliskField(300, 300);
-    this.tower(340, 320, 8, 0x3b322c, true);
-    this.tower(262, 276, 6, 0x2e2622, true);
-    this.arch(300, 356, 0, 0x2a231f, 1.2);
-
-    // Trono (600,150): gran pórtico de entrada + escalinata al trono + columnas.
-    this.arch(600, 200, 0, 0x1e1b26, 2.0);
-    this.stairs(600, 130);
-    for (const sx of [-26, 26]) this.tower(600 + sx, 190, 10, 0x201c28, true);
+    for (const p of AUTHORED_STRUCTURES) {
+      const before=this.scene.children.length;
+      switch (p.kind) {
+        case 'house': this.house(p.x,p.z,p.rotation,p.color,p.roof,p.thatched,p.scale); break;
+        case 'stall': this.marketStall(p.x,p.z,p.color,p.rotation); break;
+        case 'fountain': this.fountain(p.x,p.z); break;
+        case 'well': this.well(p.x,p.z); break;
+        case 'tower': this.tower(p.x,p.z,p.height,p.color,p.broken); break;
+        case 'arch': this.arch(p.x,p.z,p.rotation,p.color,p.scale); break;
+      }
+      if(this.scene.children.length>before) { const root=this.scene.children[before]; root.userData.authoredStructureId=p.id; }
+    }
+    this.campfireCamp(276,-8);
+    this.templeHall(0,300);
+    this.obeliskField();
+    this.stairs(600,130);
   }
 
   /** Construye el Pueblo de Aden como una ciudad amurallada con portón sur. */
@@ -231,7 +225,7 @@ export class Environment {
     const gateHalf = 5;       // medio ancho del portón (mira al sur, +Z, hacia el spawn)
 
     // Muralla octogonal de piedra con almenas, con un hueco para el portón al sur.
-    this.townWall(cx, cz, R, gateHalf);
+    this.townWall();
     this.gate(cx, cz + R, gateHalf);
 
     // Camino empedrado del portón a la plaza + faroles a los costados.
@@ -242,70 +236,30 @@ export class Environment {
       this.lamp(cx + 4, z);
     }
 
-    // Plaza central de adoquín con fuente.
-    this.fountain(cx, cz);
-    this.well(14, -4);
-
-    // Casas dispuestas en dos "calles" a los lados del camino principal.
-    const houseColors = [0xc9b48c, 0xbfa77e, 0xd0bE95, 0xb89f76, 0xcab488];
-    const roofColors = [0x7a3b2b, 0x8a4a2b, 0x6a4a3b, 0x7a4a2b];
-    let hi = 0;
-    for (const side of [-1, 1]) {
-      for (let row = 0; row < 3; row++) {
-        const hx = cx + side * (16 + (row % 2) * 3);
-        const hz = cz - 26 + row * 16;
-        const rot = side < 0 ? 1.5 + (hi % 2) * 0.1 : -1.5 - (hi % 2) * 0.1;
-        this.house(hx, hz, rot, houseColors[hi % houseColors.length], roofColors[hi % roofColors.length], hi % 3 === 0);
-        hi++;
-      }
-    }
-    // Casona/posada más grande al fondo.
-    this.house(cx, cz - 34, 0, 0xcab488, 0x6a4a3b, false, 1.5);
-
-    // Distrito de mercado al este de la plaza: fila de puestos con toldos.
-    const stallColors = [0xb23b3b, 0x2f7d4f, 0x3060a8, 0xb8902b, 0x8a4fa8];
-    for (let i = 0; i < 5; i++) {
-      this.marketStall(cx + 20 + (i % 2) * 2, cz + 2 + (i - 2) * 6, stallColors[i], -Math.PI / 2);
-    }
-    // Puestos al oeste también.
-    for (let i = 0; i < 3; i++) {
-      this.marketStall(cx - 22, cz - 6 + i * 7, stallColors[(i + 2) % stallColors.length], Math.PI / 2);
-    }
-
     // Estandartes en las torres del portón + tablón de anuncios.
     this.signpost(cx - 6, cz + 16);
 
     // Corral con vallas y algunos props de vida.
-    this.fence(cx - 30, cz + 8, cx - 30, cz - 6);
-    this.fence(cx - 30, cz - 6, cx - 18, cz - 6);
+    for (const [x0,z0,x1,z1] of TOWN_FENCES) this.fence(cx+x0,cz+z0,cx+x1,cz+z1);
     // Southern residential quarter and garden lanes give the arrival a lived-in scale.
     for (const side of [-1, 1]) {
-      this.house(cx + side * 23, cz + 24, side * Math.PI / 2, 0xc9b991, 0x566274, false);
       this.road(cx + side * 5, cz + 24, cx + side * 20, cz + 24, 3);
       this.lamp(cx + side * 11, cz + 26);
       this.banner(cx + side * 12, cz + 22, 3.5, 0x772f3f);
       this.woodPile(cx + side * 27, cz + 20, mulberry32(side + 80));
-      this.fence(cx + side * 15, cz + 30, cx + side * 27, cz + 30);
       for (let i = 0; i < 5; i++) this.bush(cx + side * (15 + i * 2.4), cz + 32, mulberry32(i + 74), 0x567142);
     }
   }
 
   /** Muralla de piedra alrededor del pueblo (octógono), con hueco de portón al sur. */
-  private townWall(cx: number, cz: number, r: number, gateHalf: number): void {
-    const segs = 24;
+  private townWall(): void {
     const wallMat = stoneMat(0x8f877a, [1.4, 0.9], true);
     const merlonMat = stoneMat(0x847c70, [0.5, 0.5], true);
-    for (let i = 0; i < segs; i++) {
-      const a0 = (i / segs) * Math.PI * 2;
-      const a1 = ((i + 1) / segs) * Math.PI * 2;
-      const mx = cx + Math.cos((a0 + a1) / 2) * r;
-      const mz = cz + Math.sin((a0 + a1) / 2) * r;
-      // Saltar los segmentos del sur (donde va el portón).
-      if (mz > cz + r - 8 && Math.abs(mx - cx) < gateHalf + 3) continue;
-      const len = Math.hypot(Math.cos(a1) * r - Math.cos(a0) * r, Math.sin(a1) * r - Math.sin(a0) * r) + 0.6;
-      const seg = new THREE.Mesh(new THREE.BoxGeometry(len, 5, 1.6), wallMat);
-      seg.position.set(mx, 2.5, mz);
-      seg.rotation.y = -((a0 + a1) / 2) - Math.PI / 2;
+    for (const p of AUTHORED_STRUCTURES.filter(p=>p.kind==='wall')) {
+      const {x:mx,z:mz,width:len}=p;
+      const seg = new THREE.Mesh(new THREE.BoxGeometry(p.width, p.height, p.depth), wallMat);
+      seg.position.set(mx,p.height/2,mz); seg.rotation.y=p.rotation;
+      seg.userData.structureId=p.id;
       this.scene.add(seg);
       // Almena arriba del segmento.
       const merlon = new THREE.Mesh(new THREE.BoxGeometry(len, 1, 0.8), merlonMat);
@@ -318,9 +272,9 @@ export class Environment {
   /** Portón: dos torres cuadradas flanqueando el acceso + estandartes + braseros. */
   private gate(cx: number, cz: number, gateHalf: number): void {
     const towerMat = stoneMat(0x8a8276, [1, 2], true);
-    for (const sx of [-1, 1]) {
+    for (const p of AUTHORED_STRUCTURES.filter(p=>p.kind==='gateTower')) {
       const g = new THREE.Group();
-      const shaft = new THREE.Mesh(new THREE.BoxGeometry(4, 9, 4), towerMat);
+      const shaft = new THREE.Mesh(new THREE.BoxGeometry(p.width, p.height, p.depth), towerMat);
       shaft.position.y = 4.5;
       g.add(shaft);
       // almenas
@@ -328,10 +282,10 @@ export class Environment {
         const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1.2, 1), towerMat);
         m.position.set(ox, 9.6, oz); g.add(m);
       }
-      g.position.set(cx + sx * (gateHalf + 2), 0, cz);
+      g.position.set(p.x, 0, p.z); shaft.userData.structureId=p.id;
       this.scene.add(g);
       // Estandarte colgando de cada torre.
-      this.banner(cx + sx * (gateHalf + 2), cz - 2.1, 6.5, 0x8a2b2b);
+      this.banner(p.x, p.z - 2.1, 6.5, 0x8a2b2b);
     }
     // Dintel sobre el portón.
     const lintel = new THREE.Mesh(new THREE.BoxGeometry(gateHalf * 2 + 4, 1.6, 2.4), towerMat);
@@ -345,7 +299,7 @@ export class Environment {
   /** Casa low-poly texturizada: revoque + tejado de tejas + puerta, ventanas y chimenea. */
   private house(cx: number, cz: number, rot: number, color: number, roof = 0x7a3b2b, thatched = false, scale = 1): void {
     const g = new THREE.Group();
-    const w = 5 * scale, h = 3 * scale, d = 4.5 * scale;
+    const w = STRUCTURE_SIZE.houseWidth * scale, h = 3 * scale, d = STRUCTURE_SIZE.houseDepth * scale;
     const wall = plasterMat(color, [w / 3, h / 3]);
     const body = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wall);
     body.position.y = h / 2;
@@ -378,7 +332,7 @@ export class Environment {
   private fountain(cx: number, cz: number): void {
     const g = new THREE.Group();
     const stone = stoneMat(0xa39a8c, [2, 1], true);
-    const basin = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.6, 1, 16), stone);
+    const basin = new THREE.Mesh(new THREE.CylinderGeometry(3.4, STRUCTURE_SIZE.fountainRadius, 1, 16), stone);
     basin.position.y = 0.5; g.add(basin);
     const inner = new THREE.Mesh(
       new THREE.CylinderGeometry(2.9, 2.9, 0.4, 16),
@@ -400,7 +354,7 @@ export class Environment {
     const g = new THREE.Group();
     const wood = woodMat(0x8a6a3c, [2, 1]);
     // Mostrador.
-    const counter = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1, 1.4), wood);
+    const counter = new THREE.Mesh(new THREE.BoxGeometry(STRUCTURE_SIZE.stallWidth, 1, STRUCTURE_SIZE.stallDepth), wood);
     counter.position.y = 0.5; g.add(counter);
     // Postes.
     for (const ox of [-1.4, 1.4]) for (const oz of [-0.5, 0.5]) {
@@ -467,7 +421,7 @@ export class Environment {
     const n = Math.max(2, Math.round(len / 2));
     for (let i = 0; i <= n; i++) {
       const t = i / n;
-      const post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.2, 6), wood);
+      const post = new THREE.Mesh(new THREE.CylinderGeometry(STRUCTURE_SIZE.fenceDepth/2, STRUCTURE_SIZE.fenceDepth/2, 1.2, 6), wood);
       post.position.set(x0 + (x1 - x0) * t, 0.6, z0 + (z1 - z0) * t);
       this.scene.add(post);
     }
@@ -505,15 +459,16 @@ export class Environment {
       this.scene.add(log);
     }
     // Tienda triangular.
-    const tent = new THREE.Mesh(new THREE.ConeGeometry(2, 2.2, 4), clothMat(0x6a5a3a, [2, 2]));
-    tent.position.set(cx + 4, 1.1, cz + 3); tent.rotation.y = Math.PI / 4;
+    const p=AUTHORED_STRUCTURES.find(p=>p.kind==='tent')!;
+    const tent = new THREE.Mesh(new THREE.ConeGeometry(p.width/2, p.height, 4), clothMat(0x6a5a3a, [2, 2]));
+    tent.position.set(p.x, p.height/2, p.z); tent.rotation.y=p.rotation;tent.userData.structureId=p.id;
     this.scene.add(tent);
   }
 
   private well(cx: number, cz: number): void {
     const g = new THREE.Group();
     const stone = stoneMat(0x9a938a, [1.5, 1], true);
-    const ring = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 1.1, 12), stone);
+    const ring = new THREE.Mesh(new THREE.CylinderGeometry(STRUCTURE_SIZE.wellRadius, STRUCTURE_SIZE.wellRadius, 1.1, 12), stone);
     ring.position.y = 0.55;
     const post1 = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, 2.4, 6), woodMat(0x6b4a2b, [1, 2]));
     post1.position.set(-0.9, 1.7, 0);
@@ -528,7 +483,7 @@ export class Environment {
   private tower(cx: number, cz: number, h: number, color: number, broken = false): void {
     const g = new THREE.Group();
     const stone = stoneMat(color, [2, Math.max(2, Math.round(h / 3))], true);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2, 2.4, h, 10), stone);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(2, STRUCTURE_SIZE.towerRadius, h, 10), stone);
     shaft.position.y = h / 2;
     g.add(shaft);
     if (!broken) {
@@ -555,8 +510,8 @@ export class Environment {
   private arch(cx: number, cz: number, rot: number, color: number, scale = 1): void {
     const g = new THREE.Group();
     const stone = stoneMat(color, [1, 4], true);
-    const p1 = new THREE.Mesh(new THREE.BoxGeometry(1, 7, 1), stone); p1.position.set(-3, 3.5, 0);
-    const p2 = p1.clone(); p2.position.x = 3;
+    const p1 = new THREE.Mesh(new THREE.BoxGeometry(STRUCTURE_SIZE.archPierWidth, 7, STRUCTURE_SIZE.archPierWidth), stone); p1.position.set(-STRUCTURE_SIZE.archPierOffset, 3.5, 0);
+    const p2 = p1.clone(); p2.position.x = STRUCTURE_SIZE.archPierOffset;
     const top = new THREE.Mesh(new THREE.BoxGeometry(8, 1.2, 1.2), stone); top.position.y = 7.2;
     g.add(p1, p2, top);
     g.position.set(cx, 0, cz); g.rotation.y = rot; g.scale.setScalar(scale);
@@ -572,14 +527,11 @@ export class Environment {
     platform.userData.ground = true;
     g.add(platform);
     // dos hileras de columnas (algunas rotas)
-    for (let i = 0; i < 6; i++) {
-      const z = -8 + i * 3.2;
-      for (const sx of [-12, 12]) {
-        const h = 6 + (Math.random() < 0.3 ? -3 - Math.random() * 2 : Math.random());
-        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.9, h, 10), colStone);
-        col.position.set(sx, 1 + h / 2, z);
-        g.add(col);
-      }
+    for (const p of AUTHORED_STRUCTURES.filter(p=>p.kind==='templeColumn')) {
+      const h = p.height + (Math.random() < 0.3 ? -3 - Math.random() * 2 : Math.random());
+      const col = new THREE.Mesh(new THREE.CylinderGeometry(.8,p.width/2,h,10), colStone);
+      col.position.set(p.x-cx,1+h/2,p.z-cz); col.userData.structureId=p.id;
+      g.add(col);
     }
     // vigas del techo caídas encima
     for (let i = 0; i < 4; i++) {
@@ -592,17 +544,14 @@ export class Environment {
     this.scene.add(g);
   }
 
-  private obeliskField(cx: number, cz: number): void {
+  private obeliskField(): void {
     const obs = stoneMat(0x241f2e, [1, 3], true);
-    const pts: Array<[number, number, number]> = [
-      [-30, 20, 10], [28, -18, 12], [-10, -30, 8], [18, 26, 9], [-26, -8, 11], [8, 8, 7],
-    ];
-    for (const [dx, dz, h] of pts) {
+    for (const p of AUTHORED_STRUCTURES.filter(p=>p.kind==='obelisk')) {
       const g = new THREE.Group();
-      const spire = new THREE.Mesh(new THREE.ConeGeometry(1.6, h, 4), obs);
-      spire.position.y = h / 2; spire.rotation.y = Math.random();
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(p.width/2, p.height, 4), obs);
+      spire.position.y = p.height / 2; spire.rotation.y = p.rotation;
       g.add(spire);
-      g.position.set(cx + dx, 0, cz + dz);
+      g.position.set(p.x, 0, p.z); spire.userData.structureId=p.id;
       this.scene.add(g);
     }
   }
@@ -817,13 +766,9 @@ export class Environment {
   // ── Ruinas de Nihil: columnas rotas, bloques caídos, cristales violeta ─────
   private populateRuinas(z: Zone, rng: () => number): void {
     const stone = crackedStoneMat(0x8a8497, [1, 2], true);
-    for (let i = 0; i < 26; i++) {
-      const [x, zz] = this.spot(z, rng);
-      const h = 1.5 + rng() * 4;
-      const col = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.6, h, 8), stone);
-      col.position.set(x, h / 2, zz);
-      col.rotation.z = (rng() - 0.5) * 0.25; // ligeramente inclinadas
-      this.scene.add(col);
+    for (const p of AUTHORED_STRUCTURES.filter(p=>p.kind==='ruinColumn')) {
+      const col=new THREE.Mesh(new THREE.CylinderGeometry(.5,p.width/2,p.height,8),stone);
+      col.position.set(p.x,p.height/2,p.z);col.userData.structureId=p.id;this.scene.add(col);
     }
     // Bloques/escombros.
     for (let i = 0; i < 30; i++) {
@@ -897,27 +842,22 @@ export class Environment {
     const obsidian = texturedMaterial("lava", { color: 0x555568, bumpScale: 0.08 });
 
     // Pilares de hueso en dos hileras que flanquean el acceso (desde el sur).
-    for (let i = 0; i < 5; i++) {
-      const zz = z.center.z + 12 - i * 6;
-      for (const sx of [-7, 7]) {
-        const h = 6 + rng() * 1.5;
-        const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, h, 7), bone);
-        pillar.position.set(z.center.x + sx, h / 2, zz);
-        this.scene.add(pillar);
-        const skull = new THREE.Mesh(new THREE.IcosahedronGeometry(0.8, 0), bone);
-        skull.position.set(z.center.x + sx, h + 0.5, zz);
-        this.scene.add(skull);
-      }
+    for (const p of AUTHORED_STRUCTURES.filter(p=>p.kind==='boneColumn')) {
+      const h=p.height+rng()*1.5;
+      const pillar=new THREE.Mesh(new THREE.CylinderGeometry(.7,p.width/2,h,7),bone);
+      pillar.position.set(p.x,h/2,p.z); pillar.userData.structureId=p.id; this.scene.add(pillar);
+      const skull=new THREE.Mesh(new THREE.IcosahedronGeometry(.8,0),bone);
+      skull.position.set(p.x,h+.5,p.z); this.scene.add(skull);
     }
-
     // Braseros encendidos a la entrada de la arena (acento + "preparación").
     this.addGlow(z.center.x - 7, z.center.z + 14, 0xff3b3b, 0.7);
     this.addGlow(z.center.x + 7, z.center.z + 14, 0xff3b3b, 0.7);
 
     // El Trono: plataforma de obsidiana escalonada + respaldo, DETRÁS del jefe.
     const throne = new THREE.Group();
-    const base = new THREE.Mesh(new THREE.BoxGeometry(10, 1, 10), obsidian);
-    base.position.y = 0.5;
+    const throneLayout = AUTHORED_STRUCTURES.find(p=>p.kind==='throne')!;
+    const base = new THREE.Mesh(new THREE.BoxGeometry(throneLayout.width, 1, throneLayout.depth), obsidian);
+    base.position.y = 0.5; base.userData.structureId=throneLayout.id;
     throne.add(base);
     const seat = new THREE.Mesh(new THREE.BoxGeometry(4, 1.4, 3), obsidian);
     seat.position.set(0, 1.7, -1);
@@ -931,7 +871,7 @@ export class Environment {
       spike.position.set(sx, 7.4, -2.5);
       throne.add(spike);
     }
-    throne.position.set(z.center.x, 0, z.center.z - 10);
+    throne.position.set(throneLayout.x, 0, throneLayout.z);
     this.scene.add(throne);
   }
 
