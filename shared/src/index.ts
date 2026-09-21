@@ -18,6 +18,7 @@ export * from "./questNarrative.js";
 export * from "./adventure.js";
 export * from "./dungeon.js";
 export * from "./classes.js";
+export * from "./appearance.js";
 export * from "./pvp.js";
 export * from "./story.js";
 export * from "./guilds.js";

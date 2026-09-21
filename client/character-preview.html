@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Aden · Diez personajes</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#121b27;color:#dfd2b5;font:14px Georgia,serif}header{position:absolute;top:0;left:0;right:0;text-align:center;z-index:1;padding:12px;background:#121b27e8}h1{font-weight:400;font-size:24px;margin:0 0 8px}button{background:#273646;color:#dfd2b5;border:1px solid #917c53;padding:6px 12px;margin:2px;cursor:pointer}#status{font:12px system-ui;margin:7px}canvas{display:block}#labels{position:absolute;inset:0;pointer-events:none}#labels span{position:absolute;transform:translateX(-50%);text-align:center;color:#dcbf85;font-size:17px}details{position:absolute;bottom:0;left:0;font:12px monospace;background:#101720e8;max-height:150px;overflow:auto;width:100%}
+</style>
+<header><h1>Aden · Cinco clases, dos apariencias</h1><nav id="controls"></nav><div id="status">Preparando personajes…</div></header>
+<div id="labels"></div><details><summary>Verificación de modelos y animaciones</summary><pre id="report"></pre></details>
+<script type="module">
+import * as THREE from 'three';
+import {CharacterFactory} from '/src/render/CharacterFactory.ts';
+import {MODEL_NAMES} from '/src/assets/manifest.ts';
+import {selectClip} from '/src/render/animation.ts';
+import {preloadMaterialAtlas} from '/src/render/materialAtlas.ts';
+await preloadMaterialAtlas();
+const factory=new CharacterFactory();await factory.preload(MODEL_NAMES);
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x121b27);
+scene.add(new THREE.HemisphereLight(0xcfe4ff,0x40301e,2.5));
+const key=new THREE.DirectionalLight(0xffe3b3,3);key.position.set(4,8,8);scene.add(key);
+const rim=new THREE.DirectionalLight(0x96c4ff,2.5);rim.position.set(-6,4,-3);scene.add(rim);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;document.body.prepend(renderer.domElement);
+const camera=new THREE.OrthographicCamera(-6,6,7,-.3,.1,100);camera.position.set(0,3.2,18);camera.lookAt(0,3.2,0);
+const labels=['Caballero','Mago','Bárbaro','Pícaro','Explorador','Caballera','Maga','Bárbara','Pícara','Exploradora'];
+const chars=MODEL_NAMES.map((name,i)=>{const c=factory.create(name);c.root.position.set((i%5-2)*2.35,i<5?3.25:0,0);c.root.rotation.y=-.18;scene.add(c.root);c.play(selectClip(c.clipNames,'idle'),true);document.querySelector('#labels').append(Object.assign(document.createElement('span'),{textContent:labels[i]}));return c;});
+let mode='idle';
+for(const [kind,label] of [['idle','Reposo'],['walk','Caminar'],['attack','Atacar'],['hit','Recibir golpe'],['death','Caer']]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{mode=kind;for(const c of chars){const clip=selectClip(c.clipNames,kind);if(clip)c.play(clip,true);}};document.querySelector('#controls').append(b);}
+const turn=document.createElement('button');turn.textContent='Girar 45°';turn.onclick=()=>chars.forEach(c=>c.root.rotation.y+=Math.PI/4);document.querySelector('#controls').append(turn);
+const report=chars.map((c,i)=>{
+ const errors=[];const anchors=['Head','Torso','Hips','WeaponR','FistL','FootL','FootR'];for(const name of anchors)if(!c.root.getObjectByName(name))errors.push('Falta '+name);
+ for(const kind of ['idle','walk','attack','hit','death']) {const clip=selectClip(c.clipNames,kind);if(!clip){errors.push('Falta animación '+kind);continue;}c.play(clip,true);for(let j=0;j<12;j++){c.mixer.update(.08);c.root.updateMatrixWorld(true);c.root.traverse(o=>{if(o.visible&&o instanceof THREE.Mesh&&!o.matrixWorld.elements.every(Number.isFinite))errors.push('Transformación no finita '+o.name);});}}
+ c.play(selectClip(c.clipNames,'idle'),true);
+ return {model:MODEL_NAMES[i],gender:c.root.userData.gender,clips:c.clipNames.length,errors};
+});
+document.querySelector('#report').textContent=JSON.stringify(report,null,2);document.body.dataset.ready='true';document.body.dataset.passed=String(report.every(r=>!r.errors.length));
+function resize(){renderer.setSize(innerWidth,innerHeight);const aspect=innerWidth/innerHeight;const viewHeight=8.2,w=Math.max(12,viewHeight*aspect);camera.left=-w/2;camera.right=w/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();document.querySelectorAll('#labels span').forEach((label,i)=>{label.style.left=((i%5-2)*2.35/w+.5)*innerWidth+'px';label.style.top=((3.2+viewHeight/2-(i<5?6.02:2.77))/viewHeight)*innerHeight+'px';});}addEventListener('resize',resize);resize();
+let last=performance.now();function frame(now){const dt=Math.min((now-last)/1000,.05);last=now;chars.forEach(c=>c.mixer.update(dt));renderer.render(scene,camera);document.querySelector('#status').textContent=`10 modelos · ${mode} · ${renderer.info.render.triangles.toLocaleString()} triángulos · ${renderer.info.render.calls} llamadas de dibujo · ${report.every(r=>!r.errors.length)?'Animaciones verificadas':'Revisar errores'}`;requestAnimationFrame(frame);}requestAnimationFrame(frame);
+</script></html>

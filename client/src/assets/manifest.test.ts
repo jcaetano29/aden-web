@@ -1,7 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { MODEL_HEIGHTS, MODEL_NAMES, modelUrl, pickModelForSession, MOB_MODEL_NAMES, modelForTemplate } from "./manifest.js";
+import { MODEL_HEIGHTS, MODEL_NAMES, modelUrl, pickModelForSession, MOB_MODEL_NAMES, modelForTemplate, modelForClass } from "./manifest.js";
 
 describe("modelUrl", () => {
+  it.each([['knight', 'Knight'], ['mage', 'Mage'], ['barbarian', 'Barbarian'], ['rogue', 'Rogue'], ['ranger', 'Ranger']])("resuelve ambas apariencias de %s con recursos precargados", (id, base) => {
+    expect(modelForClass(id, 'male')).toBe(base);
+    expect(modelForClass(id, 'female')).toBe(`${base}_Female`);
+    expect(MODEL_NAMES).toContain(modelForClass(id, 'female'));
+    expect(modelUrl(`${base}_Female`)).toBe(`/models/${base === 'Ranger' ? 'Rogue' : base}.glb`);
+    expect(modelForClass(id)).toBe(base);
+  });
   it("resuelve la ruta pública del GLB", () => {
     expect(modelUrl("Knight")).toBe("/models/Knight.glb");
   });

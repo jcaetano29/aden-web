@@ -1,9 +1,9 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { modelUrl, MODEL_HEIGHTS } from "../assets/manifest.js";
+import { modelUrl, MODEL_HEIGHTS, HERO_MODELS } from "../assets/manifest.js";
 import { CharacterMaterial } from "./CharacterMaterial.js";
-import { addHeroDetails } from "./HeroDetails.js";
+import { buildHeroAppearance } from "./HeroAppearance.js";
 import { addRevenantDetails } from "./RevenantDetails.js";
 
 interface LoadedModel {
@@ -30,9 +30,15 @@ export class CharacterFactory {
   private readonly loaded = new Map<string, LoadedModel>();
 
   async preload(names: readonly string[]): Promise<void> {
+    const sources = new Map<string, ReturnType<GLTFLoader['loadAsync']>>();
     await Promise.all(
       names.map(async (name) => {
-        const gltf = await this.loader.loadAsync(modelUrl(name));
+        const baseName = name.replace(/_Female$/, '');
+        const isHero = (HERO_MODELS as readonly string[]).includes(baseName);
+        const url = modelUrl(name);
+        if (!sources.has(url)) sources.set(url, this.loader.loadAsync(url));
+        const source = await sources.get(url)!;
+        const gltf = { scene: cloneSkeleton(source.scene), animations: source.animations.map(clip => clip.clone()) };
         // Reduce the remaining skeletons' oversized heads, including animated
         // scale keys, so subsequent clips cannot restore the old proportions.
         {
@@ -42,7 +48,7 @@ export class CharacterFactory {
           for (const clip of gltf.animations) for (const track of clip.tracks)
             if (track.name === `${headName}.scale`) for (let i=0;i<track.values.length;i++) track.values[i]*=headScale;
         }
-        if (name === "Mage") {
+        if (baseName === "Mage") {
           const spell=gltf.animations.find(clip=>clip.name==="Spell1")?.clone();
           if(spell) { spell.name="Primary_Attack";gltf.animations.push(spell); }
         }
@@ -53,7 +59,7 @@ export class CharacterFactory {
             if(!material){material=new THREE.MeshStandardMaterial({name:source.name,map:source.map,color:name==="DreadKnight"?0x858f9c:0x667989,roughness:.7,metalness:.25,side:source.side});materials.set(source,material);}
             return material;
           }
-          if (["Knight", "Mage", "Rogue", "Ranger", "Barbarian"].includes(name) && source instanceof THREE.MeshBasicMaterial) {
+          if (isHero && source instanceof THREE.MeshBasicMaterial) {
             let material = materials.get(source);
             if (!material) {
               material = new THREE.MeshStandardMaterial({ name: source.name, color: source.color, map: source.map, side: source.side, transparent: source.transparent, opacity: source.opacity, alphaTest: source.alphaTest, roughness: 0.78, metalness: 0.08 });
@@ -90,7 +96,7 @@ export class CharacterFactory {
         gltf.scene.traverse(o=>{if(o instanceof THREE.SkinnedMesh)o.skeleton.update();});
         const box=new THREE.Box3().setFromObject(gltf.scene,true);
         const size=box.getSize(new THREE.Vector3());
-        const height=MODEL_HEIGHTS[name] ?? 2.4;
+        const height=MODEL_HEIGHTS[baseName] ?? 2.4;
         const scale=height/Math.max(size.y,0.001);
         const normalized=new THREE.Group();
         normalized.name=`${name}_normalized`;
@@ -98,7 +104,7 @@ export class CharacterFactory {
         normalized.position.y=-box.min.y*scale;
         normalized.add(gltf.scene);
         const root=new THREE.Group();root.add(normalized);root.userData.visualHeight=height;
-        addHeroDetails(root, name);
+        if (isHero) buildHeroAppearance(root, baseName, name.endsWith('_Female') ? 'female' : 'male');
         addRevenantDetails(root, name);
         this.loaded.set(name, { scene: root, animations: gltf.animations });
       }),

@@ -86,7 +86,11 @@ export function addRangerEquipment(root: THREE.Object3D): void {
   ]);
   bow.add(new THREE.Line(stringGeometry, new THREE.LineBasicMaterial({ color: 0xd8cfaa })));
   bow.rotation.set(0.15, 0.2, -0.45);
-  (root.getObjectByName("HandL") ?? root.getObjectByName("HandR") ?? root).add(bow);
+  const hand = root.getObjectByName('FistL') ?? root.getObjectByName('Fist.L') ?? root.getObjectByName('HandL') ?? root.getObjectByName('HandR') ?? root;
+  root.updateMatrixWorld(true);
+  bow.position.copy(hand.getWorldPosition(new THREE.Vector3()));
+  bow.position.y += h * .035;
+  root.add(bow); root.updateMatrixWorld(true); hand.attach(bow);
 
   const quiver = new THREE.Group();
   quiver.name = "ranger_quiver";
@@ -103,7 +107,8 @@ export function addRangerEquipment(root: THREE.Object3D): void {
     arrow.position.set((i - 2) * h * 0.018, h * 0.08 + Math.abs(i - 2) * h * 0.012, 0);
     quiver.add(arrow);
   }
-  quiver.position.set(-h * 0.13, h * 0.04, -h * 0.13);
+  const torso = root.getObjectByName('Torso') ?? root.getObjectByName('Spine2') ?? root.getObjectByName('Spine') ?? root;
+  quiver.position.copy(torso.getWorldPosition(new THREE.Vector3())).add(new THREE.Vector3(-h * .11, h * .02, -h * .13));
   quiver.rotation.set(0.2, 0, 0.28);
-  (root.getObjectByName("Spine2") ?? root.getObjectByName("Spine") ?? root).add(quiver);
+  root.add(quiver); root.updateMatrixWorld(true); torso.attach(quiver);
 }

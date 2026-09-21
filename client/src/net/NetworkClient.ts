@@ -33,6 +33,8 @@ import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
 import type { PartyInvitation } from '@aden/shared';
 import type { PartyPanelData, PartyMember } from '../render/PartyPanel.js';
 
+import { characterGender, type CharacterGender } from '@aden/shared';
+
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
 
 export interface PlayerSnapshot {
@@ -51,6 +53,7 @@ export interface PlayerSnapshot {
   dead: boolean;
   /** Clase del jugador (knight/mage/barbarian/rogue); se sincroniza desde el server. Solo para jugadores. */
   className?: string;
+  gender?: CharacterGender;
   /** Optional visual override supplied by equipment such as transformation rings. */
   appearanceModel?: string;
   equipment?:Record<string,string>;
@@ -151,10 +154,10 @@ export class NetworkClient {
   private room!: Room;
   private partyInvitation: PartyInvitation | null = null;
 
-  async connect(name: string, password: string, className: string, cb: RoomCallbacks, mode = ""): Promise<void> {
+  async connect(name: string, password: string, className: string, cb: RoomCallbacks, mode = "", gender: CharacterGender = 'male'): Promise<void> {
     this.partyInvitation = null;
     const client = new Client(SERVER_URL);
-    this.room = await client.joinOrCreate("game", { name, password, className, mode });
+    this.room = await client.joinOrCreate("game", { name, password, className, mode, gender });
     const selfId = this.room.sessionId;
 
     const snap = (p: any): PlayerSnapshot => ({
@@ -168,6 +171,7 @@ export class NetworkClient {
       stunMs: p.stunMs ?? 0, rootMs: p.rootMs ?? 0, poisonMs: p.poisonMs ?? 0,
       atkBuffMs: p.atkBuffMs ?? 0, defBuffMs: p.defBuffMs ?? 0,
       className: p.className,
+      gender: characterGender(p.gender),
       appearanceModel: p.appearanceModel ?? "",
       equipment:Object.fromEntries(p.equipment?.entries()??[]),
       guildTag: p.guildTag ?? "",

@@ -17,6 +17,7 @@ describe("toCharacterSave", () => {
     expect(save.mapId).toBe("bosque");
     expect(save.equipment).toEqual({ weapon: "iron_sword" });
     expect(save.progress).toEqual({
+      gender: 'male',
       loginStreak: 4, lastLoginDay: "2026-08-24", dailyQuestId: "d_hunt", dailyProgress: 3,
       dailyDone: false, totalKills: 42, bossKills: 1, title: "Aventurero",
       achievements: ["first_blood", "adventurer"],

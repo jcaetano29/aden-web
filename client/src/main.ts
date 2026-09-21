@@ -115,7 +115,7 @@ async function main() {
   const bossBar = new BossBar();
   // Tiempo de reaparición del jefe (config compartida) para el contador de la barra.
   const bossRespawnMs = respawnForTemplate("skeleton_king") ?? 60000;
-  const classSelect = new ClassSelect();
+  const classSelect = new ClassSelect(document.body, factory);
   const storyCard = new StoryCard();
   const dialog = new DialogPanel();
   const zoneIndicator = new ZoneIndicator();
@@ -138,7 +138,7 @@ async function main() {
   let className = "";
   const netCallbacks: RoomCallbacks = {
     onAdd: (id, isSelf, snap) => {
-      views.add(id, isSelf, modelForClass(snap.className ?? "knight"), snap);
+      views.add(id, isSelf, modelForClass(snap.className ?? "knight", snap.gender), snap);
       statusEffects.sync(`p:${id}`, snap, () => views.playerWorldPosition(id));
     },
     onChange: (id, snap) => {
@@ -287,7 +287,7 @@ async function main() {
     const creds = await classSelect.create(loginError);
     className = creds.className;
     try {
-      await net.connect(creds.name, creds.password, creds.className, netCallbacks, creds.mode);
+      await net.connect(creds.name, creds.password, creds.className, netCallbacks, creds.mode, creds.gender);
       connected = true;
     } catch (err) {
       if (isAuthError(err)) {
@@ -295,10 +295,13 @@ async function main() {
         continue;
       }
       console.error("[aden] no se pudo conectar al servidor:", err);
+      classSelect.remove();
       showServerOffline();
       return;
     }
   }
+
+  classSelect.remove();
 
   // En modo "Entrar", la clase la trae el personaje guardado: esperar el estado del
   // self y leer su clase real antes de armar el kit de skills.

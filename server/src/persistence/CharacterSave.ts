@@ -1,5 +1,8 @@
-/** Etapa 13: estado de retención (racha, diaria, logros) persistido como un solo blob. */
+import { characterGender, type CharacterGender } from '@aden/shared';
+
+/** Appearance shares the existing JSON column, including in Supabase: no migration required. */
 export interface ProgressSave {
+  gender?: CharacterGender;
   learnedTomes?: string[];
   loginStreak: number;
   lastLoginDay: string;
@@ -44,6 +47,7 @@ export interface CharacterSave {
 }
 
 export interface Persistable {
+  gender?: CharacterGender;
   learnedTomes?: { forEach(cb: (v: string) => void): void };
   level: number;
   exp: number;
@@ -114,6 +118,7 @@ export function toCharacterSave(p: Persistable): CharacterSave {
     guildTag: p.guildTag,
     equipment,
     progress: {
+      gender: characterGender(p.gender),
       ...(learnedTomes.length ? {learnedTomes} : {}),
       loginStreak: p.loginStreak,
       lastLoginDay: p.lastLoginDay,

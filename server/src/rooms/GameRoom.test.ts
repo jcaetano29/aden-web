@@ -25,6 +25,46 @@ describe("GameRoom", () => {
     await colyseus.cleanup();
   });
 
+  it.each(['knight', 'mage', 'barbarian', 'rogue', 'ranger'])('guarda y sincroniza la apariencia femenina de %s al reconectar', async (className) => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const observer = await colyseus.connectTo(room, { name: 'Observer' });
+    const options = { name: 'Heroina', password: 'clave123', className, gender: 'female', mode: 'create' };
+    const client = await colyseus.connectTo(room, options);
+    await vi.waitFor(() => {
+      expect(client.state.players.get(client.sessionId)?.gender).toBe('female');
+      expect(observer.state.players.get(client.sessionId)?.gender).toBe('female');
+    });
+    const p = room.state.players.get(client.sessionId)!;
+    expect(p.gender).toBe('female');
+    expect(client.state.players.get(client.sessionId)?.gender).toBe('female');
+    expect(p.maxHp).toBe(statsForClass(className, 1).maxHp);
+    expect(toCharacterSave(p).progress.gender).toBe('female');
+    await client.leave();
+    await room.waitForNextPatch();
+    const returned = await colyseus.connectTo(room, { ...options, mode: 'login', gender: 'male', className: 'knight' });
+    await room.waitForNextPatch();
+    expect(room.state.players.get(returned.sessionId)).toMatchObject({ className, gender: 'female' });
+  });
+
+  it('rechaza una apariencia inválida antes de registrar la cuenta', async () => {
+    const room = await colyseus.createRoom('game', {});
+    await colyseus.connectTo(room, { name: 'Observer' });
+    await expect(colyseus.connectTo(room, { name: 'InvalidGender', password: 'clave123', mode: 'create', gender: 'invalid' })).rejects.toBeDefined();
+    const valid = await colyseus.connectTo(room, { name: 'InvalidGender', password: 'clave123', mode: 'create', gender: 'male' });
+    await room.waitForNextPatch();
+    expect(room.state.players.get(valid.sessionId).gender).toBe('male');
+  });
+
+  it('conserva la apariencia masculina de guardados anteriores aunque el cliente pida femenino', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const client = await colyseus.connectTo(room, { name: 'LegacySource', className: 'mage' });
+    const legacy = toCharacterSave(room.state.players.get(client.sessionId)!);
+    delete legacy.progress.gender;
+    await room['persistence'].save('LegacyHero', legacy);
+    const restored = await colyseus.connectTo(room, { name: 'LegacyHero', className: 'knight', gender: 'female' });
+    expect(room.state.players.get(restored.sessionId)).toMatchObject({ className: 'mage', gender: 'male' });
+  });
+
   it('rechaza golpes fuera de alcance y publica posiciones y daño al conectar', async () => {
     const room = await colyseus.createRoom('game', {}) as GameRoom;
     const c = await colyseus.connectTo(room, { name: 'SkillRange', className: 'mage' });
@@ -1079,16 +1119,19 @@ describe("GameRoom", () => {
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
       // Antes de ganar nada: un título no ganado se rechaza.
+      const rejectedTitle = room.waitForMessage(MessageType.SetTitle);
       c.send(MessageType.SetTitle, { title: "Matarreyes" });
-      await room.waitForNextPatch();
+      await rejectedTitle;
       expect(p.title).not.toBe("Matarreyes");
       // Desbloquear first_blood → título Novato ganado y luego seleccionable.
       await killOneMob(room, c, p, "skeleton_minion");
+      const removedTitle = room.waitForMessage(MessageType.SetTitle);
       c.send(MessageType.SetTitle, { title: "" }); // sacárselo
-      await room.waitForNextPatch();
+      await removedTitle;
       expect(p.title).toBe("");
+      const selectedTitle = room.waitForMessage(MessageType.SetTitle);
       c.send(MessageType.SetTitle, { title: "Novato" });
-      await room.waitForNextPatch();
+      await selectedTitle;
       expect(p.title).toBe("Novato");
     });
   });

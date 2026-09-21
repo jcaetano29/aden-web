@@ -11,7 +11,7 @@ function snapshot(appearanceModel = "") {
 }
 
 describe("EntityViews appearance override", () => {
-  it("recrea el visual transformado y restaura el modelo de clase", () => {
+  it.each(['Ranger', 'Ranger_Female'])("recrea el visual transformado y restaura %s", (base) => {
     const created: string[] = [];
     const factory = {
       create(model: string) {
@@ -25,11 +25,11 @@ describe("EntityViews appearance override", () => {
     const nameplates = { add: vi.fn(), remove: vi.fn(), setText: vi.fn(), setTitle: vi.fn() };
     const views = new EntityViews(new THREE.Scene(), factory as any, nameplates as any);
 
-    views.add("self", true, "Ranger", snapshot());
+    views.add("self", true, base, snapshot());
     views.update("self", snapshot("DeathWraith"));
     views.update("self", snapshot(""));
 
-    expect(created).toEqual(["Ranger", "DeathWraith", "Ranger"]);
+    expect(created).toEqual([base, "DeathWraith", base]);
     expect(views.selfPosition()).toEqual({ x: 2, z: 3 });
   });
 });

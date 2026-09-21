@@ -1,6 +1,7 @@
 import { getTemplate, CLASSES } from "@aden/shared";
 
-export const MODEL_NAMES = ["Knight", "Mage", "Barbarian", "Rogue", "Ranger"] as const;
+export const HERO_MODELS = ["Knight", "Mage", "Barbarian", "Rogue", "Ranger"] as const;
+export const MODEL_NAMES: readonly string[] = [...HERO_MODELS, ...HERO_MODELS.map(name => `${name}_Female`)];
 
 export const MOB_MODEL_NAMES = ["DreadStalker", "DreadKnight", "OrcBrute", "ForestTroll", "BoneWarden", "InfernalDemon", "DeathWraith", "AncientDrake"] as const;
 
@@ -13,7 +14,8 @@ export const MODEL_HEIGHTS: Record<string, number> = {
 };
 
 export function modelUrl(name: string): string {
-  return `/models/${name === "Ranger" ? "Rogue" : name}.glb`;
+  const base = name.replace(/_Female$/, '');
+  return `/models/${base === "Ranger" ? "Rogue" : base}.glb`;
 }
 
 export function modelForTemplate(templateId: string): string {
@@ -24,9 +26,9 @@ export function modelForTemplate(templateId: string): string {
  * Devuelve el modelo de Three.js correspondiente a una clase (knight, mage, etc.).
  * Si la clase es desconocida, fallback al primer modelo (Knight).
  */
-export function modelForClass(className: string): string {
+export function modelForClass(className: string, gender: string = 'male'): string {
   const classDef = CLASSES[className];
-  return classDef?.model ?? MODEL_NAMES[0];
+  return (classDef?.model ?? MODEL_NAMES[0]) + (gender === 'female' ? '_Female' : '');
 }
 
 export function pickModelForSession(sessionId: string, models: readonly string[]): string {

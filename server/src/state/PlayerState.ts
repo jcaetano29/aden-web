@@ -1,6 +1,7 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { InventoryItemState } from "./InventoryItemState.js";
 import { emptyEffects } from '@aden/shared';
+import type { CharacterGender } from '@aden/shared';
 
 export class PlayerState extends Schema {
   @type("number") x = 0;
@@ -20,6 +21,7 @@ export class PlayerState extends Schema {
   @type("number") maxMp = 0;
   @type("boolean") dead = false;
   @type("string") className = "knight";
+  @type("string") gender: CharacterGender = 'male';
   @type("string") appearanceModel = "";
   /** Mapa actual del jugador (Etapa 15, estilo Mu). Se cambia warpeando (tecla M). */
   @type("string") mapId = "pueblo";

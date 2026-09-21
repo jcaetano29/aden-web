@@ -1,4 +1,5 @@
 import { tryPickup, dropPosition } from '../systems/LootSystem.js';
+import { characterGender, isCharacterGender } from '@aden/shared';
 // NOTA: import por default + destructuring en lugar de `import { Room, Client }`.
 // El paquete "colyseus" (CJS, bundle de esbuild) sólo anota estáticamente
 // RedisDriver/RedisPresence como named exports en su "0 && (module.exports = {...})";
@@ -1314,11 +1315,14 @@ export class GameRoom extends Room<GameState> {
    * Sin `mode` (compat/tests): comportamiento tolerante (verifica si existe, registra
    * si no). Devuelve truthy para permitir el join; lanzar rechaza con el mensaje.
    */
-  async onAuth(_client: Client, options: { name?: string; password?: string; className?: string; mode?: string }) {
+  async onAuth(_client: Client, options: { name?: string; password?: string; className?: string; mode?: string; gender?: unknown }) {
     const name = (options?.name ?? "").trim();
     const password = options?.password ?? "";
     const mode = options?.mode ?? "";
     if (name.length < 1 || name.length > 16) throw new Error("Nombre inválido (1-16 caracteres).");
+    if (mode !== 'login' && options.gender !== undefined && !isCharacterGender(options.gender)) {
+      throw new Error('Elegí una apariencia masculina o femenina.');
+    }
     const acct = await this.persistence.loadAccount(name);
     const hasAccount = !!(acct && acct.passwordHash);
 
@@ -1351,7 +1355,7 @@ export class GameRoom extends Room<GameState> {
     return { name, save };
   }
 
-  async onJoin(client: Client, options: { name?: string; className?: string }) {
+  async onJoin(client: Client, options: { name?: string; className?: string; gender?: unknown }) {
     // Save precargado por onAuth (síncrono acá). En login trae la clase real del
     // personaje; en create es null y se usa la clase elegida.
     const preSave = (client.auth as { save?: CharacterSave | null } | undefined)?.save ?? null;
@@ -1361,6 +1365,7 @@ export class GameRoom extends Room<GameState> {
       ? preSave.className
       : (isValidClass(options?.className) ? options.className! : "knight");
     player.className = className;
+    player.gender = characterGender(preSave ? preSave.progress?.gender : options?.gender);
     const st = statsForClass(className, 1);
     player.hp = st.maxHp;
     player.maxHp = st.maxHp;
