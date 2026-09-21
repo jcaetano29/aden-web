@@ -7,7 +7,7 @@ Autorización: el 21/09/2026 el usuario pidió ejecutar todas las tareas posible
 - Checkout de trabajo: `C:/Users/Joaco/.codex/worktrees/aden-alfa-consolidacion/l2`.
 - Rama: `codex/alfa-consolidacion`; base: `bd2e056`.
 - Checkout original: `C:/Users/Joaco/Documents/GitHub/l2`; no mezclar dependencias ni alterar sus artefactos.
-- Automatización: `consolidaci-n-nocturna-de-aden`, cada hora, ocho ejecuciones desde 21/09/2026 04:02 UTC. Detenerla cuando se complete el trabajo o el usuario lo solicite.
+- Automatización: `consolidaci-n-nocturna-de-aden`, cada veinte minutos, veinticuatro ejecuciones durante aproximadamente ocho horas. Detenerla cuando se complete el trabajo o el usuario lo solicite.
 - Entorno Windows/PowerShell. Este checkout está fuera de las raíces iniciales escribibles: usar exec_command con require_escalated para sus escrituras, pruebas y commits cuando haga falta. Usuario ya autorizó el trabajo.
 - Dependencias instaladas con `npm ci --offline --no-audit --no-fund`; paquetes propios apuntan a este checkout.
 - No usar Supabase real para pruebas. Puertos locales de verificación: servidor 2577, cliente 5177; cerrar los procesos propios al terminar.
@@ -37,5 +37,11 @@ Autorización: el 21/09/2026 el usuario pidió ejecutar todas las tareas posible
 
 - Análisis previo: 595 pruebas (187 shared, 187 servidor, 221 cliente), TypeScript y build correctos. Navegador: creación temporal, pueblo, bosque e inventario.
 - Riesgo confirmado por lectura: SupabasePersistence devuelve null al fallar una carga y traga errores de guardado. No se comprobó pérdida de datos real.
-- Base de pruebas del checkout aislado en ejecución; log `artifacts/baseline-tests.log`.
-- Próxima acción: ejecutar entrega 1 y revisar su diff.
+- Base del checkout aislado verificada: 595 pruebas aprobadas; log `artifacts/baseline-tests.log`.
+- Entrega 1 implementada: commit 961739b (fallos explícitos, mensajes seguros y carga del clan antes de crear estado). RED: 14 fallos; GREEN enfocado final: 19/19; suite servidor ejecutada durante la entrega: 204/204; tsc servidor correcto. Revisión independiente en curso con review_persistence_safety; todavía no marcar completa. Informe en .superpowers/sdd/2026-09-21-persistencia-segura/task-1-report.md.
+- Análisis de balance completado en docs/analisis-balance-alfa.md: ruta de EXP válida; revisar protección PvP inicial, presupuesto de flechas, premio +5 de Cripta, hacha legacy universal y recompensas duplicadas. Es análisis estático con supuestos, no playtest.
+- Hallazgos de sesiones, conexión, interfaz y rendimiento: docs/diagnostico-continuidad.md (investigación, no correcciones).
+- Próxima acción: cerrar entrega 1 con pruebas y revisión; avanzar a guardados ordenados y sesiones.
+
+
+
