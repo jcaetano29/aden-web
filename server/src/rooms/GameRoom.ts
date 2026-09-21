@@ -124,6 +124,7 @@ import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.
 import { createPersistence } from "../persistence/createPersistence.js";
 import type { PersistenceService, CharacterRank, GuildRank } from "../persistence/PersistenceService.js";
 import { toCharacterSave, inventoryRecordToEntries, type CharacterSave } from "../persistence/CharacterSave.js";
+import type { GuildSave } from "../persistence/GuildSave.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 
 /** Intervalo de guardado periódico de personajes (Etapa 3c). */
@@ -304,43 +305,47 @@ export class GameRoom extends Room<GameState> {
 
   /** Recalcula el snapshot del leaderboard: persistencia (incluye offline) mezclada con el estado vivo (online), ordenada, top 10. */
   private async refreshLeaderboard(): Promise<void> {
-    const [chars, guilds] = await Promise.all([
-      this.persistence.topCharacters(20),
-      this.persistence.topGuilds(20),
-    ]);
+    try {
+      const [chars, guilds] = await Promise.all([
+        this.persistence.topCharacters(20),
+        this.persistence.topGuilds(20),
+      ]);
 
-    // Jugadores: mezcla por nombre, el estado vivo pisa al persistido (stats más frescas).
-    const pByName = new Map<string, CharacterRank>();
-    for (const c of chars) pByName.set(c.name, c);
-    this.state.players.forEach((pl) => {
-      if (!pl.loaded) return;
-      pByName.set(pl.name, { name: pl.name, level: pl.level, pvpKills: pl.pvpKills, className: pl.className });
-    });
-    const players = [...pByName.values()]
-      .sort((a, b) => b.level - a.level || b.pvpKills - a.pvpKills)
-      .slice(0, 10);
+      // Jugadores: mezcla por nombre, el estado vivo pisa al persistido (stats más frescas).
+      const pByName = new Map<string, CharacterRank>();
+      for (const c of chars) pByName.set(c.name, c);
+      this.state.players.forEach((pl) => {
+        if (!pl.loaded) return;
+        pByName.set(pl.name, { name: pl.name, level: pl.level, pvpKills: pl.pvpKills, className: pl.className });
+      });
+      const players = [...pByName.values()]
+        .sort((a, b) => b.level - a.level || b.pvpKills - a.pvpKills)
+        .slice(0, 10);
 
-    // Guilds: mezcla por tag, las guilds vivas pisan a las persistidas.
-    const gByTag = new Map<string, GuildRank>();
-    for (const g of guilds) gByTag.set(g.tag, g);
-    this.state.guilds.forEach((g) => {
-      gByTag.set(g.tag, { name: g.name, tag: g.tag, bossKills: g.bossKills });
-    });
-    const gl = [...gByTag.values()]
-      .sort((a, b) => b.bossKills - a.bossKills)
-      .slice(0, 10);
+      // Guilds: mezcla por tag, las guilds vivas pisan a las persistidas.
+      const gByTag = new Map<string, GuildRank>();
+      for (const g of guilds) gByTag.set(g.tag, g);
+      this.state.guilds.forEach((g) => {
+        gByTag.set(g.tag, { name: g.name, tag: g.tag, bossKills: g.bossKills });
+      });
+      const gl = [...gByTag.values()]
+        .sort((a, b) => b.bossKills - a.bossKills)
+        .slice(0, 10);
 
-    this.state.leaderboard.players.splice(0);
-    for (const p of players) {
-      const e = new LeaderPlayerEntry();
-      e.name = p.name; e.level = p.level; e.pvpKills = p.pvpKills; e.className = p.className;
-      this.state.leaderboard.players.push(e);
-    }
-    this.state.leaderboard.guilds.splice(0);
-    for (const g of gl) {
-      const e = new LeaderGuildEntry();
-      e.name = g.name; e.tag = g.tag; e.bossKills = g.bossKills;
-      this.state.leaderboard.guilds.push(e);
+      this.state.leaderboard.players.splice(0);
+      for (const p of players) {
+        const e = new LeaderPlayerEntry();
+        e.name = p.name; e.level = p.level; e.pvpKills = p.pvpKills; e.className = p.className;
+        this.state.leaderboard.players.push(e);
+      }
+      this.state.leaderboard.guilds.splice(0);
+      for (const g of gl) {
+        const e = new LeaderGuildEntry();
+        e.name = g.name; e.tag = g.tag; e.bossKills = g.bossKills;
+        this.state.leaderboard.guilds.push(e);
+      }
+    } catch (error) {
+      console.error("[aden] leaderboard refresh failed; keeping previous snapshot", error);
     }
   }
 
@@ -1350,7 +1355,15 @@ export class GameRoom extends Room<GameState> {
     if (mode !== 'login' && options.gender !== undefined && !isCharacterGender(options.gender)) {
       throw new Error('Elegí una apariencia masculina o femenina.');
     }
-    const acct = await this.persistence.loadAccount(name);
+    const persistenceForAuth = async <T>(operation: () => Promise<T>): Promise<T> => {
+      try {
+        return await operation();
+      } catch (error) {
+        console.error("[aden] persistence unavailable during authentication", error);
+        throw new Error("El servicio de guardado no está disponible. Intentá nuevamente.");
+      }
+    };
+    const acct = await persistenceForAuth(() => this.persistence.loadAccount(name));
     const hasAccount = !!(acct && acct.passwordHash);
 
     if (mode === "login") {
@@ -1363,7 +1376,7 @@ export class GameRoom extends Room<GameState> {
       if (hasAccount) throw new Error("Ese nombre ya está en uso. Usá «Entrar».");
       if (password.length < 4) throw new Error("La contraseña necesita al menos 4 caracteres.");
       const { hash, salt } = hashPassword(password);
-      await this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt });
+      await persistenceForAuth(() => this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt }));
     } else {
       // Sin modo explícito (compat/tests): verifica si existe, registra si no.
       if (hasAccount) {
@@ -1372,20 +1385,25 @@ export class GameRoom extends Room<GameState> {
         }
       } else if (password.length >= 4) {
         const { hash, salt } = hashPassword(password);
-        await this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt });
+        await persistenceForAuth(() => this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt }));
       }
     }
     // Precargar el personaje guardado (si existe) para que onJoin lo aplique de forma
     // SÍNCRONA antes de insertar al jugador → el primer snapshot ya trae la clase/stats
     // correctas (sin el parpadeo "knight" del load async) y sin la race save-before-load.
-    const save = await this.persistence.load(name);
-    return { name, save };
+    const save = await persistenceForAuth(() => this.persistence.load(name));
+    const guild = save?.guildId
+      ? await persistenceForAuth(() => this.persistence.loadGuild(save.guildId))
+      : null;
+    return { name, save, guild };
   }
 
   async onJoin(client: Client, options: { name?: string; className?: string; gender?: unknown }) {
     // Save precargado por onAuth (síncrono acá). En login trae la clase real del
     // personaje; en create es null y se usa la clase elegida.
-    const preSave = (client.auth as { save?: CharacterSave | null } | undefined)?.save ?? null;
+    const auth = client.auth as { save?: CharacterSave | null; guild?: GuildSave | null } | undefined;
+    const preSave = auth?.save ?? null;
+    const preGuild = auth?.guild ?? null;
     const player = new PlayerState();
     player.name = options?.name ?? "Adventurer";
     const className = preSave?.className && isValidClass(preSave.className)
@@ -1512,7 +1530,7 @@ export class GameRoom extends Room<GameState> {
     // Etapa 9b: si el jugador tiene guild pero no hay ninguna instancia online (todos los
     // demás miembros están desconectados), reconstruir la GuildState viva desde el save.
     if (player.guildId !== "" && !this.state.guilds.has(player.guildId)) {
-      const row = await this.persistence.loadGuild(player.guildId);
+      const row = preGuild;
       const g = new GuildState();
       g.id = player.guildId;
       g.name = row?.name ?? player.guildName;

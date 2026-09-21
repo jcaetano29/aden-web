@@ -8,14 +8,20 @@ export interface GuildRank { name: string; tag: string; bossKills: number; }
 export interface AccountRecord { name: string; passwordHash: string; passwordSalt: string; }
 
 export interface PersistenceService {
+  /** A successful lookup without a row resolves null; provider and transport failures reject. */
   load(name: string): Promise<CharacterSave | null>;
+  /** Writes reject when persistence cannot confirm the operation. */
   save(name: string, data: CharacterSave): Promise<void>;
+  /** A successful lookup without a row resolves null; provider and transport failures reject. */
   loadGuild(id: string): Promise<GuildSave | null>;
+  /** Writes reject when persistence cannot confirm the operation. */
   saveGuild(g: GuildSave): Promise<void>;
+  /** Ranking queries reject on provider and transport failures. */
   topCharacters(limit: number): Promise<CharacterRank[]>;
   topGuilds(limit: number): Promise<GuildRank[]>;
-  /** Etapa 21: cuentas (auth). */
+  /** Etapa 21: cuentas (auth). Successful absence resolves null; failures reject. */
   loadAccount(name: string): Promise<AccountRecord | null>;
+  /** Writes reject when persistence cannot confirm the operation. */
   saveAccount(acct: AccountRecord): Promise<void>;
 }
 
