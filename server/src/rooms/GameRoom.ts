@@ -111,6 +111,8 @@ import { MobState } from "../state/MobState.js";
 import { DroppedItemState } from "../state/DroppedItemState.js";
 import { GuildState } from "../state/GuildState.js";
 import { PartySystem } from '../systems/PartySystem.js';
+import { ChatSystem } from '../systems/ChatSystem.js';
+import { CHAT_LOCAL_RANGE, type ChatMessage } from '@aden/shared';
 import { PARTY_REWARD_RANGE } from '@aden/shared';
 import { WorldObjectState } from "../state/WorldObjectState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
@@ -126,8 +128,15 @@ import { hashPassword, verifyPassword } from "../auth/password.js";
 
 /** Intervalo de guardado periódico de personajes (Etapa 3c). */
 const SAVE_INTERVAL_MS = 15000;
+const GLOBAL_CHAT_TOPIC = 'aden:chat:global';
 
 export class GameRoom extends Room<GameState> {
+  private readonly chat = new ChatSystem();
+  private readonly deliverGlobalChat = (message: ChatMessage): void => {
+    for (const client of this.clients) {
+      if (this.state.players.get(client.sessionId)?.loaded) client.send(MessageType.ChatMessage, message);
+    }
+  };
   private parties!: PartySystem;
   /** Contador para generar ids únicos de ítems dropeados (R-E3b-3). */
   private dropSeq = 0;
@@ -335,8 +344,26 @@ export class GameRoom extends Room<GameState> {
     }
   }
 
-  onCreate() {
+  async onCreate() {
     this.setState(new GameState());
+    await this.presence.subscribe(GLOBAL_CHAT_TOPIC, this.deliverGlobalChat);
+    this.onMessage(MessageType.ChatSend, async (client, payload: unknown) => {
+      const sender = this.state.players.get(client.sessionId);
+      const result = this.chat.submit(client.sessionId, sender, payload);
+      if ('error' in result) { client.send(MessageType.ChatError, result.error); return; }
+      if (result.message.channel === 'global') {
+        try { await this.presence.publish(GLOBAL_CHAT_TOPIC, result.message); }
+        catch { client.send(MessageType.ChatError, { code: 'unavailable', text: 'No se pudo enviar a Global. Volvé a intentarlo.' }); }
+        return;
+      }
+      for (const recipient of this.clients) {
+        const player = this.state.players.get(recipient.sessionId);
+        if (player?.loaded && player.mapId === sender!.mapId &&
+            distance2D(sender!.x, sender!.z, player.x, player.z) <= CHAT_LOCAL_RANGE) {
+          recipient.send(MessageType.ChatMessage, result.message);
+        }
+      }
+    });
     this.parties = new PartySystem(this.state, (id, invitation) => {
       this.clients.find(c => c.sessionId === id)?.send(MessageType.PartyInvitation, invitation);
     });
@@ -1512,6 +1539,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   async onLeave(client: Client) {
+    this.chat.remove(client.sessionId);
     this.parties.leave(client.sessionId);
     const player = this.state.players.get(client.sessionId);
     // Remove from live systems before the asynchronous save: disconnected players
@@ -1531,5 +1559,9 @@ export class GameRoom extends Room<GameState> {
         }
       }
     }
+  }
+
+  async onDispose() {
+    await this.presence.unsubscribe(GLOBAL_CHAT_TOPIC, this.deliverGlobalChat);
   }
 }

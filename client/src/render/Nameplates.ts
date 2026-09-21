@@ -1,11 +1,17 @@
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { COLORS, FONT_DISPLAY, FONT_BODY } from "./theme.js";
+import type { ChatMessage } from '@aden/shared';
+import './Nameplates.css';
+
+const CHAT_BUBBLE_MS = 5000;
+const CHAT_FADE_MS = 600;
 
 interface Plate {
   label: CSS2DObject;
   titleEl: HTMLDivElement;
   nameEl: HTMLDivElement;
+  bubble?: { el: HTMLDivElement; expiresAt: number; mapId: string };
 }
 
 /**
@@ -14,6 +20,8 @@ interface Plate {
  */
 export class Nameplates {
   private readonly plates = new Map<string, Plate>();
+
+  constructor(private readonly now: () => number = () => performance.now()) {}
 
   add(id: string, name: string, parent: THREE.Object3D, color?: string, title = "") {
     const wrap = document.createElement("div");
@@ -51,6 +59,42 @@ export class Nameplates {
     if (!p) return;
     p.titleEl.textContent = title;
     p.titleEl.style.display = title ? "" : "none";
+  }
+
+  /** One bubble per character, attached above the existing name/title label. */
+  showChat(message: ChatMessage): void {
+    if (message.channel !== 'local') return;
+    const plate = this.plates.get(message.senderId);
+    if (!plate || plate.label.parent?.visible === false) return;
+    plate.bubble?.el.remove();
+    const el = document.createElement('div');
+    el.className = 'aden-chat-bubble'; el.dataset.chatBubble = message.senderId;
+    // The chat log already announces messages to assistive technology.
+    el.setAttribute('aria-hidden', 'true');
+    el.textContent = message.text; el.style.opacity = '1';
+    plate.label.element.append(el);
+    plate.bubble = { el, expiresAt: this.now() + CHAT_BUBBLE_MS, mapId: message.mapId };
+  }
+
+  /** Called after map visibility is updated, so bubbles never follow a warp. */
+  updateChat(currentMapId: string): void {
+    const now = this.now();
+    for (const plate of this.plates.values()) {
+      const bubble = plate.bubble;
+      if (!bubble) continue;
+      const remaining = bubble.expiresAt - now;
+      if (remaining <= 0 || bubble.mapId !== currentMapId || plate.label.parent?.visible === false) {
+        bubble.el.remove(); plate.bubble = undefined;
+      } else {
+        bubble.el.style.opacity = String(Math.min(1, remaining / CHAT_FADE_MS));
+      }
+    }
+  }
+
+  clearChat(): void {
+    for (const plate of this.plates.values()) {
+      plate.bubble?.el.remove(); plate.bubble = undefined;
+    }
   }
 
   remove(id: string) {

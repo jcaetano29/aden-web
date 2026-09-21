@@ -1,0 +1,47 @@
+.aden-chat {
+  position: fixed;
+  left: 14px;
+  bottom: 202px;
+  width: min(390px, calc(100vw - 28px));
+  box-sizing: border-box;
+  z-index: 1000;
+  pointer-events: auto;
+  color: #e9dcc2;
+  background: rgba(12, 17, 23, .87);
+  border: 1px solid #655434;
+  border-radius: 4px;
+  box-shadow: 0 4px 16px #0006;
+  font: 14px/1.4 'EB Garamond', Georgia, serif;
+}
+.aden-chat [hidden] { display: none; }
+.aden-chat-header { display: flex; align-items: center; gap: 12px; padding: 6px 9px; border-bottom: 1px solid #65543480; }
+.aden-chat-header > strong { color: #f2d896; font: 12px 'Cinzel', Georgia, serif; }
+.aden-chat-filters { display: flex; gap: 4px; flex: 1; }
+.aden-chat button, .aden-chat select, .aden-chat input { font: inherit; color: inherit; }
+.aden-chat button { border: 1px solid transparent; background: transparent; border-radius: 3px; padding: 3px 7px; cursor: pointer; }
+.aden-chat button:hover { background: #c9a24b20; }
+.aden-chat button[aria-pressed=true] { border-color: #8d713a; color: #f2d896; background: #c9a24b16; }
+.aden-chat :focus-visible { outline: 2px solid #f2d896; outline-offset: 2px; }
+.aden-chat-log { height: clamp(80px, 18vh, 165px); overflow: auto; overscroll-behavior: contain; padding: 8px 10px; scrollbar-width: thin; scrollbar-color: #655434 transparent; }
+.aden-chat-message { overflow-wrap: anywhere; padding-bottom: 4px; }
+.aden-chat-message time { color: #aaa394; font-size: 11px; }
+.aden-chat-message strong { color: #f0e8d9; }
+.aden-chat-channel { color: #a7c9d9; font-size: 12px; }
+.aden-chat-message[data-channel=global] .aden-chat-channel { color: #f2d896; }
+.aden-chat-empty { color: #aaa394; font-style: italic; margin: 3px 0; max-width: 290px; }
+.aden-chat-compose { display: flex; gap: 5px; padding: 7px 8px 3px; border-top: 1px solid #65543480; }
+.aden-chat-compose input { min-width: 0; flex: 1; width: 0; background: #080d13; border: 1px solid #5a574d; border-radius: 3px; padding: 5px 7px; }
+.aden-chat-compose input::placeholder { color: #aaa394; }
+.aden-chat-compose select { width: 68px; background: #172029; border: 1px solid #655434; border-radius: 3px; padding: 3px; }
+.aden-chat-compose button { color: #f2d896; border-color: #655434; }
+.aden-chat :disabled { opacity: .5; cursor: default; }
+.aden-chat-status { padding: 2px 9px; min-height: 16px; color: #a7c9d9; font-size: 12px; }
+.aden-chat-status[data-error=true] { color: #ffac9f; }
+.aden-chat-footer { display: flex; justify-content: space-between; gap: 8px; padding: 0 9px 6px; color: #aaa394; font-size: 11px; }
+@media (max-height: 650px) {
+  .aden-chat-log { height: 70px; }
+}
+@media (max-width: 600px) {
+  .aden-chat-header { gap: 8px; }
+  .aden-chat { font-size: 14px; }
+}

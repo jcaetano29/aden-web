@@ -1,0 +1,32 @@
+.aden-chat-bubble {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(260px, 70vw);
+  box-sizing: border-box;
+  padding: 8px 12px;
+  border: 1px solid #a48a52;
+  border-radius: 10px;
+  background: rgba(239, 231, 212, .97);
+  color: #211b14;
+  box-shadow: 0 3px 12px #0007;
+  font: 15px/1.35 'EB Garamond', Georgia, serif;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  text-shadow: none;
+  pointer-events: none;
+}
+.aden-chat-bubble::after {
+  content: '';
+  position: absolute;
+  left: calc(50% - 5px);
+  bottom: -6px;
+  width: 9px;
+  height: 9px;
+  background: #efe7d4;
+  border-right: 1px solid #a48a52;
+  border-bottom: 1px solid #a48a52;
+  transform: rotate(45deg);
+}

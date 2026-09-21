@@ -94,8 +94,9 @@ export class ClassSelect {
               <div><dt><kbd>T</kbd></dt><dd>Progreso, logros y misión diaria</dd></div>
               <div><dt><kbd>L</kbd></dt><dd>Clasificación de jugadores y clanes</dd></div>
               <div><dt><kbd>N</kbd></dt><dd>Silenciar o activar el sonido</dd></div>
+              <div><dt><kbd>Enter</kbd></dt><dd>Escribir y enviar en el chat. Cerca habla con vecinos; Global con todo el servidor.</dd></div>
             </dl>
-            <p class="character-guide-note">Volvé a pulsar la misma tecla para cerrar un panel. <kbd>Esc</kbd> también cierra el panel de grupo.</p>
+            <p class="character-guide-note">Volvé a pulsar la misma tecla para cerrar un panel. <kbd>Esc</kbd> sale del chat o cierra el grupo. En el chat, usá /g para Global y /s para Cerca.</p>
           </div>
         </div>
         <p class="character-guide-tip"><strong>Tu primera misión:</strong> al entrar, hablá con el Anciano del pueblo para comenzar la aventura.</p>

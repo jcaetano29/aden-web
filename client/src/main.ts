@@ -16,6 +16,7 @@ import { SkillBar } from "./render/SkillBar.js";
 import { InventoryPanel } from "./render/InventoryPanel.js";
 import { GuildPanel } from "./render/GuildPanel.js";
 import { PartyPanel } from './render/PartyPanel.js';
+import { ChatPanel } from './render/ChatPanel.js';
 import { LeaderboardPanel } from "./render/LeaderboardPanel.js";
 import { ProgressPanel } from "./render/ProgressPanel.js";
 import { BossBar } from "./render/BossBar.js";
@@ -126,6 +127,8 @@ async function main() {
   // Minimapa (esquina sup. der.): radar del mapa actual (Etapa 15).
   const minimap = new Minimap();
   const net = new NetworkClient();
+  const chatPanel = new ChatPanel(message => net.sendChat(message));
+  window.addEventListener('pagehide', event => { if (!event.persisted) chatPanel.dispose(); });
   // Menú de mapas (tecla M): viajar entre mapas.
   const mapPanel = new MapPanel((mapId) => net.sendWarpTo(mapId));
   mapPanel.mount(document.body);
@@ -137,6 +140,15 @@ async function main() {
   // Callbacks de red (se reutilizan si hay que reintentar el login).
   let className = "";
   const netCallbacks: RoomCallbacks = {
+    onChatMessage: message => {
+      chatPanel.receive(message);
+      if (message.mapId === net.getSelf()?.mapId) nameplates.showChat(message);
+    },
+    onChatError: error => chatPanel.showError(error),
+    onConnectionChange: connected => {
+      chatPanel.setConnected(connected, net.sessionId);
+      if (!connected) nameplates.clearChat();
+    },
     onAdd: (id, isSelf, snap) => {
       views.add(id, isSelf, modelForClass(snap.className ?? "knight", snap.gender), snap);
       statusEffects.sync(`p:${id}`, snap, () => views.playerWorldPosition(id));
@@ -310,6 +322,7 @@ async function main() {
 
   // Mostrar la premisa narrativa una sola vez, ya conectado.
   await storyCard.show();
+  chatPanel.mount(document.body);
 
   // Interacción con el NPC de misiones: diálogo narrativo contextual.
   // El server es autoritativo; el diálogo es presentación.
@@ -660,6 +673,7 @@ async function main() {
     const myMapId = selfCombat?.mapId ?? "pueblo";
     groundItems.setMap(myMapId);
     views.setCurrentMap(myMapId);
+    nameplates.updateChat(myMapId);
     worldObjects.setCurrentMap(myMapId);
     hazards.setCurrentMap(myMapId);
     worldObjects.update3d(dt);

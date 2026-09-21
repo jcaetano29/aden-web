@@ -1,4 +1,7 @@
 export const MessageType = {
+  ChatSend: "chatSend",
+  ChatMessage: "chatMessage",
+  ChatError: "chatError",
   MoveTo: "moveTo",
   SetTarget: "setTarget",
   Damage: "damage",

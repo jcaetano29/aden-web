@@ -40,6 +40,7 @@ export class Hud {
 
   constructor(parent: HTMLElement = document.body) {
     this.root = document.createElement("div");
+    this.root.dataset.playerHud = '';
     this.root.className = "aden-panel aden-fadein";
     this.root.style.cssText =
       "position:fixed;left:14px;bottom:14px;pointer-events:none;z-index:1000;" +

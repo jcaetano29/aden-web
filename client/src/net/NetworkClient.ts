@@ -1,6 +1,9 @@
 import { Client, Room } from "colyseus.js";
 import {
   MessageType,
+  type ChatSendMessage,
+  type ChatMessage,
+  type ChatErrorEvent,
   type MoveToMessage,
   type SetTargetMessage,
   type UseSkillMessage,
@@ -117,6 +120,9 @@ export interface SelfCombatSnapshot {
 }
 
 export interface RoomCallbacks {
+  onChatMessage?: (message: ChatMessage) => void;
+  onChatError?: (error: ChatErrorEvent) => void;
+  onConnectionChange?: (connected: boolean) => void;
   onAdd: (id: string, isSelf: boolean, snap: PlayerSnapshot) => void;
   onChange: (id: string, snap: PlayerSnapshot) => void;
   onRemove: (id: string) => void;
@@ -151,14 +157,19 @@ export interface RoomCallbacks {
 }
 
 export class NetworkClient {
+  private chatConnected = false;
   private room!: Room;
   private partyInvitation: PartyInvitation | null = null;
 
   async connect(name: string, password: string, className: string, cb: RoomCallbacks, mode = "", gender: CharacterGender = 'male'): Promise<void> {
+    this.chatConnected = false;
     this.partyInvitation = null;
     const client = new Client(SERVER_URL);
     this.room = await client.joinOrCreate("game", { name, password, className, mode, gender });
     const selfId = this.room.sessionId;
+    this.room.onLeave(() => { this.chatConnected = false; cb.onConnectionChange?.(false); });
+    this.room.onMessage(MessageType.ChatMessage, (message: ChatMessage) => cb.onChatMessage?.(message));
+    this.room.onMessage(MessageType.ChatError, (error: ChatErrorEvent) => cb.onChatError?.(error));
 
     const snap = (p: any): PlayerSnapshot => ({
       name: p.name,
@@ -242,6 +253,14 @@ export class NetworkClient {
     this.room.state.worldObjects.onRemove((_o: any, id: string) => cb.onObjectRemove(id));
 
     this.room.onMessage(MessageType.SkillCast, (data: SkillCastEvent) => cb.onSkillCast(data));
+    this.chatConnected = true;
+    cb.onConnectionChange?.(true);
+  }
+
+  sendChat(message: ChatSendMessage): boolean {
+    if (!this.chatConnected) return false;
+    try { this.room.send(MessageType.ChatSend, message); return true; }
+    catch { return false; }
   }
 
   sendMove(msg: MoveToMessage) {
