@@ -60,7 +60,46 @@ export class ClassSelect {
           <div class="character-error" role="alert"></div>
           <button type="submit" class="character-enter">Entrar a Aden</button>
         </form>
-      </div>`;
+      </div>
+      <section class="character-guide" aria-labelledby="character-guide-title">
+        <h2 id="character-guide-title">Cómo jugar</h2>
+        <p class="character-guide-intro">Movete con el mouse y usá el teclado para combatir y abrir tus paneles.</p>
+        <div class="character-guide-columns">
+          <div>
+            <h3>Mouse</h3>
+            <dl class="character-guide-mouse">
+              <div><dt>Clic en el suelo</dt><dd>Caminá hasta ese lugar.</dd></div>
+              <div><dt>Clic en un enemigo</dt><dd>Seleccionalo como objetivo. Lo atacás automáticamente cuando está a tu alcance.</dd></div>
+              <div><dt>Clic en un personaje del pueblo</dt><dd>Acercate para hablar, aceptar misiones o comprar.</dd></div>
+              <div><dt>Clic en un objeto</dt><dd>Recogé botín del suelo o interactuá con cofres, barriles y santuarios al acercarte.</dd></div>
+            </dl>
+          </div>
+          <div>
+            <h3>Combate</h3>
+            <dl class="character-guide-keys">
+              <div><dt><kbd>1</kbd> a <kbd>6</kbd></dt><dd>Usar las habilidades de tu barra.</dd></div>
+              <div><dt><kbd>Espacio</kbd></dt><dd>Usar la primera habilidad de tu barra.</dd></div>
+              <div><dt><kbd>Q</kbd></dt><dd>Usar una poción de vida si tenés una y te falta salud.</dd></div>
+            </dl>
+            <p class="character-guide-note">Para las habilidades de ataque, seleccioná un enemigo y acercate. Revisá tu maná y esperá a que la habilidad esté lista otra vez.</p>
+          </div>
+          <div>
+            <h3>Paneles y sonido</h3>
+            <dl class="character-guide-keys">
+              <div><dt><kbd>I</kbd></dt><dd>Inventario y equipo</dd></div>
+              <div><dt><kbd>C</kbd></dt><dd>Atributos del personaje</dd></div>
+              <div><dt><kbd>M</kbd></dt><dd>Mapa y viajes</dd></div>
+              <div><dt><kbd>P</kbd></dt><dd>Grupo (party)</dd></div>
+              <div><dt><kbd>G</kbd></dt><dd>Clan (guild)</dd></div>
+              <div><dt><kbd>T</kbd></dt><dd>Progreso, logros y misión diaria</dd></div>
+              <div><dt><kbd>L</kbd></dt><dd>Clasificación de jugadores y clanes</dd></div>
+              <div><dt><kbd>N</kbd></dt><dd>Silenciar o activar el sonido</dd></div>
+            </dl>
+            <p class="character-guide-note">Volvé a pulsar la misma tecla para cerrar un panel. <kbd>Esc</kbd> también cierra el panel de grupo.</p>
+          </div>
+        </div>
+        <p class="character-guide-tip"><strong>Tu primera misión:</strong> al entrar, hablá con el Anciano del pueblo para comenzar la aventura.</p>
+      </section>`;
     this.creation = this.root.querySelector('.character-creation')!;
     this.caption = this.root.querySelector('.character-caption')!;
     this.nameInput = this.root.querySelector('input[type="text"]')!;
