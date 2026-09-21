@@ -23,7 +23,7 @@ export class SkillEffects {
    * Reproduce el VFX de una skill. `caster` = posición del que lanza; `target` =
    * posición del objetivo (o null para heal/buff sobre uno mismo).
    */
-  cast(skillId: string, caster: Vec3, target: Vec3 | null): void {
+  cast(skillId: string, caster: Vec3, target: Vec3 | null, destination?: Vec3): void {
     let skill;
     try { skill = getSkill(skillId); } catch { return; }
     const color = skill.vfxColor ?? 0xffffff;
@@ -32,22 +32,49 @@ export class SkillEffects {
     // Destello de casteo bajo los pies del lanzador (feedback siempre presente).
     this.push(this.ring(caster, color, 0.4, 1.6, 0.35));
 
-    if (skill.type === "heal") {
+    if (skill.dash && destination) {
+      this.push(this.streak(caster, destination, color));
+      this.push(this.ring(destination, color, .2, 1.8, .6));
+      this.push(this.sparkles(destination, color));
+    }
+    if (skill.type === "dash") {
       this.push(this.sparkles(caster, color));
+      return;
+    }
+
+    if (skill.type === "heal") {
+      this.push(this.sparkles(destination ?? caster, color));
       return;
     }
     if (skill.type === "buff") {
-      this.push(this.ring(caster, color, 0.5, 2.4, 0.55, 0.4));
-      this.push(this.sparkles(caster, color));
+      this.push(this.ring(destination ?? caster, color, 0.5, 2.4, 0.55, 0.4));
+      this.push(this.sparkles(destination ?? caster, color));
       return;
     }
     const to = target ? new THREE.Vector3(target.x, 1.2, target.z) : from;
-    if (skill.projectile && target) {
-      this.push(this.projectile(from, to, color, () => this.hitBurst(target, color)));
+    if (!target) return;
+    if (skillId === "meteor" || skillId === "tome_meteorite") {
+      this.push(this.ring(target, color, .4, 1.5, .5));
+      this.push(this.projectile(new THREE.Vector3(to.x, 9, to.z), to, color, () => this.hitBurst(target, color), "meteor"));
+    } else if (skillId === "tome_lightning") {
+      this.push(this.lightning(target, color));
+      this.hitBurst(target, color);
+    } else if (skillId === "frost_nova" || skillId === "tome_twister" || skillId === "tome_hellfire" || skillId === "tome_flame") {
+      this.push(this.elementColumn(target, color, skillId));
+      this.hitBurst(target, color);
+    } else if (skillId === "tome_power_wave") {
+      this.push(this.streak(caster, target, color));
+      this.push(this.ring(target, color, .2, 1.8, .5));
+    } else if (skill.projectile) {
+      const shape = ["aimed_shot", "snaring_shot", "piercing_shot", "item_volley"].includes(skillId) ? "arrow"
+        : ["ice_lance", "tome_ice"].includes(skillId) ? "ice"
+        : skillId === "tome_evil_spirit" ? "spirit" : "orb";
+      this.push(this.projectile(from, to, color, () => this.hitBurst(target, color), shape));
     } else if (skill.type === "dot" && target) {
       this.push(this.impact(target, color, 1.3));
       this.push(this.burst(target, color, 8));
     } else if (target) {
+      this.push(this.slash(destination ?? caster, target, color, skillId));
       this.hitBurst(target, color);
     }
   }
@@ -91,15 +118,26 @@ export class SkillEffects {
   }
 
   /** Proyectil emissivo (núcleo + halo) que viaja del caster al objetivo; al llegar llama onArrive. */
-  private projectile(from: THREE.Vector3, to: THREE.Vector3, color: number, onArrive: () => void): Effect {
+  private projectile(from: THREE.Vector3, to: THREE.Vector3, color: number, onArrive: () => void, shape = "orb"): Effect {
     const group = new THREE.Group();
     const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false });
-    const mesh = new THREE.Mesh(new THREE.SphereGeometry(0.34, 12, 12), mat);
+    const geometry = shape === "arrow" ? new THREE.ConeGeometry(.12, 1.2, 5)
+      : shape === "ice" ? new THREE.OctahedronGeometry(.4)
+      : new THREE.SphereGeometry(shape === "meteor" ? .65 : .28, 12, 12);
+    const mesh = new THREE.Mesh(geometry, mat);
+    if (shape === "arrow") mesh.rotation.x = Math.PI / 2;
+    if (shape === "ice") mesh.scale.z = 2.4;
     // Halo tenue alrededor del núcleo → se siente "energético" con el bloom.
     const haloMat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false });
     const halo = new THREE.Mesh(new THREE.SphereGeometry(0.7, 12, 12), haloMat);
     group.add(mesh, halo);
     group.position.copy(from);
+    group.lookAt(to);
+    // A tapered luminous tail keeps the projectile legible at the game camera distance.
+    const tail = new THREE.Mesh(new THREE.ConeGeometry(shape === "meteor" ? .5 : .16, 1.8, 8), haloMat);
+    tail.rotation.x = -Math.PI / 2;
+    tail.position.z = -1;
+    group.add(tail);
     this.scene.add(group);
     const dist = from.distanceTo(to);
     const dur = Math.max(0.12, dist / 34); let t = 0; let arrived = false;
@@ -110,11 +148,78 @@ export class SkillEffects {
         group.position.lerpVectors(from, to, k);
         pulse += dt * 12;
         halo.scale.setScalar(1 + Math.sin(pulse) * 0.15);
+        if (shape === "spirit") mesh.position.x = Math.sin(pulse) * .3;
         if (k >= 1 && !arrived) { arrived = true; onArrive(); }
         return t < dur;
       },
-      dispose: () => { this.scene.remove(group); mesh.geometry.dispose(); mat.dispose(); halo.geometry.dispose(); haloMat.dispose(); },
+      dispose: () => { this.scene.remove(group); mesh.geometry.dispose(); mat.dispose(); halo.geometry.dispose(); tail.geometry.dispose(); haloMat.dispose(); },
     };
+  }
+
+  private animateMesh(mesh: THREE.Mesh, duration: number, animate: (k: number) => void): Effect {
+    this.scene.add(mesh);
+    let age = 0;
+    return {
+      update: dt => { age += dt; const k = Math.min(1, age / duration); animate(k); return k < 1; },
+      dispose: () => { this.scene.remove(mesh); mesh.geometry.dispose(); (mesh.material as THREE.Material).dispose(); },
+    };
+  }
+
+  private material(color: number): THREE.MeshBasicMaterial {
+    return new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .8, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false });
+  }
+
+  private slash(caster: Vec3, target: Vec3, color: number, id: string): Effect {
+    const stab = ["backstab", "assassinate", "shadowstep"].includes(id);
+    const shield = id === "shield_bash" || id === "shield_charge";
+    const mat = this.material(color);
+    const mesh = new THREE.Mesh(shield ? new THREE.RingGeometry(.4, .8, 6)
+      : stab ? new THREE.ConeGeometry(.18, 1.8, 4)
+      : new THREE.RingGeometry(1, 1.35, 32, 1, 0, Math.PI * 1.3), mat);
+    mesh.position.set(caster.x, 1.2, caster.z);
+    mesh.rotation.set(Math.PI / 2, 0, Math.atan2(target.z - caster.z, target.x - caster.x));
+    return this.animateMesh(mesh, .35, k => {
+      mesh.position.x = caster.x + (target.x - caster.x) * k;
+      mesh.position.z = caster.z + (target.z - caster.z) * k;
+      if (!stab) mesh.rotation.z += .12;
+      mesh.scale.setScalar(.6 + k * .8); mat.opacity = 1 - k;
+    });
+  }
+
+  private streak(from: Vec3, to: Vec3, color: number): Effect {
+    const a = new THREE.Vector3(from.x, .8, from.z), b = new THREE.Vector3(to.x, .8, to.z);
+    const mat = this.material(color);
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(.08, .3, Math.max(.1, a.distanceTo(b)), 8), mat);
+    mesh.position.copy(a).add(b).multiplyScalar(.5);
+    const direction = b.clone().sub(a);
+    if (direction.lengthSq() > 0) mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    return this.animateMesh(mesh, .45, k => { mat.opacity = (1 - k) * .8; mesh.scale.x = mesh.scale.z = 1 + k; });
+  }
+
+  private lightning(pos: Vec3, color: number): Effect {
+    const points = Array.from({ length: 9 }, (_, i) => new THREE.Vector3(i === 8 ? 0 : Math.sin(i * 8) * .45, 7 - i * .75, 0));
+    const mat = this.material(color);
+    const mesh = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 24, .09, 5, false), mat);
+    mesh.position.set(pos.x, 0, pos.z);
+    return this.animateMesh(mesh, .4, k => { mat.opacity = (1 - k) * (.55 + .45 * Math.abs(Math.sin(k * 40))); });
+  }
+
+  private elementColumn(pos: Vec3, color: number, id: string): Effect {
+    const mat = this.material(color);
+    const ice = id === "frost_nova", wind = id === "tome_twister";
+    const points = Array.from({ length: 65 }, (_, i) => {
+      const t = i / 64, angle = t * Math.PI * 8, r = .3 + t * .85;
+      return new THREE.Vector3(Math.cos(angle) * r, t * 2.8, Math.sin(angle) * r);
+    });
+    const geometry = wind ? new THREE.TubeGeometry(new THREE.CatmullRomCurve3(points), 80, .09, 5, false)
+      : new THREE.ConeGeometry(ice ? 1.1 : .7, ice ? 2 : 3.4, ice ? 6 : 12, 1, true);
+    const mesh = new THREE.Mesh(geometry, mat);
+    mesh.position.set(pos.x, wind ? 0 : 1, pos.z);
+    return this.animateMesh(mesh, .7, k => {
+      mesh.rotation.y = k * Math.PI * 2;
+      mesh.scale.setScalar(Math.sin(k * Math.PI) * .8 + .2);
+      mat.opacity = (1 - k) * .85;
+    });
   }
 
   /** Chispas que salen disparadas hacia afuera con gravedad (impacto de golpe). */

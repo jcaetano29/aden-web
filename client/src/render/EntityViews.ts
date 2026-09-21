@@ -297,7 +297,7 @@ export class EntityViews {
   /** Posición de mundo aprox. de la cabeza del mob, para anclar damage numbers. */
   mobWorldPosition(mobId: string): THREE.Vector3 | null {
     const view = this.mobViews.get(mobId);
-    if (!view) return null;
+    if (!view || !view.object.visible) return null;
     const p = view.object.position;
     return new THREE.Vector3(p.x, p.y + (view.object.userData.visualHeight ?? MOB_HP_BAR_Y) * view.object.scale.y + 0.2, p.z);
   }
@@ -326,7 +326,7 @@ export class EntityViews {
   /** Posición de mundo aprox. de la cabeza del jugador, para anclar damage numbers. */
   playerWorldPosition(playerId: string): THREE.Vector3 | null {
     const view = this.views.get(playerId);
-    if (!view) return null;
+    if (!view || !view.object.visible) return null;
     const p = view.object.position;
     return new THREE.Vector3(p.x, p.y + (view.object.userData.visualHeight ?? PLAYER_HP_BAR_Y) * view.object.scale.y + 0.2, p.z);
   }

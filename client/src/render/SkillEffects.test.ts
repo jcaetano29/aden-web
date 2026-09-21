@@ -1,8 +1,23 @@
 import { describe, it, expect } from "vitest";
 import * as THREE from "three";
 import { SkillEffects } from "./SkillEffects.js";
+import { SKILLS } from "@aden/shared";
 
 describe("SkillEffects", () => {
+  it.each(Object.keys(SKILLS))("%s tiene animación y libera sus recursos", (id) => {
+    const scene = new THREE.Scene();
+    const fx = new SkillEffects(scene);
+    fx.cast(id, { x: 0, z: 0 }, { x: 3, z: 0 }, { x: 4, z: 0 });
+    expect(scene.children.length).toBeGreaterThan(1);
+    for (let i = 0; i < 100; i++) fx.update(.1);
+    expect(scene.children).toHaveLength(0);
+  });
+
+  it("el meteoro cae desde arriba del objetivo", () => {
+    const scene = new THREE.Scene();
+    new SkillEffects(scene).cast("meteor", { x: 0, z: 0 }, { x: 8, z: 0 });
+    expect(scene.children.some(o => o.position.y > 5 && o.position.x === 8)).toBe(true);
+  });
   it("lanzar un proyectil agrega efectos a la escena y se limpian con el tiempo", () => {
     const scene = new THREE.Scene();
     const fx = new SkillEffects(scene);

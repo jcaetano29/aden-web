@@ -15,6 +15,8 @@ import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, res
 const { Room } = colyseusPkg;
 import {
   MessageType,
+  skillRange,
+  type SkillCastEvent,
   type MoveToMessage,
   type SetTargetMessage,
   type UseSkillMessage,
@@ -393,6 +395,16 @@ export class GameRoom extends Room<GameState> {
       if (p.mp < skill.mpCost) return;
       if ((p.skillCooldowns.get(skill.id) ?? 0) > 0) return;
 
+      const origin = { x: p.x, z: p.z };
+      const announceCast = (targetId: string, amount?: number) => {
+        const target = targetId ? this.resolveTarget(targetId, p.mapId) : null;
+        const event: SkillCastEvent = {
+          casterId: client.sessionId, skillId: skill.id, targetId, amount,
+          origin, destination: { x: p.x, z: p.z }, mapId: p.mapId,
+          targetPosition: target ? { x: target.entity.x, z: target.entity.z } : undefined,
+        };
+        this.broadcast(MessageType.SkillCast, event);
+      };
       const atkCd = getClass(p.className).base.attackCooldownMs / (1+p.itemEffects.attackSpeed);
       const spend = () => { p.mp -= skill.mpCost; p.skillCooldowns.set(skill.id, skill.cooldownMs); };
       const applyCleanse = () => { if (skill.cleanse) { p.stunMs = 0; p.rootMs = 0; } };
@@ -404,7 +416,7 @@ export class GameRoom extends Room<GameState> {
         if (t.kind === 'mob' && !canFightDungeonMob(p,t.entity.templateId)) return;
         const gapCloser = skill.dash === "toTarget";
         // Enganche: requiere ataque listo pero NO rango (el dash acerca); si no, canAttack normal.
-        const ready = gapCloser ? (p.attackCooldownMs <= 0 && t.entity.hp > 0 && distance2D(p.x,p.z,t.entity.x,t.entity.z)<=12) : canAttack(p, t.entity, skill.range ?? (p.className==='mage'?10:ATTACK_RANGE));
+        const ready = gapCloser ? (p.attackCooldownMs <= 0 && t.entity.hp > 0 && distance2D(p.x,p.z,t.entity.x,t.entity.z)<=skillRange(skill)) : canAttack(p, t.entity, skillRange(skill));
         if (!ready) return;
         if (t.kind === "player") {
           const victim = t.entity;
@@ -419,13 +431,13 @@ export class GameRoom extends Room<GameState> {
         const variance = 0.9 + Math.random() * 0.2;
         const dmg = resolveAttack(p, t.entity, skill.factor ?? 1, variance, atkCd,Math.random,skillElement(skill.id));
         // Modificadores de counterplay sobre el objetivo.
-        if (skill.stunMs) t.entity.stunMs = Math.max(t.entity.stunMs, skill.stunMs);
-        if (skill.rootMs) t.entity.rootMs = Math.max(t.entity.rootMs, Math.round(skill.rootMs*(1-(t.kind==='player'&&skillElement(skill.id)==='ice'?t.entity.itemEffects.iceResist:0))));
+        if (dmg > 0 && skill.stunMs) t.entity.stunMs = Math.max(t.entity.stunMs, skill.stunMs);
+        if (dmg > 0 && skill.rootMs) t.entity.rootMs = Math.max(t.entity.rootMs, Math.round(skill.rootMs*(1-(t.kind==='player'&&skillElement(skill.id)==='ice'?t.entity.itemEffects.iceResist:0))));
         if (skill.lifestealPct && p.hp>0) p.hp = Math.min(p.maxHp, p.hp + Math.round(dmg * skill.lifestealPct));
         this.markCombat(p);
         if (t.kind === "player") this.markCombat(t.entity);
-        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId, amount: dmg });
-        this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: t.entity.hp });
+        announceCast(p.targetId, dmg);
+        this.broadcast(MessageType.Damage, { attackerId: client.sessionId, targetId: p.targetId, amount: dmg, hp: t.entity.hp, skillId: skill.id, dodged: dmg === 0 });
         if (t.entity.hp <= 0) {
           if (t.kind === "mob") this.killMob(t.entity, p.targetId, client.sessionId);
           else this.killPlayer(t.entity, p.targetId, client.sessionId);
@@ -436,7 +448,7 @@ export class GameRoom extends Room<GameState> {
         const healAmount = Math.round(p.maxHp * (skill.healPct ?? 0));
         p.hp = Math.min(p.maxHp, p.hp + healAmount);
         applyCleanse();
-        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: "", amount: healAmount });
+        announceCast("", healAmount);
       } else if (skill.type === "buff") {
         spend();
         if (skill.buffStat === "pAtk") {
@@ -451,23 +463,23 @@ export class GameRoom extends Room<GameState> {
         if (skill.healPct) { healAmount = Math.round(p.maxHp * skill.healPct); p.hp = Math.min(p.maxHp, p.hp + healAmount); }
         applyCleanse();
         if (skill.dash === "away") this.dashAway(p, skill.dashRange);
-        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: "", amount: healAmount || undefined });
+        announceCast("", healAmount || undefined);
       } else if (skill.type === "dash") {
         // Movilidad pura (blink): escape sin objetivo.
         spend();
         if (skill.dash === "away") this.dashAway(p, skill.dashRange);
         applyCleanse();
-        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: "" });
+        announceCast("");
       } else if (skill.type === "dot") {
         const target=p.targetId?this.resolveTarget(p.targetId,p.mapId):null;
-        if(!target || !canAttack(p,target.entity,skill.range??ATTACK_RANGE))return;
+        if(!target || !canAttack(p,target.entity,skillRange(skill)))return;
         if(target.kind==='mob' && !canFightDungeonMob(p,target.entity.templateId))return;
         if(target.kind==='player' && (!this.inPvpZone(p)||!this.inPvpZone(target.entity)||(p.guildId!==''&&p.guildId===target.entity.guildId)))return;
         spend();
         if(target.kind==='mob') { const mob=target.entity; mob.dotMs=skill.dotMs??0;mob.dotDps=skill.dotDps??0;mob.dotAttackerId=client.sessionId;mob.dotAccumMs=0; }
         else { const victim=target.entity;victim.poisonMs=skill.dotMs??0;victim.poisonDps=skill.dotDps??0;victim.poisonAttackerId=client.sessionId;victim.poisonAccumMs=0; }
         this.markCombat(p);
-        this.broadcast(MessageType.SkillCast, { casterId: client.sessionId, skillId: skill.id, targetId: p.targetId });
+        announceCast(p.targetId);
       }
     });
 
@@ -1014,7 +1026,17 @@ export class GameRoom extends Room<GameState> {
           if(!source || source.dead || source.mapId!==p.mapId || !this.inPvpZone(p)||!this.inPvpZone(source)) {p.poisonMs=0;p.poisonAccumMs=0;}
           else {
             p.poisonAccumMs+=Math.min(dtMs,p.poisonMs);p.poisonMs=Math.max(0,p.poisonMs-dtMs);
-            while(p.poisonAccumMs>=500&&!p.dead){p.poisonAccumMs-=500;const dmg=Math.max(1,Math.round(p.poisonDps*.5*(1-p.itemEffects.reduction)*(1-p.itemEffects.poisonResist)));p.hp=Math.max(0,p.hp-dmg);this.markCombat(p);if(p.hp<=0){const id=[...this.state.players.entries()].find(([,v])=>v===p)?.[0];if(id)this.killPlayer(p,id,p.poisonAttackerId);}}
+            while (p.poisonAccumMs >= 500 && !p.dead) {
+              p.poisonAccumMs -= 500;
+              const dmg = Math.max(1, Math.round(p.poisonDps * .5 * (1 - p.itemEffects.reduction) * (1 - p.itemEffects.poisonResist)));
+              p.hp = Math.max(0, p.hp - dmg);
+              this.markCombat(p);
+              const id = [...this.state.players.entries()].find(([, v]) => v === p)?.[0];
+              if (id) {
+                this.broadcast(MessageType.Damage, { attackerId: p.poisonAttackerId, targetId: id, amount: dmg, hp: p.hp, periodic: true });
+                if (p.hp <= 0) this.killPlayer(p, id, p.poisonAttackerId);
+              }
+            }
           }
         }
         if(p.dead)return;
@@ -1132,7 +1154,7 @@ export class GameRoom extends Room<GameState> {
       if (mob.dead || mob.dotMs <= 0) return;
       if(mob.mapId==='cripta' && !canFightDungeonMob(this.dungeonRun,mob.templateId)) {mob.dotMs=0;return;}
 
-      mob.dotAccumMs += dtMs;
+      mob.dotAccumMs += Math.min(dtMs, mob.dotMs);
 
       // Tick de daño cada 500ms
       while (mob.dotAccumMs >= 500) {
@@ -1141,6 +1163,7 @@ export class GameRoom extends Room<GameState> {
 
         this.broadcast(MessageType.Damage, {
           attackerId: mob.dotAttackerId,
+          periodic: true,
           targetId: mobId,
           amount: dmg,
           hp: mob.hp,

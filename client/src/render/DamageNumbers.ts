@@ -11,6 +11,7 @@ interface ActiveNumber {
   el: HTMLDivElement;
   bornAt: number;
   baseY: number;
+  anchor: THREE.Vector3;
 }
 
 /**
@@ -23,13 +24,21 @@ export class DamageNumbers {
 
   constructor(private readonly scene: THREE.Scene) {}
 
+  private place(obj: CSS2DObject, el: HTMLDivElement, worldPos: THREE.Vector3): void {
+    const nearby = this.active.filter(n => n.anchor.distanceToSquared(worldPos) < 1).length;
+    obj.position.copy(worldPos);
+    obj.position.x += ((nearby % 3) - 1) * .38;
+    obj.position.y += nearby * .3;
+    this.scene.add(obj);
+    this.active.push({ obj, el, bornAt: performance.now(), baseY: obj.position.y, anchor: worldPos.clone() });
+  }
+
   spawn(worldPos: THREE.Vector3, amount: number) {
     const el = document.createElement("div");
     const n = Math.round(amount);
-    // Golpes grandes (≥40) se leen como "críticos": naranja ardiente, más grandes
-    // y con resplandor — se sienten más satisfactorios cuando "pesan" más.
+    // Large hits are emphasized without claiming a server-confirmed critical.
     const crit = n >= 40;
-    el.textContent = crit ? `${n}!` : String(n);
+    el.textContent = String(n);
     const size = (crit ? 22 : 15) + Math.min(28, n) * 0.45;
     const color = crit ? "#ff8a2a" : "#ffe08a";
     const glow = crit ? ",0 0 12px rgba(255,120,30,0.9)" : ",0 0 6px rgba(255,200,80,0.5)";
@@ -37,9 +46,7 @@ export class DamageNumbers {
       `color:${color};font-family:${FONT_DISPLAY};font-weight:700;font-size:${size}px;` +
       `text-shadow:0 2px 3px #000,0 0 3px #000${glow};pointer-events:none;white-space:nowrap;transform-origin:center;`;
     const obj = new CSS2DObject(el);
-    obj.position.copy(worldPos);
-    this.scene.add(obj);
-    this.active.push({ obj, el, bornAt: performance.now(), baseY: worldPos.y });
+    this.place(obj, el, worldPos);
   }
 
   /** Muestra un texto personalizado (ej: "¡Esquivado!") en una posición. */
@@ -50,9 +57,7 @@ export class DamageNumbers {
       `color:${color};font-family:${FONT_DISPLAY};font-weight:700;font-size:17px;` +
       "text-shadow:0 2px 3px #000,0 0 4px #000;pointer-events:none;white-space:nowrap;transform-origin:center;";
     const obj = new CSS2DObject(el);
-    obj.position.copy(worldPos);
-    this.scene.add(obj);
-    this.active.push({ obj, el, bornAt: performance.now(), baseY: worldPos.y });
+    this.place(obj, el, worldPos);
   }
 
   /** Anima la subida/desvanecido y auto-remueve los números vencidos. Llamar en el render loop. */

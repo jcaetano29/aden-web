@@ -59,10 +59,10 @@ export class PlayerState extends Schema {
   poisonAccumMs = 0;
   poisonAttackerId = "";
 
-  // Buff fields — server-only (NO @type)
-  atkBuffMs = 0;
+  // Buff durations synchronized for persistent visual indicators.
+  @type("number") atkBuffMs = 0;
   atkBuffMult = 1;
-  defBuffMs = 0;
+  @type("number") defBuffMs = 0;
   defBuffMult = 1;
 
   // Etapa 22: control (sincronizado para que el cliente muestre el estado y bloquee input).

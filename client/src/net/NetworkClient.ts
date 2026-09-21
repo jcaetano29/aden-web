@@ -34,6 +34,11 @@ import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
 
 export interface PlayerSnapshot {
+  stunMs?: number;
+  rootMs?: number;
+  poisonMs?: number;
+  atkBuffMs?: number;
+  defBuffMs?: number;
   name: string;
   x: number;
   z: number;
@@ -156,6 +161,8 @@ export class NetworkClient {
       targetZ: p.targetZ,
       moving: p.moving,
       dead: p.dead,
+      stunMs: p.stunMs ?? 0, rootMs: p.rootMs ?? 0, poisonMs: p.poisonMs ?? 0,
+      atkBuffMs: p.atkBuffMs ?? 0, defBuffMs: p.defBuffMs ?? 0,
       className: p.className,
       appearanceModel: p.appearanceModel ?? "",
       equipment:Object.fromEntries(p.equipment?.entries()??[]),
@@ -185,6 +192,7 @@ export class NetworkClient {
       hp: m.hp,
       maxHp: m.maxHp,
       dead: m.dead,
+      stunMs: m.stunMs ?? 0, rootMs: m.rootMs ?? 0, poisonMs: m.dotMs ?? 0,
       windupMs: m.windupMs ?? 0,
       hazardMs: m.hazardMs ?? 0,
       hazardX: m.hazardX ?? m.x,

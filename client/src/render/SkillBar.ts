@@ -1,4 +1,4 @@
-import { getSkill } from "@aden/shared";
+import { getSkill, skillRange } from "@aden/shared";
 import { COLORS, FONT_DISPLAY } from "./theme.js";
 
 const SKILL_SLOT_WIDTH = 60;
@@ -94,6 +94,11 @@ export class SkillBar {
       try {
         const skill = getSkill(ids[i]);
         nameEl.textContent = skill.name;
+        const targeted = skill.type === "damage" || skill.type === "dot";
+        slot.title = `${skill.name} · ${skill.mpCost} MP · ${skill.cooldownMs / 1000}s` +
+          (targeted ? ` · Alcance ${skillRange(skill)} m` : " · Sobre vos") +
+          (skill.stunMs ? ` · Stun ${skill.stunMs / 1000}s` : "") +
+          (skill.rootMs ? ` · Inmoviliza ${skill.rootMs / 1000}s` : "");
         const tint = TYPE_COLOR[skill.type] ?? COLORS.gold;
         slot.style.borderColor = tint;
         slot.style.boxShadow = `0 5px 16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(242,216,150,0.12), 0 0 10px ${tint}44`;

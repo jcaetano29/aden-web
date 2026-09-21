@@ -21,6 +21,8 @@ import { BossBar } from "./render/BossBar.js";
 import { MapPanel } from "./render/MapPanel.js";
 import { WorldObjectViews } from "./render/WorldObjectViews.js";
 import { SkillEffects } from "./render/SkillEffects.js";
+import { StatusEffects } from "./render/StatusEffects.js";
+import { skillRange } from "@aden/shared";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ServiceNpc } from "./render/ServiceNpc.js";
@@ -60,6 +62,7 @@ async function main() {
   window.addEventListener('pagehide',()=>{groundItems.dispose();disposeItemModels();},{once:true});
   const worldObjects = new WorldObjectViews(renderer.scene);
   const skillEffects = new SkillEffects(renderer.scene);
+  const statusEffects = new StatusEffects(renderer.scene);
   const audio = new AudioEngine();
   const screenShake = new ScreenShake();
   // Autoplay policy: el AudioContext sólo puede arrancar/reanudarse tras un
@@ -126,14 +129,20 @@ async function main() {
   // Callbacks de red (se reutilizan si hay que reintentar el login).
   let className = "";
   const netCallbacks: RoomCallbacks = {
-    onAdd: (id, isSelf, snap) =>
-      views.add(id, isSelf, modelForClass(snap.className ?? "knight"), snap),
-    onChange: (id, snap) => views.update(id, snap),
-    onRemove: (id) => views.remove(id),
-    onMobAdd: (id, templateId, snap) => { views.addMob(id, modelForTemplate(templateId), templateId, snap); hazards.update(id, snap); },
-    onMobChange: (id, snap) => { views.updateMob(id, snap); hazards.update(id, snap); },
+    onAdd: (id, isSelf, snap) => {
+      views.add(id, isSelf, modelForClass(snap.className ?? "knight"), snap);
+      statusEffects.sync(`p:${id}`, snap, () => views.playerWorldPosition(id));
+    },
+    onChange: (id, snap) => {
+      views.update(id, snap);
+      statusEffects.sync(`p:${id}`, snap, () => views.playerWorldPosition(id));
+    },
+    onRemove: (id) => { views.remove(id); statusEffects.remove(`p:${id}`); },
+    onMobAdd: (id, templateId, snap) => { views.addMob(id, modelForTemplate(templateId), templateId, snap); hazards.update(id, snap); statusEffects.sync(`m:${id}`, snap, () => views.mobWorldPosition(id)); },
+    onMobChange: (id, snap) => { views.updateMob(id, snap); hazards.update(id, snap); statusEffects.sync(`m:${id}`, snap, () => views.mobWorldPosition(id)); },
     onMobRemove: (id) => {
       views.removeMob(id);
+      statusEffects.remove(`m:${id}`);
       hazards.remove(id);
       if (id === currentTargetId) currentTargetId = null;
     },
@@ -167,7 +176,7 @@ async function main() {
         }
       }
       // Animación de ataque en el ATACANTE (mob o jugador), vía attackerId.
-      views.playAttackerAnim(ev.attackerId);
+      if (!ev.skillId && !ev.periodic) views.playAttackerAnim(ev.attackerId);
       // Audio + screen shake: esquive silba, te pegan duele más (shake grande),
       // pegar/ver pegar a otro es un impacto chico.
       if (ev.dodged) {
@@ -241,19 +250,21 @@ async function main() {
     onObjectChange: (id, snap) => worldObjects.update(id, snap),
     onObjectRemove: (id) => worldObjects.remove(id),
     onSkillCast: (ev) => {
+      if (ev.mapId && ev.mapId !== net.getSelf()?.mapId) return;
       const caster = views.playerWorldPosition(ev.casterId);
       if (!caster) return;
       let target: THREE.Vector3 | null = null;
       if (ev.targetId) {
         target = views.hasMob(ev.targetId) ? views.mobWorldPosition(ev.targetId) : views.playerWorldPosition(ev.targetId);
       }
-      skillEffects.cast(ev.skillId, { x: caster.x, z: caster.z }, target ? { x: target.x, z: target.z } : null);
+      skillEffects.cast(ev.skillId, ev.origin ?? caster, ev.targetPosition ?? target, ev.destination);
+      views.playAttackerAnim(ev.casterId);
       // Etapa 22: nombre del skill flotante sobre el caster + número de cura.
       try {
         const skill = getSkill(ev.skillId);
         const nameAbove = caster.clone(); nameAbove.y += 2.6;
         damageNumbers.spawnText(nameAbove, skill.name, "#ffe6a8");
-        if (skill.type === "heal" && ev.amount && ev.amount > 0) {
+        if ((skill.type === "heal" || skill.type === "buff") && ev.amount && ev.amount > 0) {
           const healAt = caster.clone(); healAt.y += 1.4;
           damageNumbers.spawnText(healAt, `+${ev.amount}`, "#5fd06a");
         }
@@ -512,6 +523,13 @@ async function main() {
     if (self.mp < skill.mpCost) { hud.toast(`Sin maná (necesitás ${skill.mpCost})`, "#6ba6ff"); return; }
     const needsTarget = skill.type === "damage" || skill.type === "dot";
     if (needsTarget && !currentTargetId) { hud.toast("Necesitás un objetivo", "#ffe066"); return; }
+    if (needsTarget && currentTargetId) {
+      const from = views.selfPosition();
+      const to = views.hasMob(currentTargetId) ? views.mobWorldPosition(currentTargetId) : views.playerWorldPosition(currentTargetId);
+      if (!from || !to || Math.hypot(from.x - to.x, from.z - to.z) > skillRange(skill)) {
+        hud.toast(`Fuera de alcance (${skillRange(skill)} m)`, "#ffe066"); return;
+      }
+    }
 
     net.sendUseSkill(skillId);
     // Cooldown local + veil en la barra.
@@ -606,6 +624,7 @@ async function main() {
     damageNumbers.update(dt);
     groundItems.update(dt, renderer.camera);
     skillEffects.update(dt);
+    statusEffects.update(dt);
     const self = views.selfPosition();
     const shake = screenShake.update(dt);
     const selfCombat = net.getSelf();

@@ -41,6 +41,8 @@ export interface UseSkillMessage {
 }
 
 export interface DamageEvent {
+  periodic?: boolean;
+  skillId?: string;
   attackerId?: string;
   targetId: string;
   amount: number;
@@ -139,6 +141,11 @@ export interface InteractObjectMessage {
 
 /** Server→todos: un jugador lanzó una skill (Etapa 17), para renderizar su VFX en todos los clientes. */
 export interface SkillCastEvent {
+  /** Authoritative positions avoid stale client interpolation during dashes. */
+  origin?: { x: number; z: number };
+  destination?: { x: number; z: number };
+  targetPosition?: { x: number; z: number };
+  mapId?: string;
   casterId: string;
   skillId: string;
   /** objetivo del efecto ("" para heal/buff sobre uno mismo). */

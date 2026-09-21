@@ -38,8 +38,8 @@ export class MobState extends Schema {
   attackCooldownMs = 0;
   respawnMs = 0;
 
-  // DoT (Damage over Time) — server-only (NO @type)
-  dotMs = 0;
+  // DoT duration synchronized; damage bookkeeping remains server-only.
+  @type("number") dotMs = 0;
   dotDps = 0;
   dotAttackerId = "";
   dotAccumMs = 0;

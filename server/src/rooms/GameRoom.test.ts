@@ -25,6 +25,48 @@ describe("GameRoom", () => {
     await colyseus.cleanup();
   });
 
+  it('rechaza golpes fuera de alcance y publica posiciones y daño al conectar', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const c = await colyseus.connectTo(room, { name: 'SkillRange', className: 'mage' });
+    await room.waitForNextPatch();
+    room.setSimulationInterval(() => {}, 50);
+    const p = room.state.players.get(c.sessionId)!;
+    p.mapId = 'bosque'; p.x = 300; p.z = 0; p.level = 40; p.mp = 100;
+    const mob = room.spawnMob('skill-target', 'skeleton_minion', 308, 0, 'bosque');
+    mob.hp = mob.maxHp = 500; p.targetId = 'skill-target';
+    const events: any[] = [], damage: any[] = [];
+    c.onMessage(MessageType.SkillCast, e => events.push(e));
+    c.onMessage(MessageType.Damage, e => damage.push(e));
+    c.send(MessageType.UseSkill, { skillId: 'frost_nova' });
+    await room.waitForNextPatch();
+    expect(mob.hp).toBe(500); expect(p.mp).toBe(100); expect(events).toHaveLength(0);
+    c.send(MessageType.UseSkill, { skillId: 'fireball' });
+    await room.waitForNextPatch();
+    expect(mob.hp).toBeLessThan(500);
+    expect(events[0]).toMatchObject({ origin: { x: 300, z: 0 }, targetPosition: { x: 308, z: 0 }, mapId: 'bosque' });
+    expect(damage).toHaveLength(1);
+    expect(damage[0].amount).toBe(500 - mob.hp);
+    expect(damage[0].skillId).toBe('fireball');
+  });
+
+  it('cada tick de veneno PvP publica su número de daño', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const a = await colyseus.connectTo(room, { name: 'PoisonSource', className: 'rogue' });
+    const b = await colyseus.connectTo(room, { name: 'PoisonVictim', className: 'knight' });
+    await room.waitForNextPatch(); room.setSimulationInterval(() => {}, 50);
+    const source = room.state.players.get(a.sessionId)!, victim = room.state.players.get(b.sessionId)!;
+    source.mapId = victim.mapId = 'bosque'; source.x = victim.x = 300; source.z = victim.z = 0;
+    source.targetId = victim.targetId = ''; source.moving = victim.moving = false;
+    victim.poisonMs = 1000; victim.poisonDps = 14; victim.poisonAttackerId = a.sessionId;
+    const events = vi.spyOn(room, 'broadcast');
+    room.tick(.5); room.tick(.5);
+    const calls = events.mock.calls as unknown as Array<[string, import('@aden/shared').DamageEvent]>;
+    const ticks = calls.filter(([type, event]) => type === MessageType.Damage && event.targetId === b.sessionId);
+    expect(ticks).toHaveLength(2);
+    expect(ticks.map(([, e]) => e.amount)).toEqual([7, 7]);
+    expect(ticks.every(([, e]) => e.periodic === true)).toBe(true);
+  });
+
   it('dos clientes disputan loot real, preservan identidad y ven recogida, expiración y limpieza',async()=>{
     const room=await colyseus.createRoom('game',{}) as GameRoom;
     const killer=await colyseus.connectTo(room,{name:'LootKiller'}),thief=await colyseus.connectTo(room,{name:'LootThief'});
