@@ -6,6 +6,8 @@ El radar y el audio reducen su tamaño en ventanas compactas. El objetivo de ave
 
 El chat comienza minimizado cuando coincide con `(max-width: 900px), (max-height: 500px)`. Enter lo abre y enfoca cuando existe conexión. Abrirlo desde Enter, un filtro o el botón, y minimizarlo desde el botón, son decisiones explícitas que se conservan durante la vida del componente aunque cambie el tamaño de la ventana. Un cambio automático tampoco interrumpe el foco ni descarta un borrador. El contador de no leídos, el envío, el eco autoritativo y los filtros mantienen su comportamiento anterior.
 
+El acceso valida el nombre y la contraseña presentes en los campos al confirmar, incluso cuando el navegador los completa sin emitir un evento de escritura. Los cambios de campo y el retorno a la página actualizan el feedback en español; el nombre se recorta, se conservan los límites del formulario y no se guardan credenciales.
+
 La geometría compartida vive en `GameLayout.css`; cada componente conserva su paleta y estilo. El chat observa el HUD para situarse por encima de su posición real y libera sus listeners y observadores al desmontarse. Los componentes mantienen sus selectores públicos y el modal de desconexión conserva su capa superior.
 
 Esta entrega mejora visibilidad, lectura, scroll y acceso por teclado de las regiones descritas. No añade controles táctiles completos ni cambia estadísticas, misiones, recompensas o protocolo. Las pruebas DOM cubren el estado del chat; la aceptación geométrica en 1280×720, 1280×560, 390×844 y 844×390 corresponde a la verificación de navegador del controlador y no se afirma en este documento.

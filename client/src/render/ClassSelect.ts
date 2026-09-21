@@ -29,6 +29,11 @@ export class ClassSelect {
   private readonly cards = new Map<string, HTMLButtonElement>();
   private readonly preview?: HeroPreview;
   private focusTimer?: ReturnType<typeof setTimeout>;
+  private validationVisible = false;
+  private readonly refreshFromField = () => this.refreshValidation();
+  private readonly refreshFromWindow = () => {
+    if (!this.root.hidden) this.refreshValidation();
+  };
 
   constructor(parent: HTMLElement = document.body, factory?: CharacterFactory) {
     this.root.className = 'character-select aden-scroll';
@@ -51,7 +56,7 @@ export class ClassSelect {
           </fieldset>
           <p class="character-hint">Mismas habilidades y atributos en ambas apariencias.</p>
         </section>
-        <form class="character-form">
+        <form class="character-form" novalidate>
           <div class="character-class-picker"><h2>Elegí tu clase</h2><div class="character-classes" role="group" aria-label="Clase"></div></div>
           <div class="character-credentials">
             <label>Nombre del personaje<input type="text" maxlength="16" autocomplete="username" placeholder="Tu nombre en Aden" required></label>
@@ -122,8 +127,12 @@ export class ClassSelect {
       input.addEventListener('change', () => { this.gender = input.value as CharacterGender; this.refreshAppearance(); });
     });
     this.root.querySelector('form')!.addEventListener('submit', event => { event.preventDefault(); this.confirm(); });
-    this.nameInput.addEventListener('input', () => this.refreshButton());
-    this.passwordInput.addEventListener('input', () => this.refreshButton());
+    for (const input of [this.nameInput, this.passwordInput]) {
+      input.addEventListener('input', this.refreshFromField);
+      input.addEventListener('change', this.refreshFromField);
+    }
+    window.addEventListener('focus', this.refreshFromWindow);
+    window.addEventListener('pageshow', this.refreshFromWindow);
     parent.append(this.root);
     if (factory) {
       try { this.preview = new HeroPreview(this.root.querySelector('.character-canvas')!, factory); }
@@ -143,7 +152,8 @@ export class ClassSelect {
     this.root.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-selected', String((button as HTMLElement).dataset.mode === mode)));
     this.passwordInput.autocomplete = mode === 'create' ? 'new-password' : 'current-password';
     this.preview?.setVisible(mode === 'create' && !this.root.hidden);
-    this.errorDiv.textContent = ''; this.refreshButton();
+    this.validationVisible = false;
+    this.errorDiv.textContent = ''; this.refreshValidation();
   }
 
   private refreshAppearance() {
@@ -155,27 +165,58 @@ export class ClassSelect {
     this.preview?.show(this.selected, this.gender);
   }
 
-  private refreshButton() {
+  private validationError() {
+    const name = this.nameInput.value.trim();
+    if (!name) return 'Ingresá el nombre de tu personaje.';
+    if (name.length > this.nameInput.maxLength) return `El nombre puede tener hasta ${this.nameInput.maxLength} caracteres.`;
+    if (this.passwordInput.value.length < this.passwordInput.minLength) return `La contraseña debe tener al menos ${this.passwordInput.minLength} caracteres.`;
+    if (this.passwordInput.value.length > this.passwordInput.maxLength) return `La contraseña puede tener hasta ${this.passwordInput.maxLength} caracteres.`;
+    return '';
+  }
+
+  private refreshValidation() {
     this.enterBtn.textContent = this.mode === 'login' ? 'Entrar a Aden' : 'Crear personaje';
-    this.enterBtn.disabled = !this.nameInput.value.trim() || this.passwordInput.value.length < 4;
+    this.enterBtn.disabled = false;
+    this.enterBtn.removeAttribute('aria-disabled');
+    if (!this.validationVisible) {
+      this.nameInput.removeAttribute('aria-invalid');
+      this.passwordInput.removeAttribute('aria-invalid');
+      return;
+    }
+    const error = this.validationError();
+    this.errorDiv.textContent = error;
+    const nameLength = this.nameInput.value.trim().length;
+    const passwordLength = this.passwordInput.value.length;
+    this.nameInput.toggleAttribute('aria-invalid', nameLength === 0 || nameLength > this.nameInput.maxLength);
+    this.passwordInput.toggleAttribute('aria-invalid', passwordLength < this.passwordInput.minLength || passwordLength > this.passwordInput.maxLength);
   }
 
   private confirm() {
     if (!this.resolver) return;
     const name = this.nameInput.value.trim(), password = this.passwordInput.value;
-    if (!name || password.length < 4) return;
-    this.resolver({ name, password, mode: this.mode, className: this.mode === 'create' ? this.selected : '', gender: this.gender });
-    this.root.hidden = true; this.preview?.setVisible(false); this.resolver = null;
+    this.validationVisible = true;
+    this.refreshValidation();
+    if (this.validationError()) return;
+    const resolve = this.resolver;
+    this.resolver = null;
+    this.root.hidden = true; this.preview?.setVisible(false);
+    resolve({ name, password, mode: this.mode, className: this.mode === 'create' ? this.selected : '', gender: this.gender });
   }
 
   async create(errorMsg = ''): Promise<LoginResult> {
     return new Promise(resolve => {
-      this.resolver = resolve; this.errorDiv.textContent = errorMsg; this.passwordInput.value = '';
-      this.root.hidden = false; this.preview?.setVisible(this.mode === 'create'); this.refreshButton();
+      this.resolver = resolve; this.validationVisible = false; this.errorDiv.textContent = errorMsg; this.passwordInput.value = '';
+      this.root.hidden = false; this.preview?.setVisible(this.mode === 'create'); this.refreshValidation();
       clearTimeout(this.focusTimer);
       this.focusTimer = setTimeout(() => (this.nameInput.value ? this.passwordInput : this.nameInput).focus(), 50);
     });
   }
 
-  remove() { clearTimeout(this.focusTimer); this.preview?.dispose(); this.root.remove(); }
+  remove() {
+    clearTimeout(this.focusTimer);
+    window.removeEventListener('focus', this.refreshFromWindow);
+    window.removeEventListener('pageshow', this.refreshFromWindow);
+    this.preview?.dispose();
+    this.root.remove();
+  }
 }
