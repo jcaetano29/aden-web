@@ -10,7 +10,7 @@
 ## Global Constraints
 - Conservar el aspecto de Aden y coordinar las regiones de interfaz mediante CSS responsive, con atributos/clases estables.
 - No cambiar stats, recompensas, quests ni el protocolo. Conservar controles existentes y textos de historia.
-- Verificar 1280x720, 1280x560, 390x844 y 844x390; HP/MP, al menos la habilidad seleccionada, objetivo y acceso al chat siempre visibles. Scroll local permitido para seis habilidades o textos largos si todo es accesible y el control de scroll es utilizable.
+- Verificar 1280x720, 1280x560, 390x844 y 844x390; En el estado normal de juego, HP/MP, al menos la habilidad seleccionada, objetivo y acceso al chat visibles. Los avisos transitorios pueden cubrir temporalmente el objetivo o radar mientras muestran feedback; al expirar debe reaparecer íntegro. Los avisos no deben cubrir HP/MP, habilidades ni el acceso al chat. Scroll local permitido para seis habilidades o textos largos si todo es accesible y el control de scroll es utilizable.
 - HUD y skillbar no se intersectan; chat colapsado no tapa el personaje en estado inicial. Al expandirlo, su contenido y controles se pueden usar y minimizar de nuevo.
 - No colapsar el chat a mitad de escritura ni sobrescribir una preferencia explícita al redimensionar.
 - En conexión perdida, el modal de entrega3 sigue por encima de toda la UI y bloquea los controles.
