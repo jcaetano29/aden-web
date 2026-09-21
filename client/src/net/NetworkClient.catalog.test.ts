@@ -1,17 +1,48 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MessageType } from "@aden/shared";
+
+const transport = vi.hoisted(() => ({ joinOrCreate: vi.fn() }));
+
+vi.mock("colyseus.js", () => ({
+  Client: class { joinOrCreate = transport.joinOrCreate; },
+  Room: class {},
+}));
+
 import { NetworkClient } from "./NetworkClient.js";
 
+class FakeCollection<T> extends Map<string, T> {
+  onAdd(_callback: (value: T, key: string) => void): void {}
+  onRemove(_callback: (value: T, key: string) => void): void {}
+}
+
+function connectedRoom() {
+  return {
+    sessionId: "self",
+    sent: [] as Array<[string, unknown]>,
+    state: {
+      players: new FakeCollection<any>(), mobs: new FakeCollection<any>(),
+      droppedItems: new FakeCollection<any>(), worldObjects: new FakeCollection<any>(),
+    },
+    onLeave: vi.fn(),
+    onMessage: vi.fn(),
+    send(type: string, payload: unknown) { this.sent.push([type, payload]); },
+  };
+}
+
+beforeEach(() => transport.joinOrCreate.mockReset());
+
 describe("NetworkClient catalog messages", () => {
-  it("envía el objetivo elegido al usar una joya", () => {
-    const send = vi.fn();
+  it("envía el objetivo elegido al usar una joya", async () => {
+    const room = connectedRoom();
+    transport.joinOrCreate.mockResolvedValue(room);
     const net = new NetworkClient();
-    (net as any).room = { send };
-    net.sendUseItem("aden_gema_del_pacto", "weapon-instance");
-    expect(send).toHaveBeenCalledWith(MessageType.UseItem, {
-      itemTemplateId: "aden_gema_del_pacto",
-      targetItemId: "weapon-instance",
-    });
+    await net.connect("Temporal", "clave-temporal", "knight", {} as any, "login");
+
+    expect(net.sendUseItem("aden_gema_del_pacto", "weapon-instance")).toBe(true);
+    expect(room.sent).toEqual([[MessageType.UseItem, {
+        itemTemplateId: "aden_gema_del_pacto",
+        targetItemId: "weapon-instance",
+      }]]);
   });
 
   it("expone los tomos aprendidos del estado sincronizado", () => {

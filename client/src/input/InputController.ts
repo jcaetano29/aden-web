@@ -31,15 +31,18 @@ export class InputController {
     /** NPCs clickeables (Anciano, Mercader, Sanadora, Herrero, Capitán). Se chequean primero. */
     private readonly npcTargets?: () => NpcInteractable[],
     private readonly loot?: {targets:()=>{objects:THREE.Object3D[];idOf:(o:THREE.Object3D)=>string|null};pick:(id:string)=>void;hover:(ray:THREE.Raycaster)=>void},
+    private readonly isInputBlocked: () => boolean = () => false,
   ) {}
 
   attach(dom: HTMLElement) {
     dom.addEventListener('pointermove',e=>{
+      if(this.isInputBlocked())return;
       if(!this.loot)return;
       this.renderer.raycaster.setFromCamera(new THREE.Vector2(e.clientX/window.innerWidth*2-1,1-e.clientY/window.innerHeight*2),this.renderer.camera);
       this.loot?.hover(this.renderer.raycaster);
     });
     dom.addEventListener("click", (e) => {
+      if (this.isInputBlocked()) return;
       if (isUiClick(e.target)) return;
       const ndcX = (e.clientX / window.innerWidth) * 2 - 1;
       const ndcY = -(e.clientY / window.innerHeight) * 2 + 1;

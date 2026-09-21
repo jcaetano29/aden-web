@@ -37,6 +37,7 @@ import { DialogPanel } from "./render/DialogPanel.js";
 import { ZoneIndicator } from "./render/ZoneIndicator.js";
 import { ZoneBanner } from "./render/ZoneBanner.js";
 import { injectTheme } from "./render/theme.js";
+import { ConnectionDialog } from "./render/ConnectionDialog.js";
 import { NetworkClient, isAuthError, type RoomCallbacks } from "./net/NetworkClient.js";
 import { StatsPanel } from "./render/StatsPanel.js";
 import { InputController } from "./input/InputController.js";
@@ -118,6 +119,8 @@ async function main() {
   const bossRespawnMs = respawnForTemplate("skeleton_king") ?? 60000;
   const classSelect = new ClassSelect(document.body, factory);
   const storyCard = new StoryCard();
+  const connectionDialog = new ConnectionDialog(() => window.location.reload());
+  window.addEventListener("pagehide", event => { if (!event.persisted) connectionDialog.dispose(); });
   const dialog = new DialogPanel();
   const zoneIndicator = new ZoneIndicator();
   zoneIndicator.mount(document.body);
@@ -139,6 +142,13 @@ async function main() {
 
   // Callbacks de red (se reutilizan si hay que reintentar el login).
   let className = "";
+  let sessionEstablished = false;
+  let disconnectShown = false;
+  const showDisconnectedOnce = () => {
+    if (!sessionEstablished || disconnectShown) return;
+    disconnectShown = true;
+    connectionDialog.show("disconnected");
+  };
   const netCallbacks: RoomCallbacks = {
     onChatMessage: message => {
       chatPanel.receive(message);
@@ -147,7 +157,10 @@ async function main() {
     onChatError: error => chatPanel.showError(error),
     onConnectionChange: connected => {
       chatPanel.setConnected(connected, net.sessionId);
-      if (!connected) nameplates.clearChat();
+      if (!connected) {
+        nameplates.clearChat();
+        showDisconnectedOnce();
+      }
     },
     onAdd: (id, isSelf, snap) => {
       views.add(id, isSelf, modelForClass(snap.className ?? "knight", snap.gender), snap);
@@ -301,6 +314,8 @@ async function main() {
     try {
       await net.connect(creds.name, creds.password, creds.className, netCallbacks, creds.mode, creds.gender);
       connected = true;
+      sessionEstablished = true;
+      if (!net.isConnected) showDisconnectedOnce();
     } catch (err) {
       if (isAuthError(err)) {
         loginError = (err as Error)?.message || "No se pudo entrar. Probá de nuevo.";
@@ -308,7 +323,7 @@ async function main() {
       }
       console.error("[aden] no se pudo conectar al servidor:", err);
       classSelect.remove();
-      showServerOffline();
+      connectionDialog.show("unavailable");
       return;
     }
   }
@@ -527,6 +542,7 @@ async function main() {
       if(pos)net.sendMove({x:pos.x,z:pos.z});
       net.sendPickup(id);
     }},
+    () => connectionDialog.isOpen,
   );
   input.attach(document.body);
 
@@ -579,6 +595,7 @@ async function main() {
   let progressPanelVisible = false;
   let lastMapId = "";
   document.body.addEventListener("keydown", (e) => {
+    if (connectionDialog.isOpen) return;
     // No disparar hotkeys de gameplay mientras se está tipeando en un input
     // (p.ej. el form de crear guild): sin esta guarda, escribir "Guerreros"
     // o el tag "GG" cierra el panel o dispara otras acciones por accidente.
@@ -753,28 +770,6 @@ async function main() {
     requestAnimationFrame(loop);
   }
   loop();
-}
-
-/**
- * Overlay amigable cuando el cliente no puede conectar al game server (p.ej. el
- * cliente está desplegado pero el server —que va en un host de Node aparte, no en
- * Vercel— todavía no está levantado o la URL no está configurada).
- */
-function showServerOffline(): void {
-  const url = (import.meta as any).env?.VITE_SERVER_URL ?? "ws://localhost:2567";
-  const div = document.createElement("div");
-  div.style.cssText =
-    "position:fixed;inset:0;z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;" +
-    "background:radial-gradient(120% 90% at 50% -10%, #1a1206 0%, #0c0a07 55%, #050403 100%);" +
-    "color:#ddceb0;font-family:'EB Garamond','Georgia',serif;text-align:center;padding:24px;gap:12px;";
-  div.innerHTML =
-    `<div style="font-family:'Cinzel','Georgia',serif;font-weight:700;font-size:34px;letter-spacing:3px;color:#f2d896;text-shadow:0 0 18px rgba(201,162,75,0.4);">Aden está dormida</div>` +
-    `<div style="height:2px;width:160px;background:linear-gradient(90deg,transparent,#c9a24b,transparent);"></div>` +
-    `<div style="max-width:520px;opacity:0.92;line-height:1.6;font-size:17px;">No se pudo conectar al servidor del juego.<br>` +
-    `El mundo de Aden necesita su servidor en línea para jugar.</div>` +
-    `<div style="opacity:0.45;font-size:12px;margin-top:6px;">Servidor: ${url}</div>` +
-    `<button onclick="location.reload()" class="aden-btn" style="margin-top:16px;">Reintentar</button>`;
-  document.body.appendChild(div);
 }
 
 main().catch((err) => console.error("[aden] fallo al iniciar:", err));

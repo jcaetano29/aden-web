@@ -157,19 +157,54 @@ export interface RoomCallbacks {
 }
 
 export class NetworkClient {
-  private chatConnected = false;
+  private connected = false;
+  private roomActive = false;
   private room!: Room;
   private partyInvitation: PartyInvitation | null = null;
+  private connectionCallbacks?: RoomCallbacks;
+
+  get isConnected(): boolean {
+    return this.connected;
+  }
+
+  private markDisconnected(room: Room, cb: RoomCallbacks): void {
+    if (this.room !== room || !this.roomActive) return;
+    this.roomActive = false;
+    const wasConnected = this.connected;
+    this.connected = false;
+    this.partyInvitation = null;
+    if (wasConnected) cb.onConnectionChange?.(false);
+  }
+
+  private send(type: string, payload?: unknown): boolean {
+    const room = this.room;
+    const cb = this.connectionCallbacks;
+    if (!this.connected || !room || !cb) return false;
+    try {
+      room.send(type, payload);
+      return true;
+    } catch {
+      this.markDisconnected(room, cb);
+      return false;
+    }
+  }
 
   async connect(name: string, password: string, className: string, cb: RoomCallbacks, mode = "", gender: CharacterGender = 'male'): Promise<void> {
-    this.chatConnected = false;
+    this.connected = false;
+    this.roomActive = false;
     this.partyInvitation = null;
     const client = new Client(SERVER_URL);
-    this.room = await client.joinOrCreate("game", { name, password, className, mode, gender });
-    const selfId = this.room.sessionId;
-    this.room.onLeave(() => { this.chatConnected = false; cb.onConnectionChange?.(false); });
-    this.room.onMessage(MessageType.ChatMessage, (message: ChatMessage) => cb.onChatMessage?.(message));
-    this.room.onMessage(MessageType.ChatError, (error: ChatErrorEvent) => cb.onChatError?.(error));
+    const room = await client.joinOrCreate<any>("game", { name, password, className, mode, gender });
+    this.room = room;
+    this.roomActive = true;
+    this.connectionCallbacks = cb;
+    const selfId = room.sessionId;
+    const ifCurrent = (callback: () => void): void => {
+      if (this.room === room && this.roomActive) callback();
+    };
+    room.onLeave(() => this.markDisconnected(room, cb));
+    room.onMessage(MessageType.ChatMessage, (message: ChatMessage) => ifCurrent(() => cb.onChatMessage?.(message)));
+    room.onMessage(MessageType.ChatError, (error: ChatErrorEvent) => ifCurrent(() => cb.onChatError?.(error)));
 
     const snap = (p: any): PlayerSnapshot => ({
       name: p.name,
@@ -192,14 +227,15 @@ export class NetworkClient {
       dungeonKills: p.dungeonKills ?? 0,
     });
 
-    this.room.state.players.onAdd((player: any, id: string) => {
+    room.state.players.onAdd((player: any, id: string) => {
+      if (this.room !== room || !this.roomActive) return;
       cb.onAdd(id, id === selfId, snap(player));
-      player.onChange(() => cb.onChange(id, snap(player)));
-      player.equipment?.onAdd(()=>cb.onChange(id,snap(player)));
-      player.equipment?.onRemove(()=>cb.onChange(id,snap(player)));
-      player.equipment?.onChange(()=>cb.onChange(id,snap(player)));
+      player.onChange(() => ifCurrent(() => cb.onChange(id, snap(player))));
+      player.equipment?.onAdd(() => ifCurrent(() => cb.onChange(id, snap(player))));
+      player.equipment?.onRemove(() => ifCurrent(() => cb.onChange(id, snap(player))));
+      player.equipment?.onChange(() => ifCurrent(() => cb.onChange(id, snap(player))));
     });
-    this.room.state.players.onRemove((_player: any, id: string) => cb.onRemove(id));
+    room.state.players.onRemove((_player: any, id: string) => ifCurrent(() => cb.onRemove(id)));
 
     const snapMob = (m: any): MobSnapshot => ({
       name: "",
@@ -220,93 +256,95 @@ export class NetworkClient {
       mapId: m.mapId ?? "",
     });
 
-    this.room.state.mobs.onAdd((mob: any, id: string) => {
+    room.state.mobs.onAdd((mob: any, id: string) => {
+      if (this.room !== room || !this.roomActive) return;
       cb.onMobAdd(id, mob.templateId, snapMob(mob));
-      mob.onChange(() => cb.onMobChange(id, snapMob(mob)));
+      mob.onChange(() => ifCurrent(() => cb.onMobChange(id, snapMob(mob))));
     });
-    this.room.state.mobs.onRemove((_m: any, id: string) => cb.onMobRemove(id));
+    room.state.mobs.onRemove((_m: any, id: string) => ifCurrent(() => cb.onMobRemove(id)));
 
-    this.room.state.droppedItems.onAdd((it: any, id: string) =>
-      cb.onItemAdd(id, it.itemTemplateId, it.x, it.z, it.mapId, it.qty),
+    room.state.droppedItems.onAdd((it: any, id: string) =>
+      ifCurrent(() => cb.onItemAdd(id, it.itemTemplateId, it.x, it.z, it.mapId, it.qty)),
     );
-    this.room.state.droppedItems.onRemove((_it: any, id: string) => cb.onItemRemove(id));
+    room.state.droppedItems.onRemove((_it: any, id: string) => ifCurrent(() => cb.onItemRemove(id)));
 
-    this.room.onMessage(MessageType.Damage, (data: DamageEvent) => cb.onDamage(data));
-    this.room.onMessage(MessageType.Death, (data: DeathEvent) => cb.onDeath(data.entityId));
-    this.room.onMessage(MessageType.LevelUp, (data: LevelUpEvent) => cb.onLevelUp(data.level, data.learned ?? []));
-    this.room.onMessage(MessageType.BossKilled, (data: BossKilledEvent) => cb.onBossKilled(data));
-    this.room.onMessage(MessageType.DailyReset, (data: DailyResetEvent) => cb.onDailyReset(data));
-    this.room.onMessage(MessageType.DailyComplete, (data: DailyCompleteEvent) => cb.onDailyComplete(data));
-    this.room.onMessage(MessageType.Achievement, (data: AchievementEvent) => cb.onAchievement(data));
-    this.room.onMessage(MessageType.WorldAnnounce, (data: WorldAnnounceEvent) => cb.onWorldAnnounce(data));
-    this.room.onMessage(MessageType.ItemResult, (data: { success: boolean; text: string }) => cb.onItemResult?.(data));
-    this.room.onMessage(MessageType.PartyInvitation, (data: PartyInvitation | null) => { this.partyInvitation = data; });
+    room.onMessage(MessageType.Damage, (data: DamageEvent) => ifCurrent(() => cb.onDamage(data)));
+    room.onMessage(MessageType.Death, (data: DeathEvent) => ifCurrent(() => cb.onDeath(data.entityId)));
+    room.onMessage(MessageType.LevelUp, (data: LevelUpEvent) => ifCurrent(() => cb.onLevelUp(data.level, data.learned ?? [])));
+    room.onMessage(MessageType.BossKilled, (data: BossKilledEvent) => ifCurrent(() => cb.onBossKilled(data)));
+    room.onMessage(MessageType.DailyReset, (data: DailyResetEvent) => ifCurrent(() => cb.onDailyReset(data)));
+    room.onMessage(MessageType.DailyComplete, (data: DailyCompleteEvent) => ifCurrent(() => cb.onDailyComplete(data)));
+    room.onMessage(MessageType.Achievement, (data: AchievementEvent) => ifCurrent(() => cb.onAchievement(data)));
+    room.onMessage(MessageType.WorldAnnounce, (data: WorldAnnounceEvent) => ifCurrent(() => cb.onWorldAnnounce(data)));
+    room.onMessage(MessageType.ItemResult, (data: { success: boolean; text: string }) => ifCurrent(() => cb.onItemResult?.(data)));
+    room.onMessage(MessageType.PartyInvitation, (data: PartyInvitation | null) => ifCurrent(() => { this.partyInvitation = data; }));
 
     // Etapa 16: objetos de mundo.
     const snapObj = (o: any): WorldObjectSnapshot => ({
       id: o.id, kind: o.kind, mapId: o.mapId, x: o.x, z: o.z, active: o.active,
     });
-    this.room.state.worldObjects.onAdd((o: any, id: string) => {
+    room.state.worldObjects.onAdd((o: any, id: string) => {
+      if (this.room !== room || !this.roomActive) return;
       cb.onObjectAdd(id, snapObj(o));
-      o.onChange(() => cb.onObjectChange(id, snapObj(o)));
+      o.onChange(() => ifCurrent(() => cb.onObjectChange(id, snapObj(o))));
     });
-    this.room.state.worldObjects.onRemove((_o: any, id: string) => cb.onObjectRemove(id));
+    room.state.worldObjects.onRemove((_o: any, id: string) => ifCurrent(() => cb.onObjectRemove(id)));
 
-    this.room.onMessage(MessageType.SkillCast, (data: SkillCastEvent) => cb.onSkillCast(data));
-    this.chatConnected = true;
-    cb.onConnectionChange?.(true);
+    room.onMessage(MessageType.SkillCast, (data: SkillCastEvent) => ifCurrent(() => cb.onSkillCast(data)));
+    if (this.room === room && this.roomActive) {
+      this.connected = true;
+      cb.onConnectionChange?.(true);
+    }
   }
 
   sendChat(message: ChatSendMessage): boolean {
-    if (!this.chatConnected) return false;
-    try { this.room.send(MessageType.ChatSend, message); return true; }
-    catch { return false; }
+    return this.send(MessageType.ChatSend, message);
   }
 
-  sendMove(msg: MoveToMessage) {
-    this.room.send(MessageType.MoveTo, msg);
+  sendMove(msg: MoveToMessage): boolean {
+    return this.send(MessageType.MoveTo, msg);
   }
-  sendPickup(dropId:string) { this.room.send(MessageType.PickupItem,{dropId}); }
+  sendPickup(dropId:string): boolean { return this.send(MessageType.PickupItem,{dropId}); }
 
-  sendSetTarget(targetId: string) {
+  sendSetTarget(targetId: string): boolean {
     const msg: SetTargetMessage = { targetId };
-    this.room.send(MessageType.SetTarget, msg);
+    return this.send(MessageType.SetTarget, msg);
   }
 
   /** Envía la intención de usar una skill (p.ej. "power_strike"). El server resuelve target/rango/MP/cooldown. */
-  sendUseSkill(skillId: string) {
+  sendUseSkill(skillId: string): boolean {
     const msg: UseSkillMessage = { skillId };
-    this.room.send(MessageType.UseSkill, msg);
+    return this.send(MessageType.UseSkill, msg);
   }
 
   /** Envía la intención de interactuar con un NPC (npcId ruteado por el server). */
-  sendInteractNpc(npcId?: string) {
+  sendInteractNpc(npcId?: string): boolean {
     const msg: InteractNpcMessage = npcId ? { npcId } : {};
-    this.room.send(MessageType.InteractNpc, msg);
+    return this.send(MessageType.InteractNpc, msg);
   }
 
   /** Etapa 21: gastar un punto de atributo (str|agi|vit|ene). */
-  sendAllocateStat(attr: string) {
+  sendAllocateStat(attr: string): boolean {
     const msg: AllocateStatMessage = { attr };
-    this.room.send(MessageType.AllocateStat, msg);
+    return this.send(MessageType.AllocateStat, msg);
   }
 
   /** Envía la intención de comprar un ítem en la tienda. */
-  sendBuyItem(itemTemplateId: string, qty = 1) {
+  sendBuyItem(itemTemplateId: string, qty = 1): boolean {
     const msg: BuyItemMessage = { itemTemplateId, qty };
-    this.room.send(MessageType.BuyItem, msg);
+    return this.send(MessageType.BuyItem, msg);
   }
 
   /** Envía la intención de usar un ítem consumible (p.ej. poción). */
-  sendUseItem(itemTemplateId: string, targetItemId?: string) {
+  sendUseItem(itemTemplateId: string, targetItemId?: string): boolean {
     const msg: UseItemMessage = targetItemId ? { itemTemplateId, targetItemId } : { itemTemplateId };
-    this.room.send(MessageType.UseItem, msg);
+    return this.send(MessageType.UseItem, msg);
   }
 
-  sendPartyInvite(targetId: string) { this.room.send(MessageType.PartyInvite, { targetId }); }
-  sendPartyRespond(inviterId: string, accept: boolean) { this.room.send(MessageType.PartyRespond, { inviterId, accept }); }
-  sendPartyLeave() { this.room.send(MessageType.PartyLeave); }
-  sendPartyKick(targetId: string) { this.room.send(MessageType.PartyKick, { targetId }); }
+  sendPartyInvite(targetId: string): boolean { return this.send(MessageType.PartyInvite, { targetId }); }
+  sendPartyRespond(inviterId: string, accept: boolean): boolean { return this.send(MessageType.PartyRespond, { inviterId, accept }); }
+  sendPartyLeave(): boolean { return this.send(MessageType.PartyLeave); }
+  sendPartyKick(targetId: string): boolean { return this.send(MessageType.PartyKick, { targetId }); }
 
   getPartyPanelData(): PartyPanelData {
     const selfId = this.room.sessionId;
@@ -326,38 +364,38 @@ export class NetworkClient {
   }
 
   /** Envía la intención de crear una guild nueva (el jugador local pasa a ser el líder). */
-  sendCreateGuild(name: string, tag: string) {
+  sendCreateGuild(name: string, tag: string): boolean {
     const msg: CreateGuildMessage = { name, tag };
-    this.room.send(MessageType.CreateGuild, msg);
+    return this.send(MessageType.CreateGuild, msg);
   }
 
   /** Envía la intención de unirse a una guild existente. */
-  sendJoinGuild(guildId: string) {
+  sendJoinGuild(guildId: string): boolean {
     const msg: JoinGuildMessage = { guildId };
-    this.room.send(MessageType.JoinGuild, msg);
+    return this.send(MessageType.JoinGuild, msg);
   }
 
   /** Envía la intención de abandonar la guild actual. */
-  sendLeaveGuild() {
-    this.room.send(MessageType.LeaveGuild, {});
+  sendLeaveGuild(): boolean {
+    return this.send(MessageType.LeaveGuild, {});
   }
 
   /** Envía la intención de equipar un ítem del inventario (el server valida slot/posesión). */
-  sendEquipItem(itemTemplateId: string) {
+  sendEquipItem(itemTemplateId: string): boolean {
     const msg: EquipItemMessage = { itemTemplateId };
-    this.room.send(MessageType.EquipItem, msg);
+    return this.send(MessageType.EquipItem, msg);
   }
 
   /** Envía la intención de desequipar el slot dado; el ítem vuelve al inventario. */
-  sendUnequipItem(slot: string) {
+  sendUnequipItem(slot: string): boolean {
     const msg: UnequipItemMessage = { slot };
-    this.room.send(MessageType.UnequipItem, msg);
+    return this.send(MessageType.UnequipItem, msg);
   }
 
   /** Envía la intención de lucir un título desbloqueado ("" = ninguno). */
-  sendSetTitle(title: string) {
+  sendSetTitle(title: string): boolean {
     const msg: SetTitleMessage = { title };
-    this.room.send(MessageType.SetTitle, msg);
+    return this.send(MessageType.SetTitle, msg);
   }
 
   /** Estado de retención del jugador local (racha, diaria, logros, título). */
@@ -408,15 +446,15 @@ export class NetworkClient {
   }
 
   /** Envía la intención de viajar a un mapa (Etapa 15, menú M). El server valida el gate. */
-  sendWarpTo(mapId: string) {
+  sendWarpTo(mapId: string): boolean {
     const msg: WarpToMessage = { mapId };
-    this.room.send(MessageType.WarpTo, msg);
+    return this.send(MessageType.WarpTo, msg);
   }
 
   /** Envía la intención de interactuar con un objeto de mundo (Etapa 16). */
-  sendInteractObject(objectId: string) {
+  sendInteractObject(objectId: string): boolean {
     const msg: InteractObjectMessage = { objectId };
-    this.room.send(MessageType.InteractObject, msg);
+    return this.send(MessageType.InteractObject, msg);
   }
 
   /**

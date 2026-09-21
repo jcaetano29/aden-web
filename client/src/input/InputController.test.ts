@@ -6,7 +6,7 @@ import { AdventureTracker } from "../render/AdventureTracker.js";
 
 afterEach(() => { document.body.innerHTML = ""; });
 
-function setup() {
+function setup(isInputBlocked?: () => boolean) {
   const onMove = vi.fn();
   const renderer = {
     pickMobs: vi.fn(() => null),
@@ -16,12 +16,24 @@ function setup() {
     raycastTargets: vi.fn(() => ({ objects: [], idOf: () => null })),
     raycastPlayerTargets: vi.fn(() => ({ objects: [], idOf: () => null })),
   };
-  const input = new InputController(renderer as any, views as any, onMove, vi.fn(), vi.fn());
+  const input = new InputController(renderer as any, views as any, onMove, vi.fn(), vi.fn(), undefined, undefined, undefined, undefined, isInputBlocked);
   input.attach(document.body);
   return { renderer, onMove };
 }
 
 describe("InputController UI boundary", () => {
+  it("blocks world picking before raycasts while a connection modal is open", () => {
+    const { renderer, onMove } = setup(() => true);
+    const canvas = document.createElement("canvas");
+    document.body.appendChild(canvas);
+
+    canvas.click();
+
+    expect(renderer.pickMobs).not.toHaveBeenCalled();
+    expect(renderer.pickGround).not.toHaveBeenCalled();
+    expect(onMove).not.toHaveBeenCalled();
+  });
+
   it("lets players read the adventure panel without moving into the world behind it", () => {
     const { renderer, onMove } = setup();
     const tracker = new AdventureTracker();
