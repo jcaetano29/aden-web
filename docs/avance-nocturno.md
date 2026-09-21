@@ -15,7 +15,7 @@ Autorización: el 21/09/2026 el usuario pidió ejecutar todas las tareas posible
 ## Orden de entregas
 
 1. [x] Fallos de persistencia: lecturas y escrituras explícitas, acceso seguro y regresión de pérdida de progreso. Plan activo: `docs/superpowers/plans/2026-09-21-persistencia-segura.md`.
-2. [ ] Guardados ordenados y sesiones: impedir escrituras obsoletas, colisiones por dos sesiones del mismo personaje y pérdida al desconectar durante un guardado. Diseñar con el contrato de la entrega 1.
+2. [x] Guardados ordenados y sesiones: escrituras serializadas y snapshots independientes, sesión única por nombre autenticado y reintento de guardado final antes de reingreso. Garantías de un proceso; límites de memoria/reinicio documentados.
 3. [ ] Recuperación de conexión: estado visible, impedir acciones desconectadas y vía segura de reingreso. No guardar contraseñas en localStorage ni recrear personajes al reconectar.
 4. [ ] Experiencia inicial: reducir superposición de avisos/chat y mejorar descubrimiento de controles, objetivo, arma y pociones; revisar escritorio y pantalla pequeña con navegador.
 5. [ ] Balance 1–10: herramienta reproducible de análisis de cinco clases, curva de EXP, recompensas, arma +5 de Cripta, consumo y PvP inicial. Aplicar ajustes respaldados por pruebas; diferenciar simulación de partidas reales.
@@ -42,9 +42,13 @@ Autorización: el 21/09/2026 el usuario pidió ejecutar todas las tareas posible
 - Análisis de balance completado en docs/analisis-balance-alfa.md: ruta de EXP válida; revisar protección PvP inicial, presupuesto de flechas, premio +5 de Cripta, hacha legacy universal y recompensas duplicadas. Es análisis estático con supuestos, no playtest.
 - Hallazgos de sesiones, conexión, interfaz y rendimiento: docs/diagnostico-continuidad.md (investigación, no correcciones).
 - Verificación conjunta final: 614 pruebas aprobadas (187 shared, 206 servidor, 221 cliente); TypeScript de los tres paquetes y build correctos. Evidencia: artifacts/persistence-final-tests.log y artifacts/persistence-final-build.log. Advertencia preexistente: bundle del cliente de 1109,34 kB minificado.
-- Próxima acción: entrega 2. Leer docs/diagnostico-continuidad.md; diseñar una solución acotada para escrituras ordenadas y sesión única, crear su propio spec/plan/ledger y ejecutar con regresiones. Entrega 1 ya está aprobada; no repetir su implementación.
-- No quedan agentes ni procesos de prueba pendientes de esta ejecución. Los informes de revisión de la entrega 1 se conservaron para la continuidad nocturna.
+- Entrega 2 completa: implementación 362870f, plan 04d9740. Cola y propiedad compartidas por proceso; auth.name canónico; cierre durante auth/dispose seguro; pendiente final recuperable; copias de learnedTomes. RED funcional de solapamiento/aliasing; GREEN 227/227 servidor y 21/21 enfocadas, TypeScript correcto. Logs artifacts/session-tests/server-final.log, green-final.log y tsc-final.log. Revisión independiente review_ordered_character_sessions aprobada sin hallazgos; ledger/informes .superpowers/sdd/2026-09-21-guardados-sesiones/. No repetir implementación ni pruebas sin nuevo motivo.
+- Próxima acción: ejecutar entrega 3 desde docs/superpowers/plans/2026-09-21-recuperacion-conexion.md y su spec (commit 941bb61). Diseño: comandos seguros, diálogo de corte, retorno manual al acceso mediante recarga, sin guardar contraseñas ni repetir create. Crear su propio ledger/brief, implementar con TDD, revisión independiente y navegador. No hay agentes ni procesos de prueba pendientes de esta ejecución; los informes de entregas anteriores se conservan.
 
 
 
 
+
+
+### Límites confirmados de la entrega 2
+La coordinación cubre todas las salas de un proceso que usan el mismo backend real. El modo InMemoryPersistence sigue aislado por sala; no demuestra continuidad a otra sala ni a reinicio. Los pendientes fallidos residen en memoria y se reintentan en próximo acceso, no son un diario duradero. Proveedor que no resuelve conserva el lease para impedir escrituras obsoletas. Multiproceso, cola acotada/coalescida para proveedores colgados y guardados de clanes siguen fuera de este contrato; medir o diseñar antes de ampliar garantías.
