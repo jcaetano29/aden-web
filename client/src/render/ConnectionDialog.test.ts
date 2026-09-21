@@ -65,6 +65,32 @@ describe("ConnectionDialog", () => {
     expect(onReturn).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps focus on the action across noninteractive panel targets without consuming button input", () => {
+    const onReturn = vi.fn();
+    const dialog = createDialog(onReturn);
+    dialog.show("disconnected");
+    const panel = document.querySelector<HTMLElement>(".connection-dialog__panel")!;
+    const title = document.querySelector<HTMLElement>(".connection-dialog__title")!;
+    const message = document.querySelector<HTMLElement>(".connection-dialog__message")!;
+    const button = document.querySelector<HTMLButtonElement>("button")!;
+
+    for (const target of [panel, title, message]) {
+      button.blur();
+      const pointer = new MouseEvent("pointerdown", { bubbles: true, cancelable: true });
+      target.dispatchEvent(pointer);
+      expect(pointer.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(button);
+    }
+
+    const buttonPointer = new MouseEvent("pointerdown", { bubbles: true, cancelable: true });
+    button.dispatchEvent(buttonPointer);
+    expect(buttonPointer.defaultPrevented).toBe(false);
+    expect(onReturn).not.toHaveBeenCalled();
+    button.click();
+    button.click();
+    expect(onReturn).toHaveBeenCalledTimes(1);
+  });
+
   it.each(["Enter", " "])("activates the focused action with %j", (key) => {
     const onReturn = vi.fn();
     const dialog = createDialog(onReturn);

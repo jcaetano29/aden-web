@@ -49,7 +49,7 @@ export class ConnectionDialog {
     this.button.type = "button";
     this.button.className = "connection-dialog__action aden-btn";
     this.button.addEventListener("click", this.activate);
-    this.root.addEventListener("pointerdown", this.keepBackdropFocus);
+    this.root.addEventListener("pointerdown", this.keepModalFocus);
 
     panel.append(this.title, this.message, this.button);
     this.root.appendChild(panel);
@@ -80,7 +80,7 @@ export class ConnectionDialog {
     this.open = false;
     document.removeEventListener("keydown", this.guardKeyboard, true);
     this.button.removeEventListener("click", this.activate);
-    this.root.removeEventListener("pointerdown", this.keepBackdropFocus);
+    this.root.removeEventListener("pointerdown", this.keepModalFocus);
     this.root.remove();
   }
 
@@ -91,8 +91,9 @@ export class ConnectionDialog {
     this.onReturn();
   };
 
-  private readonly keepBackdropFocus = (event: PointerEvent): void => {
-    if (!this.open || event.target !== this.root) return;
+  private readonly keepModalFocus = (event: PointerEvent): void => {
+    const target = event.target;
+    if (!this.open || (target instanceof Node && this.button.contains(target))) return;
     event.preventDefault();
     this.button.focus();
   };
