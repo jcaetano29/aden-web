@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { AudioEngine } from "./AudioEngine.js";
 
 // Stub mínimo de AudioContext que registra la creación de nodos.
 function makeStubCtx() {
   const osc = { type: "sine", frequency: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), value: 0 }, connect: vi.fn(), start: vi.fn(), stop: vi.fn() };
-  const gain = { gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), value: 0 }, connect: vi.fn() };
+  const gain = { gain: { setValueAtTime: vi.fn(), exponentialRampToValueAtTime: vi.fn(), linearRampToValueAtTime: vi.fn(), setTargetAtTime: vi.fn(), value: 0 }, connect: vi.fn() };
   const ctx = {
     currentTime: 0,
     destination: {},
@@ -21,6 +21,7 @@ function makeStubCtx() {
 }
 
 describe("AudioEngine", () => {
+  beforeEach(() => localStorage.clear());
   it("no crea nodos hasta resume()", () => {
     const ctx = makeStubCtx();
     const a = new AudioEngine(() => ctx as unknown as AudioContext);

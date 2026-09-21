@@ -1,0 +1,28 @@
+.aden-audio {
+  position: fixed; top: 224px; right: 12px; width: 184px; z-index: 1250;
+  color: var(--aden-text, #ddceb0); font-family: var(--aden-font-body, Georgia, serif);
+  pointer-events: auto;
+}
+.aden-audio-toggle {
+  width: 100%; padding: 8px 10px; color: var(--aden-gold-bright, #f2d896);
+  background: rgba(12, 17, 23, .94); border: 1px solid #655434; border-radius: 5px;
+  font: 12px var(--aden-font-display, Georgia, serif); cursor: pointer;
+}
+.aden-audio-toggle:hover, .aden-audio-toggle[aria-expanded="true"] { background: #26303a; border-color: #c9a24b; }
+.aden-audio button:focus-visible, .aden-audio input:focus-visible { outline: 2px solid #f2d896; outline-offset: 3px; }
+.aden-audio .aden-audio-mixer {
+  position: absolute; top: calc(100% + 8px); right: 0; box-sizing: border-box;
+  width: min(284px, calc(100vw - 24px)); max-height: calc(100vh - 290px); overflow-y: auto; padding: 18px;
+}
+.aden-audio-mixer[hidden] { display: none; }
+.aden-audio-mixer h2 { margin: 0 0 16px; font: 16px var(--aden-font-display, Georgia, serif); color: #f2d896; }
+.aden-audio-title { font-size: 18px; color: #e9dcc2; }
+.aden-audio-description { margin: 5px 0 17px; color: #baad95; font-size: 14px; line-height: 1.4; }
+.aden-audio-level { display: grid; grid-template-columns: 1fr auto; gap: 5px; margin: 13px 0; font-size: 15px; }
+.aden-audio-level output { color: #baad95; font-size: 13px; font-variant-numeric: tabular-nums; }
+.aden-audio-level input { grid-column: 1 / -1; width: 100%; height: 18px; margin: 0; accent-color: #c9a24b; cursor: pointer; }
+.aden-audio-mixer .aden-btn { width: 100%; margin-top: 8px; padding: 8px; font-size: 13px; }
+.aden-audio-mixer small { display: block; margin-top: 12px; color: #baad95; font-size: 12px; line-height: 1.4; }
+@media (max-height: 650px) {
+  .aden-audio .aden-audio-mixer { position: fixed; top: 12px; right: 12px; max-height: calc(100vh - 24px); }
+}

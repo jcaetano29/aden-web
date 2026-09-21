@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Aden · Música de los mapas</title>
+  <style>
+    body { margin:0; background:#10151c; color:#e9dcc2; font:16px/1.5 Georgia,serif; }
+    #app { position:fixed; inset:0; }
+    .listening-room { position:fixed; z-index:1100; top:24px; left:24px; width:300px; max-width:calc(100vw - 48px); box-sizing:border-box; padding:22px; }
+    h1 { font:24px var(--aden-font-display,Georgia,serif); color:#f2d896; margin:0 0 12px; }
+    p { margin:8px 0 18px; color:#c6bca7; }
+    #maps { display:flex; flex-direction:column; gap:7px; }
+    #maps button { text-align:left; font-size:14px; padding:9px 12px; }
+    #maps [aria-pressed="true"] { border-color:#f2d896; background:#39433c; }
+    #listen { width:100%; padding:11px; margin-top:18px; }
+    #status { display:block; margin-top:14px; font-size:13px; color:#c6bca7; }
+    @media(max-width:650px) {
+      .listening-room { top:12px; left:12px; width:calc(100vw - 220px); max-height:calc(100vh - 24px); overflow:auto; padding:12px; }
+      h1 { font-size:17px; } p { font-size:13px; } #maps button { font-size:12px; padding:7px; }
+    }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <section class="aden-panel listening-room" aria-label="Escuchar los mapas">
+    <h1>Los ecos de Aden</h1>
+    <p>Seis lugares, seis melodías. Elegí un destino y escuchá cómo cambia el mundo.</p>
+    <div id="maps"></div>
+    <button id="listen" class="aden-btn">Escuchar este mapa</button>
+    <span id="status">La música comienza cuando la activás.</span>
+  </section>
+  <script type="module" src="/src/dev/SoundtrackPreview.ts"></script>
+</body>
+</html>

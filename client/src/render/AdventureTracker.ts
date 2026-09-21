@@ -45,12 +45,12 @@ export class AdventureTracker {
   private readonly story = document.createElement("div");
   constructor(parent: HTMLElement = document.body) {
     this.root.dataset.adventureTracker = "";
-    this.root.style.cssText = "position:fixed;right:12px;top:216px;width:min(260px,28vw);padding:13px 15px;background:linear-gradient(135deg,rgba(19,24,31,.92),rgba(12,13,18,.88));border:1px solid #655434;border-left:3px solid #d1ab63;border-radius:4px;color:#e6dfcf;z-index:1000;pointer-events:none;font:13px/1.5 Georgia,serif;box-sizing:border-box;box-shadow:0 5px 20px #0005;";
+    this.root.style.cssText = "position:fixed;right:12px;top:272px;width:min(260px,28vw);padding:13px 15px;background:linear-gradient(135deg,rgba(19,24,31,.92),rgba(12,13,18,.88));border:1px solid #655434;border-left:3px solid #d1ab63;border-radius:4px;color:#e6dfcf;z-index:1000;pointer-events:none;font:13px/1.5 Georgia,serif;box-sizing:border-box;box-shadow:0 5px 20px #0005;";
     this.title.style.cssText = "color:#f4cb82;font-weight:bold;margin-bottom:6px;font-size:14px";
     this.hint.style.cssText = "color:#d0cec6;font:12px/1.5 system-ui,sans-serif";
     this.story.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid #655434;color:#d9bd8c;font:italic 12px/1.5 Georgia,serif";
     this.story.hidden = true;
-    this.root.style.maxHeight = 'calc(100dvh - 240px)';
+    this.root.style.maxHeight = 'calc(100dvh - 296px)';
     this.root.style.overflowY = 'auto';
     this.root.style.pointerEvents = 'auto';
     this.root.append(this.title, this.hint, this.story); parent.appendChild(this.root);

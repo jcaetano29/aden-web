@@ -41,6 +41,8 @@ import { StatsPanel } from "./render/StatsPanel.js";
 import { InputController } from "./input/InputController.js";
 import { SkillInput } from "./input/SkillInput.js";
 import { AudioEngine } from "./audio/AudioEngine.js";
+import { attachAudioLifecycle } from './audio/lifecycle.js';
+import { AudioPanel } from './render/AudioPanel.js';
 import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
 import { availableSkills, getItem, getQuest, TOWN, distance2D, getClass, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE, SMITH_STOCK, getNpc, TOWN_SERVICE_RADIUS, HEAL_COST_GOLD, getBounty, firstBountyId, type Attribute } from "@aden/shared";
@@ -65,12 +67,10 @@ async function main() {
   const skillEffects = new SkillEffects(renderer.scene);
   const statusEffects = new StatusEffects(renderer.scene);
   const audio = new AudioEngine();
+  attachAudioLifecycle(audio);
+  const audioPanel = new AudioPanel(audio);
+  window.addEventListener('pagehide', event => { if (!event.persisted) audioPanel.dispose(); });
   const screenShake = new ScreenShake();
-  // Autoplay policy: el AudioContext sólo puede arrancar/reanudarse tras un
-  // gesto del usuario. Se engancha una vez a pointerdown y a keydown (lo que
-  // llegue primero) y se desregistra sola gracias a { once: true }.
-  window.addEventListener("pointerdown", () => audio.resume(), { once: true });
-  window.addEventListener("keydown", () => audio.resume(), { once: true });
   const hud = new Hud();
   const adventure = new AdventureTracker();
   const hazards = new HazardViews(renderer.scene);
@@ -600,7 +600,7 @@ async function main() {
       return;
     }
     // Tecla N: silenciar/activar sonido (movido desde M).
-    if (e.key === "n" || e.key === "N") {
+    if ((e.key === "n" || e.key === "N") && !e.repeat) {
       const muted = audio.toggleMuted();
       hud.toast(muted ? "🔇 Sonido apagado" : "🔊 Sonido encendido", "#ffd23f");
       return;
@@ -664,6 +664,7 @@ async function main() {
     if (myMapId !== lastMapId) {
       lastMapId = myMapId;
       minimap.setMap(getZone(myMapId));
+      audio.setMap(myMapId);
     }
     npc.update(dt);
     merchant.update(dt);
