@@ -1334,10 +1334,13 @@ describe("GameRoom", () => {
     it("registra una cuenta con contraseña y rechaza la contraseña incorrecta", async () => {
       const room = await colyseus.createRoom("game", {});
       // Registro (cuenta nueva): entra bien.
-      await colyseus.connectTo(room, { name: "Cuenta", password: "secreta", className: "knight" });
+      room.autoDispose = false;
+      const first = await colyseus.connectTo(room, { name: "Cuenta", password: "secreta", className: "knight" });
       await room.waitForNextPatch();
-      // Otro cliente con la MISMA cuenta y contraseña equivocada: rechazado.
-      await expect(colyseus.connectTo(room, { name: "Cuenta", password: "mala" })).rejects.toBeDefined();
+      await first.leave();
+      await room.waitForNextPatch();
+      // Después de salir, la contraseña equivocada sigue rechazándose por credenciales.
+      await expect(colyseus.connectTo(room, { name: "Cuenta", password: "mala" })).rejects.toThrow(/contraseña/i);
       // Con la contraseña correcta: entra.
       const ok = await colyseus.connectTo(room, { name: "Cuenta", password: "secreta" });
       await room.waitForNextPatch();
@@ -1346,9 +1349,12 @@ describe("GameRoom", () => {
 
     it("una cuenta protegida no se puede tomar sin contraseña", async () => {
       const room = await colyseus.createRoom("game", {});
-      await colyseus.connectTo(room, { name: "Protegido", password: "clave1" });
+      room.autoDispose = false;
+      const first = await colyseus.connectTo(room, { name: "Protegido", password: "clave1" });
       await room.waitForNextPatch();
-      await expect(colyseus.connectTo(room, { name: "Protegido" })).rejects.toBeDefined();
+      await first.leave();
+      await room.waitForNextPatch();
+      await expect(colyseus.connectTo(room, { name: "Protegido" })).rejects.toThrow(/contraseña/i);
     });
 
     it("asignar un punto de atributo sube el stat y baja los puntos disponibles", async () => {
@@ -1399,7 +1405,10 @@ describe("GameRoom", () => {
     it("modo login: entra a una cuenta existente con la contraseña correcta", async () => {
       const room = await colyseus.createRoom("game", {});
       // Crear la cuenta primero.
-      await colyseus.connectTo(room, { name: "Vuelve", password: "clave1", className: "mage", mode: "create" });
+      room.autoDispose = false;
+      const first = await colyseus.connectTo(room, { name: "Vuelve", password: "clave1", className: "mage", mode: "create" });
+      await room.waitForNextPatch();
+      await first.leave();
       await room.waitForNextPatch();
       // Volver a entrar con login.
       const c = await colyseus.connectTo(room, { name: "Vuelve", password: "clave1", mode: "login" });
@@ -1409,9 +1418,12 @@ describe("GameRoom", () => {
 
     it("modo create: rechaza un nombre ya tomado", async () => {
       const room = await colyseus.createRoom("game", {});
-      await colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "knight", mode: "create" });
+      room.autoDispose = false;
+      const first = await colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "knight", mode: "create" });
       await room.waitForNextPatch();
-      await expect(colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "rogue", mode: "create" })).rejects.toBeDefined();
+      await first.leave();
+      await room.waitForNextPatch();
+      await expect(colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "rogue", mode: "create" })).rejects.toThrow(/nombre ya está en uso/i);
     });
 
     it("entregar una misión con recompensa de equipo la agrega al inventario", async () => {

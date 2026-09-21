@@ -165,3 +165,17 @@ export function emptyProgress(): ProgressSave {
     statPoints: 0,
   };
 }
+
+/** Take independent snapshots before a write is queued or returned to a caller. */
+export function cloneCharacterSave(data: CharacterSave): CharacterSave {
+  return {
+    ...data,
+    inventory: { ...data.inventory },
+    equipment: { ...(data.equipment ?? {}) },
+    progress: {
+      ...data.progress,
+      achievements: [...(data.progress?.achievements ?? [])],
+      ...(data.progress?.learnedTomes ? { learnedTomes: [...data.progress.learnedTomes] } : {}),
+    },
+  };
+}

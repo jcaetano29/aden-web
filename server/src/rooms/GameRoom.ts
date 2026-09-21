@@ -121,6 +121,7 @@ import { advanceMovable } from "../systems/MovementSystem.js";
 import { createSpawns } from "../systems/SpawnSystem.js";
 import { stepMobAI } from "../systems/MobAISystem.js";
 import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
+import { characterPersistenceCoordinator, type CharacterLease } from '../persistence/CharacterPersistenceCoordinator.js';
 import { createPersistence } from "../persistence/createPersistence.js";
 import type { PersistenceService, CharacterRank, GuildRank } from "../persistence/PersistenceService.js";
 import { toCharacterSave, inventoryRecordToEntries, type CharacterSave } from "../persistence/CharacterSave.js";
@@ -167,6 +168,15 @@ export class GameRoom extends Room<GameState> {
   }
   /** Servicio de persistencia de personajes (Supabase si hay env, si no in-memory). */
   private persistence!: PersistenceService;
+  private disposing = false;
+  private readonly characterSessions = new Map<Client, {
+    lease: CharacterLease;
+    closed: boolean;
+    authSettled: Promise<void>;
+    completeAuth: () => void;
+    onClose: () => void;
+    finishing?: Promise<void>;
+  }>();
 
   /** Agrega ítems al inventario del jugador (reutilizable en compra y pickup). */
   private addToInventory(player: PlayerState, itemTemplateId: string, qty: number): void {
@@ -1347,7 +1357,7 @@ export class GameRoom extends Room<GameState> {
    * Sin `mode` (compat/tests): comportamiento tolerante (verifica si existe, registra
    * si no). Devuelve truthy para permitir el join; lanzar rechaza con el mensaje.
    */
-  async onAuth(_client: Client, options: { name?: string; password?: string; className?: string; mode?: string; gender?: unknown }) {
+  async onAuth(client: Client, options: { name?: string; password?: string; className?: string; mode?: string; gender?: unknown }) {
     const name = (options?.name ?? "").trim();
     const password = options?.password ?? "";
     const mode = options?.mode ?? "";
@@ -1355,57 +1365,91 @@ export class GameRoom extends Room<GameState> {
     if (mode !== 'login' && options.gender !== undefined && !isCharacterGender(options.gender)) {
       throw new Error('Elegí una apariencia masculina o femenina.');
     }
-    const persistenceForAuth = async <T>(operation: () => Promise<T>): Promise<T> => {
-      try {
-        return await operation();
-      } catch (error) {
-        console.error("[aden] persistence unavailable during authentication", error);
-        throw new Error("El servicio de guardado no está disponible. Intentá nuevamente.");
+    if (this.disposing) throw new Error('La sala se está cerrando. Intentá nuevamente.');
+    const lease = characterPersistenceCoordinator.acquire(name);
+    let completeAuth!: () => void;
+    const authSettled = new Promise<void>(resolve => { completeAuth = resolve; });
+    const session = {
+      lease, closed: false, authSettled, completeAuth,
+      onClose: () => {
+        session.closed = true;
+        void this.finishCharacterSession(client);
+      },
+    };
+    this.characterSessions.set(client, session);
+    client.ref.once('close', session.onClose);
+    const assertOpen = () => {
+      if (session.closed || this.disposing || client.readyState !== 1) {
+        throw new Error('La conexión se cerró. Intentá nuevamente.');
       }
     };
-    const acct = await persistenceForAuth(() => this.persistence.loadAccount(name));
-    const hasAccount = !!(acct && acct.passwordHash);
-
-    if (mode === "login") {
-      // Volver a entrar: la cuenta tiene que existir y la contraseña coincidir.
-      if (!hasAccount || !verifyPassword(password, acct!.passwordHash, acct!.passwordSalt)) {
-        throw new Error("No existe esa cuenta o la contraseña es incorrecta.");
-      }
-    } else if (mode === "create") {
-      // Crear personaje: el nombre no puede estar tomado.
-      if (hasAccount) throw new Error("Ese nombre ya está en uso. Usá «Entrar».");
-      if (password.length < 4) throw new Error("La contraseña necesita al menos 4 caracteres.");
-      const { hash, salt } = hashPassword(password);
-      await persistenceForAuth(() => this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt }));
-    } else {
-      // Sin modo explícito (compat/tests): verifica si existe, registra si no.
-      if (hasAccount) {
-        if (!verifyPassword(password, acct!.passwordHash, acct!.passwordSalt)) {
-          throw new Error("Contraseña incorrecta.");
+    let authenticated = false;
+    try {
+      const persistenceForAuth = async <T>(operation: () => Promise<T>): Promise<T> => {
+        try {
+          assertOpen();
+          const value = await operation();
+          assertOpen();
+          return value;
+        } catch (error) {
+          console.error("[aden] persistence unavailable during authentication", error);
+          throw new Error("El servicio de guardado no está disponible. Intentá nuevamente.");
         }
-      } else if (password.length >= 4) {
+      };
+      const acct = await persistenceForAuth(() => this.persistence.loadAccount(name));
+      const hasAccount = !!(acct && acct.passwordHash);
+
+      if (mode === "login") {
+        // Volver a entrar: la cuenta tiene que existir y la contraseña coincidir.
+        if (!hasAccount || !verifyPassword(password, acct!.passwordHash, acct!.passwordSalt)) {
+          throw new Error("No existe esa cuenta o la contraseña es incorrecta.");
+        }
+      } else if (mode === "create") {
+        // Crear personaje: el nombre no puede estar tomado.
+        if (hasAccount) throw new Error("Ese nombre ya está en uso. Usá «Entrar».");
+        if (password.length < 4) throw new Error("La contraseña necesita al menos 4 caracteres.");
         const { hash, salt } = hashPassword(password);
         await persistenceForAuth(() => this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt }));
+      } else {
+        // Sin modo explícito (compat/tests): verifica si existe, registra si no.
+        if (hasAccount) {
+          if (!verifyPassword(password, acct!.passwordHash, acct!.passwordSalt)) {
+            throw new Error("Contraseña incorrecta.");
+          }
+        } else if (password.length >= 4) {
+          const { hash, salt } = hashPassword(password);
+          await persistenceForAuth(() => this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt }));
+        }
       }
+      // Precargar el personaje guardado (si existe) para que onJoin lo aplique de forma
+      // SÍNCRONA antes de insertar al jugador → el primer snapshot ya trae la clase/stats
+      // correctas (sin el parpadeo "knight" del load async) y sin la race save-before-load.
+      await persistenceForAuth(() => characterPersistenceCoordinator.retry(lease));
+      const save = await persistenceForAuth(() => this.persistence.load(name));
+      const guild = save?.guildId
+        ? await persistenceForAuth(() => this.persistence.loadGuild(save.guildId))
+        : null;
+      assertOpen();
+      authenticated = true;
+      return { name, save, guild };
+    } finally {
+      session.completeAuth();
+      if (!authenticated) await this.finishCharacterSession(client);
     }
-    // Precargar el personaje guardado (si existe) para que onJoin lo aplique de forma
-    // SÍNCRONA antes de insertar al jugador → el primer snapshot ya trae la clase/stats
-    // correctas (sin el parpadeo "knight" del load async) y sin la race save-before-load.
-    const save = await persistenceForAuth(() => this.persistence.load(name));
-    const guild = save?.guildId
-      ? await persistenceForAuth(() => this.persistence.loadGuild(save.guildId))
-      : null;
-    return { name, save, guild };
   }
 
   async onJoin(client: Client, options: { name?: string; className?: string; gender?: unknown }) {
     // Save precargado por onAuth (síncrono acá). En login trae la clase real del
     // personaje; en create es null y se usa la clase elegida.
-    const auth = client.auth as { save?: CharacterSave | null; guild?: GuildSave | null } | undefined;
-    const preSave = auth?.save ?? null;
+    const auth = client.auth as { name: string; save?: CharacterSave | null; guild?: GuildSave | null } | undefined;
+    const session = this.characterSessions.get(client);
+    if (!auth || !session || session.closed || session.finishing || this.disposing || client.readyState !== 1) {
+      throw new Error('La conexión se cerró. Intentá nuevamente.');
+    }
+    const preSave = auth.save ?? null;
     const preGuild = auth?.guild ?? null;
     const player = new PlayerState();
-    player.name = options?.name ?? "Adventurer";
+    player.name = auth.name;
     const className = preSave?.className && isValidClass(preSave.className)
       ? preSave.className
       : (isValidClass(options?.className) ? options.className! : "knight");
@@ -1546,40 +1590,63 @@ export class GameRoom extends Room<GameState> {
     this.checkAchievements(player, client.sessionId);
   }
 
-  /** Guarda el estado de todos los jugadores conectados (fire-and-forget, periódico). */
+  /** Queue independent snapshots without blocking simulation or other characters. */
   private async saveAll() {
-    this.state.players.forEach((p) => {
-      // Etapa 3c: si el load de onJoin todavía no aplicó, p tiene los defaults de nivel 1;
-      // guardarlo pisaría el registro real. Se salta hasta que loaded === true.
-      if (!p.loaded) return;
-      this.persistence.save(p.name, toCharacterSave(p)).catch((e) => console.error("[aden] save fail", p.name, e));
-    });
-  }
-
-  async onLeave(client: Client) {
-    this.chat.remove(client.sessionId);
-    this.parties.leave(client.sessionId);
-    const player = this.state.players.get(client.sessionId);
-    // Remove from live systems before the asynchronous save: disconnected players
-    // must not accept invitations or earn group rewards while persistence waits.
-    const gid = player?.guildId ?? '';
-    this.state.players.delete(client.sessionId);
-    this.maintainDungeonRun();
-    if (gid !== '') this.pruneGuildIfEmpty(gid);
-    if (player) {
-      // Etapa 3c: si se desconectó antes de que el load resolviera, no hay nada nuevo que
-      // valga la pena persistir y guardar pisaría el registro real con defaults.
-      if (player.loaded) {
-        try {
-          await this.persistence.save(player.name, toCharacterSave(player));
-        } catch (e) {
-          console.error("[aden] save fail on leave", player.name, e);
-        }
-      }
+    for (const [client, session] of this.characterSessions) {
+      const player = this.state.players.get(client.sessionId);
+      if (!player?.loaded || session.closed || session.finishing || this.disposing) continue;
+      void characterPersistenceCoordinator.save(session.lease, toCharacterSave(player),
+        this.persistence.save.bind(this.persistence))
+        .catch(error => console.error('[aden] save fail', player.name, error));
     }
   }
 
+  private finishCharacterSession(client: Client): Promise<void> {
+    const session = this.characterSessions.get(client);
+    if (!session) return Promise.resolve();
+    if (session.finishing) return session.finishing;
+    session.closed = true;
+    this.chat.remove(client.sessionId);
+    this.parties.leave(client.sessionId);
+    const player = this.state.players.get(client.sessionId);
+    const gid = player?.guildId ?? '';
+    // Leave live systems synchronously, before waiting for either auth or storage.
+    this.state.players.delete(client.sessionId);
+    this.maintainDungeonRun();
+    if (gid !== '') this.pruneGuildIfEmpty(gid);
+    session.finishing = (async () => {
+      try {
+        if (player?.loaded) {
+          await characterPersistenceCoordinator.save(session.lease, toCharacterSave(player),
+            this.persistence.save.bind(this.persistence));
+        }
+      } catch (error) {
+        console.error('[aden] save fail on leave', session.lease.name, error);
+      } finally {
+        // An aborted authentication can still be writing an account. Do not allow
+        // another owner to start until that operation has actually settled.
+        await session.authSettled;
+        await characterPersistenceCoordinator.release(session.lease);
+        client.ref.removeListener('close', session.onClose);
+        if (this.characterSessions.get(client) === session) this.characterSessions.delete(client);
+      }
+    })();
+    return session.finishing;
+  }
+
+  async onLeave(client: Client) {
+    await this.finishCharacterSession(client);
+  }
+
   async onDispose() {
-    await this.presence.unsubscribe(GLOBAL_CHAT_TOPIC, this.deliverGlobalChat);
+    this.disposing = true;
+    try {
+      await Promise.all([...this.characterSessions.keys()].map(client => {
+        client.leave();
+        return this.finishCharacterSession(client);
+      }));
+    } finally {
+      await this.presence.unsubscribe(GLOBAL_CHAT_TOPIC, this.deliverGlobalChat);
+    }
   }
 }

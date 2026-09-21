@@ -1,4 +1,4 @@
-import type { CharacterSave } from "./CharacterSave.js";
+import { cloneCharacterSave, type CharacterSave } from "./CharacterSave.js";
 import type { GuildSave } from "./GuildSave.js";
 
 export interface CharacterRank { name: string; level: number; pvpKills: number; className: string; }
@@ -25,14 +25,6 @@ export interface PersistenceService {
   saveAccount(acct: AccountRecord): Promise<void>;
 }
 
-function cloneCharacterSave(data: CharacterSave): CharacterSave {
-  return {
-    ...data,
-    inventory: { ...data.inventory },
-    equipment: { ...(data.equipment ?? {}) },
-    progress: { ...data.progress, achievements: [...(data.progress?.achievements ?? [])] },
-  };
-}
 
 export class InMemoryPersistence implements PersistenceService {
   private readonly store = new Map<string, CharacterSave>();
