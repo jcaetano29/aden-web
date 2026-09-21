@@ -2,6 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { InputController } from "./InputController.js";
 import { SkillBar } from "../render/SkillBar.js";
+import { AdventureTracker } from "../render/AdventureTracker.js";
 
 afterEach(() => { document.body.innerHTML = ""; });
 
@@ -21,6 +22,14 @@ function setup() {
 }
 
 describe("InputController UI boundary", () => {
+  it("lets players read the adventure panel without moving into the world behind it", () => {
+    const { renderer, onMove } = setup();
+    const tracker = new AdventureTracker();
+    tracker.update({ questId: "q_crypt", questProgress: 0, mapId: "cripta", dungeonStage: 2 });
+    document.querySelector<HTMLElement>("[data-adventure-tracker] div")!.click();
+    expect(renderer.pickGround).not.toHaveBeenCalled();
+    expect(onMove).not.toHaveBeenCalled();
+  });
   it("usa una skill al hacer click sin raycastear el mundo debajo", () => {
     const { renderer, onMove } = setup();
     const onUseSkill = vi.fn();

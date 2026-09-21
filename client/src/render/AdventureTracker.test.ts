@@ -30,4 +30,18 @@ describe("adventure guidance", () => {
     expect(adventureGuide({ ...base, dungeonStage: 5 }).hint).toContain("cuando todos salen");
     expect(adventureGuide({ ...base, dungeonStage: 2 }).hint).toContain("círculo rojo");
   });
+  it("shows the current crypt discovery during the quest, but not on unrelated expeditions", () => {
+    const state = { questId: "q_crypt", questProgress: 0, mapId: "cripta", dungeonStage: 2 };
+    const guide = adventureGuide(state);
+    expect(guide.story).toBeTruthy();
+    expect(adventureGuide({ ...state, dungeonStage: 5 }).story).not.toBe(guide.story);
+    expect(adventureGuide({ ...state, questId: "campaign_complete" }).story).toBeUndefined();
+    expect(adventureGuide({ ...state, questId: "q3" }).story).toBeUndefined();
+    const parent = document.createElement("div");
+    const tracker = new AdventureTracker(parent);
+    tracker.update(state);
+    expect(parent.textContent).toContain(guide.story);
+    tracker.update({ ...state, mapId: "pueblo" });
+    expect(parent.textContent).not.toContain(guide.story);
+  });
 });

@@ -1,4 +1,4 @@
-import { dungeonObjective, getQuest, getZone, getWorldObject, getNpc, CRYPT_ROOMS, CRYPT_SEALS, CRYPT_BOSS } from "@aden/shared";
+import { cryptStory, dungeonObjective, getQuest, getZone, getWorldObject, getNpc, CRYPT_ROOMS, CRYPT_SEALS, CRYPT_BOSS } from "@aden/shared";
 
 export interface AdventureState {
   questId: string; questProgress: number; mapId: string;
@@ -6,7 +6,7 @@ export interface AdventureState {
 }
 export interface ObjectiveMarker { x: number; z: number; label: string; }
 
-export function adventureGuide(state: AdventureState): { title: string; hint: string; marker?: ObjectiveMarker } {
+export function adventureGuide(state: AdventureState): { title: string; hint: string; story?: string; marker?: ObjectiveMarker } {
   if (state.mapId === "cripta") {
     const stage = state.dungeonStage ?? 0;
     const locations = [
@@ -19,9 +19,10 @@ export function adventureGuide(state: AdventureState): { title: string; hint: st
       hint: dungeonObjective(stage, state.dungeonKills ?? 0) + (stage === 2 || stage === 4 ? " Salí del círculo rojo antes del impacto." : "") +
         (stage >= 5 ? " Abrí M para volver al pueblo. Se abre una nueva expedición cuando todos salen." : " Los enemigos derrotados no reaparecen. El avance es compartido; sólo se reinicia cuando no queda nadie dentro. Al morir volvés al pueblo; podés reingresar y sumarte al avance actual."),
       marker: locations[stage],
+      story: state.questId === 'q_crypt' ? cryptStory(stage) : undefined,
     };
   }
-  if (state.questId === "campaign_complete") return { title: "Campaña completada", hint: "Aden está a salvo. Podés repetir la cripta por sus recompensas o explorar nuevas regiones con M." };
+  if (state.questId === "campaign_complete") return { title: "Campaña completada", hint: "Derrotaste a Nihil. Hablá con la gente de Aden, aceptá contratos de Varek o volvé a la Cripta por sus recompensas." };
   if (!state.questId) return { title: "Tu aventura empieza aquí", hint: "Hablá con el Anciano en la plaza para aceptar tu primera misión.", marker: state.mapId === "pueblo" ? { ...getNpc("elder"), label: "Anciano" } : undefined };
   try {
     const q = getQuest(state.questId);
@@ -41,17 +42,25 @@ export class AdventureTracker {
   private readonly root = document.createElement("aside");
   private readonly title = document.createElement("div");
   private readonly hint = document.createElement("div");
+  private readonly story = document.createElement("div");
   constructor(parent: HTMLElement = document.body) {
     this.root.dataset.adventureTracker = "";
     this.root.style.cssText = "position:fixed;right:12px;top:216px;width:min(260px,28vw);padding:13px 15px;background:linear-gradient(135deg,rgba(19,24,31,.92),rgba(12,13,18,.88));border:1px solid #655434;border-left:3px solid #d1ab63;border-radius:4px;color:#e6dfcf;z-index:1000;pointer-events:none;font:13px/1.5 Georgia,serif;box-sizing:border-box;box-shadow:0 5px 20px #0005;";
     this.title.style.cssText = "color:#f4cb82;font-weight:bold;margin-bottom:6px;font-size:14px";
     this.hint.style.cssText = "color:#d0cec6;font:12px/1.5 system-ui,sans-serif";
-    this.root.append(this.title, this.hint); parent.appendChild(this.root);
+    this.story.style.cssText = "margin-top:10px;padding-top:8px;border-top:1px solid #655434;color:#d9bd8c;font:italic 12px/1.5 Georgia,serif";
+    this.story.hidden = true;
+    this.root.style.maxHeight = 'calc(100dvh - 240px)';
+    this.root.style.overflowY = 'auto';
+    this.root.style.pointerEvents = 'auto';
+    this.root.append(this.title, this.hint, this.story); parent.appendChild(this.root);
   }
   update(state: AdventureState): ObjectiveMarker | undefined {
     const guide = adventureGuide(state);
     if (this.title.textContent !== guide.title) this.title.textContent = guide.title;
     if (this.hint.textContent !== guide.hint) this.hint.textContent = guide.hint;
+    if (this.story.textContent !== (guide.story ?? '')) this.story.textContent = guide.story ?? '';
+    this.story.hidden = !guide.story;
     return guide.marker;
   }
 }

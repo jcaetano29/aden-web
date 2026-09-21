@@ -12,7 +12,7 @@ export interface NpcInteractable {
 
 const UI_CLICK_SELECTOR = [
   "button", "input", "select", "textarea", "a", "label",
-  '[role="button"]', '[contenteditable="true"]', ".aden-panel", "[data-skill-bar]",
+  '[role="button"]', '[contenteditable="true"]', ".aden-panel", "[data-skill-bar]", "[data-adventure-tracker]",
 ].join(",");
 
 function isUiClick(target: EventTarget | null): boolean {

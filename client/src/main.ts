@@ -321,7 +321,7 @@ async function main() {
     }
 
     if (self.questId === "campaign_complete") {
-      dialog.open({ speaker: ELDER_NAME, text: "Las dos llamas vuelven a arder y Aden tiene un nuevo guardián. Completaste la campaña inicial. La cripta sigue abierta para nuevas expediciones y recompensas.", actionLabel: "Seguir explorando", onAction: () => {} });
+      dialog.open({ speaker: ELDER_NAME, text: "Bram vuelve a preparar viajes; Elenya puede hablar de recuperación, y no sólo de sobrevivir. Eso es lo que cambiaste al vencer a Nihil. Los ecos de la maldición aún nos obligan a vigilar la Cripta. Hoy, antes de volver al camino, escuchá a quienes ayudaste.", actionLabel: "Volver a la plaza", onAction: () => {} });
       return;
     }
 

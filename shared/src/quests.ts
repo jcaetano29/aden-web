@@ -46,8 +46,8 @@ export const QUESTS: Record<string, Quest> = {
   q3: {
     id: "q3",
     title: "Bajo las Ruinas",
-    intro: "Las Ruinas de Nihil, al noroeste, están tomadas por los Guardianes de la Cripta. Quebrá a 6 de esos centinelas de piedra y hueso. Ahí la muerte es más vieja y más terca.",
-    done: "Abriste camino en las Ruinas. Pero en lo más hondo algo enorme montó guardia: el Centinela de Nihil, la llave del trono.",
+    intro: "Los Guardianes de la Cripta todavía defienden las Ruinas como en vida. Varek reconoce su formación: protegen la entrada de algo. Derrotá a 6 para abrir paso. Mientras tanto, voy a buscar el símbolo de las dos llamas en los registros del reino.",
+    done: "Encontré los nombres: Memoria y Fragua. Una llama conserva a los muertos; la otra les da forma. Tomá el Amuleto del Cazador: aumenta tu ataque y tu reserva de maná. El Centinela protege la entrada al lugar donde se unen.",
     mobTemplateId: "crypt_warrior",
     amount: 6,
     rewardExp: 320,
@@ -57,8 +57,8 @@ export const QUESTS: Record<string, Quest> = {
   q4: {
     id: "q4",
     title: "El Centinela de Nihil",
-    intro: "En el corazón de las Ruinas espera el Centinela de Nihil, mini-jefe que sella el paso al norte. Derrotalo y el camino al Yermo quedará abierto. Vas a necesitar todo lo que aprendiste.",
-    done: "¡El Centinela cayó! Más allá, la tierra misma arde: el Yermo Ceniciento. Pocos volvieron de ahí. Vos podrías ser el primero en cruzarlo.",
+    intro: "El Centinela de Nihil custodia el acceso a la Cripta. Los registros dicen que allí se conservaban los juramentos de los antiguos guardianes. Nihil fue a buscar algo más. Derrotá al Centinela para que podamos investigar qué hizo con las llamas.",
+    done: "El Centinela cayó. Tomá esta Coraza de la Cripta de nuestras reservas: refuerza defensa y vida. Bajo las Ruinas están las dos llamas que buscábamos. Si cortamos su vínculo, podremos entender por qué el ejército vuelve a levantarse.",
     mobTemplateId: "crypt_sentinel",
     amount: 1,
     rewardExp: 600,
@@ -68,8 +68,8 @@ export const QUESTS: Record<string, Quest> = {
   q5: {
     id: "q5",
     title: "El Yermo Ardiente",
-    intro: "El Yermo Ceniciento, al noreste, está patrullado por los Verdugos Ardientes: élites forjados en fuego. Reducí a 8 a cenizas. Sólo así probarás que estás listo para el Trono.",
-    done: "Atravesaste el fuego y seguís en pie. Ya no queda nada entre vos y él. Al norte, en su Trono, el Rey Nihil espera.",
+    intro: "Las llamas pueden volver a encenderse mientras Nihil mantenga su orden desde el Trono. En el Yermo, sus Verdugos Ardientes sostienen la patrulla que nos separa de él. Derrotá a 8. No es una prueba de valor: necesitamos espacio para preparar el último avance.",
+    done: "La patrulla recibió el golpe que necesitábamos. Esta Guarda de Ceniza refuerza tu defensa y tu vida para lo que viene. Elenya pide que visites el santuario antes de seguir: pertenecía a los mismos guardianes, antes de que Nihil torciera su juramento.",
     mobTemplateId: "ash_warrior",
     amount: 8,
     rewardExp: 900,
@@ -79,8 +79,8 @@ export const QUESTS: Record<string, Quest> = {
   q6: {
     id: "q6",
     title: "El Rey Nihil",
-    intro: "En el extremo norte del mundo, sobre su Trono de hueso y obsidiana, reina el Rey Nihil. Mientras persista, no habrá paz. Andá. Terminá con esto. Que Aden vuelva a dormir tranquila.",
-    done: "¡Lo lograste! El Rey ha caído y su ejército se deshace en polvo. Aden vivirá, y tu nombre con ella. Sos una leyenda. (La amenaza podría regresar algún día... pero hoy, descansá.)",
+    intro: "Nihil quiso conservar su vida y convirtió el juramento de sus guardianes en una condena. Ya viste cómo las llamas obedecen esa orden. Enfrentalo en su Trono. Por los viajeros de Bram, por quienes Elenya espera curar y por los que ya no pueden volver: hacé que Aden tenga un mañana.",
+    done: "Nihil cayó. La maldición todavía deja ecos y habrá que vigilar las llamas, pero hoy Aden tiene un respiro. La Égida de Nihil es tuya: una armadura para proteger vidas, no para prolongar su condena. Pasá por la plaza; esta vez, la gente te espera para darte las gracias.",
     mobTemplateId: "skeleton_king",
     amount: 1,
     rewardExp: 1500,
@@ -96,8 +96,8 @@ Object.assign(QUESTS, {
   q_shrine: { id: "q_shrine", title: "Una luz entre los árboles", objective: "interact", targetId: "bosque_shrine", mapId: "bosque", mobTemplateId: "", amount: 1, rewardExp: 100, rewardGold: 30, intro: "El santuario de Umbra tiene el mismo grabado que la piedra de Bram. Acercate y activalo. Si todavía responde, tal vez esos símbolos nos digan qué buscan los guardianes de Nihil.", done: "El santuario respondió. Esas dos llamas también figuran en los registros de las Ruinas. Su bendición es breve, pero la pista permanece: los muertos buscan algo que perteneció al reino, antes de la maldición.", hint: "Activá el santuario cerca de la llegada del Bosque (300, 30) y volvé con Rowan. Su bendición de ataque dura 30 segundos; podés renovarla cuando esté disponible." },
   q_alpha: { id: "q_alpha", title: "El rugido de Umbra", objective: "kill", mapId: "bosque", mobTemplateId: "umbra_alpha", amount: 1, rewardExp: 180, rewardGold: 70, rewardItemId: "aden_sello_del_veneno_antiguo", intro: "Varek vio al Alfa de Umbra rondando las piedras del noroeste. Las bestias también parecen atraídas por los lugares antiguos. Derrotalo para que la guardia pueda investigar. Revisá el arma de Dorne, tus pociones y lo que aprendiste antes de enfrentarlo.", done: "La guardia pudo examinar las piedras: otra vez, las dos llamas. Tomá este Sello del Veneno Antiguo de nuestras reservas; equipado como anillo reduce el daño de veneno. Ya tenemos una dirección: las Ruinas, donde empezó la búsqueda de Nihil.", hint: "El Alfa está al noroeste del Bosque (260, -42). Revisá tu equipo en I, prepará pociones y apartate de sus golpes anunciados. Volvé con Rowan al vencerlo." },
   q_ruins: { id: "q_ruins", title: "Tras la piedra caída", objective: "visit", targetId: "ruinas", mapId: "ruinas", mobTemplateId: "", amount: 1, rewardExp: 200, rewardGold: 60, intro: "Nihil partió hacia las Ruinas buscando la inmortalidad. Ahora sus guardianes siguen símbolos que nacieron allí. Viajá a las Ruinas de Nihil con M y reconocé la entrada. Necesitamos descubrir qué relación tienen esas dos llamas con su ejército.", done: "Los guardianes siguen custodiando las Ruinas. Bajo esas piedras está la Cripta de las Dos Llamas. Antes de investigar su interior, tenemos que abrirnos paso entre los defensores.", hint: "Abrí M y viajá a Ruinas de Nihil (nivel 3). Volvé con Rowan después de reconocer la entrada." },
-  q_crypt: { id: "q_crypt", title: "Las Dos Llamas", objective: "dungeon", targetId: "cripta", mapId: "cripta", mobTemplateId: "crypt_warden", amount: 1, rewardExp: 600, rewardGold: 250, intro: "Entrá en la Cripta de las Dos Llamas. Despejá las seis criaturas del Despertar y activá su sello. Cruzá a la Fragua y vencé a sus seis defensores, incluido el Behemoth, para activar el segundo. En el Corazón aguarda el Custodio alado: salí de sus círculos antes del impacto.", done: "Apagaste las dos llamas y rompiste el sello del Custodio. Su arma te ayudará a cruzar el Yermo.", hint: "M → Cripta de las Dos Llamas (nivel 5). La expedición es compartida; las salas despejadas permanecen vacías hasta que salgan todos. Morir te devuelve al pueblo." },
-  q_ash_shrine: { id: "q_ash_shrine", title: "La última llama", objective: "interact", targetId: "yermo_shrine", mapId: "yermo", mobTemplateId: "", amount: 1, rewardExp: 300, rewardGold: 120, rewardItemId: "greater_potion", intro: "Activá el santuario de la entrada del Yermo. Su llama revelará el camino al Rey Nihil.", done: "El camino al Trono está abierto. Revisá tu equipo, reponé pociones y preparate para el último combate.", hint: "Santuario del Yermo (300, 335), cerca del punto de llegada." },
+  q_crypt: { id: "q_crypt", title: "Las Dos Llamas", objective: "dungeon", targetId: "cripta", mapId: "cripta", mobTemplateId: "crypt_warden", amount: 1, rewardExp: 600, rewardGold: 250, intro: "En la Cripta, la Memoria retiene a los muertos y la Fragua les da cuerpo. Despejá sus dos salas y activá cada sello para alcanzar al Custodio del Corazón. Necesitamos quebrar el vínculo que protege y descubrir quién sigue alimentándolo.", done: "El Custodio cayó, pero su orden venía del Trono. Nihil ató las llamas a su voluntad: romper el vínculo nos da tiempo, no una victoria definitiva. Si recibiste el arma del Custodio, equipala para probar su habilidad. Dorne puede orientarte antes de cruzar el Yermo.", hint: "M → Cripta (nivel 5). Despejá seis criaturas por sala y activá sus sellos; después vencé al Custodio. Salí de los círculos rojos. La expedición es compartida; al morir volvés al pueblo." },
+  q_ash_shrine: { id: "q_ash_shrine", title: "La última llama", objective: "interact", targetId: "yermo_shrine", mapId: "yermo", mobTemplateId: "", amount: 1, rewardExp: 300, rewardGold: 120, rewardItemId: "greater_potion", intro: "Activá el santuario de la entrada del Yermo. Los guardianes acudían allí antes de marchar: su llama protegía a quienes todavía vivían. Recordar ese propósito es nuestra respuesta a Nihil. Después volvé para preparar el viaje al Trono.", done: "El santuario todavía responde a los vivos. Elenya te dejó una Poción Mayor. Su bendición es temporal; llevá también equipo y provisiones. Ya no vamos al Trono buscando respuestas: sabemos a quién debemos detener.", hint: "Activá el santuario del Yermo (300, 335) y volvé con Rowan. La bendición de ataque dura 30 segundos; el Trono requiere nivel 9." },
 } satisfies Record<string, Quest>);
 
 for (const [id, mapId] of Object.entries({ q1: "bosque", q2: "bosque", q3: "ruinas", q4: "ruinas", q5: "yermo", q6: "trono" })) {
@@ -111,8 +111,6 @@ QUESTS.q2.rewardByClass = {
   mage: "aden_baston_del_huesero", ranger: "aden_arco_de_la_senda",
 };
 QUESTS.q4.rewardItemId = "crypt_plate";
-QUESTS.q4.done = "El Centinela cayó. Bajo sus ruinas se abre la Cripta de las Dos Llamas: cortá el poder que alimenta al ejército antes de cruzar al Yermo.";
-QUESTS.q6.done = "¡El Rey ha caído! Aden vuelve a respirar. La campaña está completa: podés seguir explorando y volver a la Cripta para buscar nuevas recompensas.";
 
 export const QUEST_ORDER: string[] = ["q1", "q_supplies", "q_shrine", "q2", "q_alpha", "q_ruins", "q3", "q4", "q_crypt", "q5", "q_ash_shrine", "q6"];
 

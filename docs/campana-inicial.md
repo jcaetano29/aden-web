@@ -16,6 +16,10 @@ Esta revisión conserva los 12 IDs, objetivos, cantidades, EXP, oro, equipo, apr
 
 ### Tabla de progresión
 
+La continuación en Ruinas, Cripta y Yermo desarrolla el misterio: Memoria conserva a los muertos y Fragua les da cuerpo; Nihil sometió ambas a su orden desde el Trono. El rastreador muestra seis fragmentos breves durante la misión de la Cripta, uno por etapa compartida. Quien llega tarde lee la revelación correspondiente al avance actual; en expediciones fuera de esa misión se conservan sólo las instrucciones prácticas.
+
+Los servicios del pueblo tienen respuestas distintas durante Ruinas, Cripta, Yermo, preparación del Trono y epílogo. Los diálogos vinculan el amuleto, la coraza, el arma con habilidad y las protecciones de fuego con su uso real. No prometen desbloqueos por misión: los mapas siguen requiriendo nivel. El cierre reconoce la victoria y presenta las expediciones repetibles como ecos de la maldición, sin anunciar regiones nuevas que todavía no existen.
+
 La columna EXP incluye la recompensa de misión y únicamente las bajas obligatorias; no cuenta cofres, desafíos, bonificaciones, grupos ni enemigos adicionales. El recorrido alcanza todas las puertas de nivel sin exigir bajas repetidas fuera de sus objetivos. La dificultad real y duración requieren seguir ajustándose con partidas de las cinco clases.
 
 | ID | Objetivo | EXP misión | EXP bajas | EXP acumulada | Nivel al entregar |

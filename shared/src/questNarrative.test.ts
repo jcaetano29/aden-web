@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classAdvice, npcStory, questTurnInText } from './questNarrative.js';
+import { classAdvice, cryptStory, npcStory, questTurnInText } from './questNarrative.js';
 import { getQuest } from './quests.js';
 
 describe('forest narrative', () => {
@@ -26,5 +26,22 @@ describe('forest narrative', () => {
     for (const npc of ['merchant', 'smith', 'healer', 'captain']) {
       expect(npcStory(npc, 'campaign_complete', 'mage', 10)).toContain('Nihil');
     }
+  });
+  it('updates every town service after the crypt instead of repeating the forest story', () => {
+    for (const npc of ['merchant', 'smith', 'healer', 'captain']) {
+      const ruins = npcStory(npc, 'q3', 'mage', 5);
+      const crypt = npcStory(npc, 'q_crypt', 'mage', 6);
+      const ash = npcStory(npc, 'q5', 'mage', 7);
+      expect(ruins).not.toBe(crypt);
+      expect(crypt).not.toBe(ash);
+      expect(ash).not.toBe(npcStory(npc, 'q6', 'mage', 9));
+    }
+  });
+  it('reveals crypt lore by expedition stage and ignores invalid stages', () => {
+    expect(cryptStory(0)).not.toContain('Custodio cayó');
+    expect(cryptStory(5)).toContain('Custodio cayó');
+    expect(new Set(Array.from({ length: 6 }, (_, stage) => cryptStory(stage))).size).toBe(6);
+    expect(cryptStory(-1)).toBe('');
+    expect(cryptStory(99)).toBe('');
   });
 });
