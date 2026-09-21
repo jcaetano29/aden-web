@@ -25,6 +25,7 @@ export class PlayerState extends Schema {
   @type("string") mapId = "pueblo";
   @type("number") pvpKills = 0;
   @type("string") guildId = "";
+  @type("string") partyId = "";
   @type("string") guildTag = "";
 
   // Progression — synced to clients

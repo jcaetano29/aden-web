@@ -109,6 +109,8 @@ import { PlayerState } from "../state/PlayerState.js";
 import { MobState } from "../state/MobState.js";
 import { DroppedItemState } from "../state/DroppedItemState.js";
 import { GuildState } from "../state/GuildState.js";
+import { PartySystem } from '../systems/PartySystem.js';
+import { PARTY_REWARD_RANGE } from '@aden/shared';
 import { WorldObjectState } from "../state/WorldObjectState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
 import { LeaderPlayerEntry, LeaderGuildEntry } from "../state/LeaderboardState.js";
@@ -125,6 +127,7 @@ import { hashPassword, verifyPassword } from "../auth/password.js";
 const SAVE_INTERVAL_MS = 15000;
 
 export class GameRoom extends Room<GameState> {
+  private parties!: PartySystem;
   /** Contador para generar ids únicos de ítems dropeados (R-E3b-3). */
   private dropSeq = 0;
   private dungeonActive = false;
@@ -333,6 +336,30 @@ export class GameRoom extends Room<GameState> {
 
   onCreate() {
     this.setState(new GameState());
+    this.parties = new PartySystem(this.state, (id, invitation) => {
+      this.clients.find(c => c.sessionId === id)?.send(MessageType.PartyInvitation, invitation);
+    });
+    this.clock.setInterval(() => this.parties.expire(), 1000);
+    this.onMessage(MessageType.PartyInvite, (client, msg: unknown) => {
+      const targetId = (msg as { targetId?: unknown } | null)?.targetId;
+      if (typeof targetId !== 'string' || targetId.length > 128) return;
+      client.send(MessageType.ItemResult, this.parties.invite(client.sessionId, targetId));
+    });
+    this.onMessage(MessageType.PartyRespond, (client, msg: unknown) => {
+      const data = msg as { inviterId?: unknown; accept?: unknown } | null;
+      if (typeof data?.inviterId !== 'string' || data.inviterId.length > 128 || typeof data.accept !== 'boolean') return;
+      client.send(MessageType.ItemResult, this.parties.respond(client.sessionId, data.inviterId, data.accept));
+    });
+    this.onMessage(MessageType.PartyLeave, client => {
+      client.send(MessageType.ItemResult, this.parties.leave(client.sessionId));
+    });
+    this.onMessage(MessageType.PartyKick, (client, msg: unknown) => {
+      const targetId = (msg as { targetId?: unknown } | null)?.targetId;
+      if (typeof targetId !== 'string' || targetId.length > 128) return;
+      const outcome = this.parties.kick(client.sessionId, targetId);
+      client.send(MessageType.ItemResult, outcome);
+      if (outcome.success) this.clients.find(c => c.sessionId === targetId)?.send(MessageType.ItemResult, { success: true, text: 'El líder te retiró de la party.' });
+    });
     this.persistence = createPersistence();
     this.clock.setInterval(() => this.saveAll(), SAVE_INTERVAL_MS);
     this.clock.setInterval(() => { void this.refreshLeaderboard(); }, 15000);
@@ -420,7 +447,7 @@ export class GameRoom extends Room<GameState> {
         if (!ready) return;
         if (t.kind === "player") {
           const victim = t.entity;
-          if (p.guildId !== "" && p.guildId === victim.guildId) return; // aliados no se pegan
+          if (this.areAllies(p, victim)) return;
           if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
         }
         if (gapCloser && !this.dashToTarget(p, t.entity.x, t.entity.z)) return;
@@ -474,7 +501,7 @@ export class GameRoom extends Room<GameState> {
         const target=p.targetId?this.resolveTarget(p.targetId,p.mapId):null;
         if(!target || !canAttack(p,target.entity,skillRange(skill)))return;
         if(target.kind==='mob' && !canFightDungeonMob(p,target.entity.templateId))return;
-        if(target.kind==='player' && (!this.inPvpZone(p)||!this.inPvpZone(target.entity)||(p.guildId!==''&&p.guildId===target.entity.guildId)))return;
+        if(target.kind==='player' && (!this.inPvpZone(p)||!this.inPvpZone(target.entity)||this.areAllies(p, target.entity)))return;
         spend();
         if(target.kind==='mob') { const mob=target.entity; mob.dotMs=skill.dotMs??0;mob.dotDps=skill.dotDps??0;mob.dotAttackerId=client.sessionId;mob.dotAccumMs=0; }
         else { const victim=target.entity;victim.poisonMs=skill.dotMs??0;victim.poisonDps=skill.dotDps??0;victim.poisonAttackerId=client.sessionId;victim.poisonAccumMs=0; }
@@ -839,26 +866,32 @@ export class GameRoom extends Room<GameState> {
     this.broadcast(MessageType.Death, { entityId: mobId });
 
     const killer = killerId ? this.state.players.get(killerId) : undefined;
+    const recipients: [string, PlayerState][] = [];
+    if (killer?.partyId) {
+      this.state.players.forEach((member, id) => {
+        if (member.partyId === killer.partyId && !member.dead && member.loaded &&
+          member.mapId === mob.mapId && distance2D(member.x, member.z, mob.x, mob.z) <= PARTY_REWARD_RANGE &&
+          this.clients.some(c => c.sessionId === id)) recipients.push([id, member]);
+      });
+      // Give the rounding remainder to the killer when eligible, otherwise the first eligible member.
+      recipients.sort(([a], [b]) => a === killerId ? -1 : b === killerId ? 1 : 0);
+    } else if (killer && !killer.dead) {
+      recipients.push([killerId!, killer]);
+    }
+    const awardedExp = new Set<string>();
+    const exp = getMobExp(mob.templateId);
+    recipients.forEach(([id, member], index) => {
+      const client = this.clients.find(c => c.sessionId === id);
+      if (client) {
+        const amount = mob.mapId === 'cripta' ? exp : Math.floor(exp / recipients.length) + (index === 0 ? exp % recipients.length : 0);
+        this.grantExp(member, client, amount);
+        awardedExp.add(id);
+      }
+      this.creditMobKill(member, id, mob);
+    });
     if (killer && !killer.dead) {
       killer.hp=Math.min(killer.maxHp,killer.hp+Math.floor(killer.maxHp*killer.itemEffects.hpOnKill));
       killer.mp=Math.min(killer.maxMp,killer.mp+Math.floor(killer.maxMp*killer.itemEffects.mpOnKill));
-      const client = this.clients.find((c) => c.sessionId === killerId);
-      if (client) {
-        this.grantExp(killer, client, getMobExp(mob.templateId));
-      }
-
-      advanceQuest(killer,'kill',mob.templateId);
-      // Etapa 20: progreso del contrato del Capitán (se entrega hablando con él).
-      if (killer.bountyId !== "") {
-        try {
-          const b = getBounty(killer.bountyId);
-          if ((b.mobTemplateId === "" || b.mobTemplateId === mob.templateId) && killer.bountyProgress < b.amount) {
-            killer.bountyProgress++;
-          }
-        } catch {
-          // Contrato desconocido, ignorar
-        }
-      }
 
       // Etapa 9c: crédito de guild por matar al jefe (last-hit)
       if (isBoss(mob.templateId) && killer.guildId !== "") {
@@ -876,37 +909,16 @@ export class GameRoom extends Room<GameState> {
         }
       }
 
-      // Etapa 13: retención — kills totales, jefes abatidos, progreso de la diaria y logros.
-      killer.totalKills += 1;
-      if (isBoss(mob.templateId)) killer.bossKills += 1;
-      if (killer.dailyQuestId !== "" && !killer.dailyDone) {
-        try {
-          const dq = getDailyQuest(killer.dailyQuestId);
-          if (dq.mobTemplateId === "" || dq.mobTemplateId === mob.templateId) {
-            killer.dailyProgress++;
-            if (killer.dailyProgress >= dq.amount) {
-              killer.dailyDone = true;
-              killer.gold += dq.rewardGold;
-              const client = this.clients.find((c) => c.sessionId === killerId);
-              if (client) {
-                this.grantExp(killer, client, dq.rewardExp);
-                client.send(MessageType.DailyComplete, { rewardGold: dq.rewardGold, rewardExp: dq.rewardExp });
-              }
-            }
-          }
-        } catch { /* diaria desconocida: ignorar */ }
-      }
-      if (killerId) this.checkAchievements(killer, killerId);
     }
 
     // Los presentes comparten avance y EXP aunque el autor del veneno haya muerto
-    // o salido. El último atacante vivo ya recibió su EXP en el bloque anterior.
+    // o salido. No duplicar EXP ya otorgada al atacante o a su party.
     const dungeonCleared=mob.mapId==='cripta' && advanceDungeonKill(this.dungeonRun,mob.templateId);
     if(mob.mapId==='cripta')this.syncDungeonRun();
     if (mob.mapId === 'cripta') this.state.players.forEach((participant, id) => {
       if (participant.dead || participant.mapId !== mob.mapId || distance2D(participant.x, participant.z, mob.x, mob.z) > 25) return;
       const client = this.clients.find(c => c.sessionId === id);
-      if (id !== killerId && client) this.grantExp(participant, client, getMobExp(mob.templateId));
+      if (!awardedExp.has(id) && client) this.grantExp(participant, client, getMobExp(mob.templateId));
       if (dungeonCleared) {
         const base = getItem(dungeonReward(participant.className));
         const reward = createItemInstance(base, { quality: 'magic', level: 5, skill: true }, randomUUID());
@@ -923,6 +935,40 @@ export class GameRoom extends Room<GameState> {
 
     // Loot (R-E3b-2): rodar drop table del mob y crear ítems en el piso con scatter.
     this.dropLoot(mob.templateId, mob.x, mob.z, mob.mapId, killer?.itemEffects.goldPct ?? 0);
+  }
+
+  private areAllies(a: PlayerState, b: PlayerState): boolean {
+    return (!!a.guildId && a.guildId === b.guildId) || (!!a.partyId && a.partyId === b.partyId);
+  }
+
+  private creditMobKill(player: PlayerState, id: string, mob: MobState): void {
+    advanceQuest(player, 'kill', mob.templateId);
+    if (player.bountyId) {
+      try {
+        const bounty = getBounty(player.bountyId);
+        if ((!bounty.mobTemplateId || bounty.mobTemplateId === mob.templateId) && player.bountyProgress < bounty.amount) player.bountyProgress++;
+      } catch { /* Unknown legacy bounty. */ }
+    }
+    player.totalKills++;
+    if (isBoss(mob.templateId)) player.bossKills++;
+    if (player.dailyQuestId && !player.dailyDone) {
+      try {
+        const daily = getDailyQuest(player.dailyQuestId);
+        if (!daily.mobTemplateId || daily.mobTemplateId === mob.templateId) {
+          player.dailyProgress++;
+          if (player.dailyProgress >= daily.amount) {
+            player.dailyDone = true;
+            player.gold += daily.rewardGold;
+            const client = this.clients.find(c => c.sessionId === id);
+            if (client) {
+              this.grantExp(player, client, daily.rewardExp);
+              client.send(MessageType.DailyComplete, { rewardGold: daily.rewardGold, rewardExp: daily.rewardExp });
+            }
+          }
+        }
+      } catch { /* Unknown legacy daily. */ }
+    }
+    this.checkAchievements(player, id);
   }
 
   /** Rueda una tabla de loot y deja los ítems en el piso (mobs y objetos de mundo). */
@@ -1023,7 +1069,7 @@ export class GameRoom extends Room<GameState> {
       if (!p.dead) {
         if(p.poisonMs>0) {
           const source=this.state.players.get(p.poisonAttackerId);
-          if(!source || source.dead || source.mapId!==p.mapId || !this.inPvpZone(p)||!this.inPvpZone(source)) {p.poisonMs=0;p.poisonAccumMs=0;}
+          if(!source || source.dead || source.mapId!==p.mapId || this.areAllies(p, source) || !this.inPvpZone(p)||!this.inPvpZone(source)) {p.poisonMs=0;p.poisonAccumMs=0;}
           else {
             p.poisonAccumMs+=Math.min(dtMs,p.poisonMs);p.poisonMs=Math.max(0,p.poisonMs-dtMs);
             while (p.poisonAccumMs >= 500 && !p.dead) {
@@ -1079,7 +1125,7 @@ export class GameRoom extends Room<GameState> {
       } else {
         // PvP: ambos fuera del pueblo
         const victim = t.entity;
-        if (p.guildId !== "" && p.guildId === victim.guildId) return; // aliados no se pegan
+        if (this.areAllies(p, victim)) return;
         if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
         if (canAttack(p, victim, weaponRange(playerLoadout(p)))) {
           if(!consumeAmmo(p))return;
@@ -1461,7 +1507,14 @@ export class GameRoom extends Room<GameState> {
   }
 
   async onLeave(client: Client) {
+    this.parties.leave(client.sessionId);
     const player = this.state.players.get(client.sessionId);
+    // Remove from live systems before the asynchronous save: disconnected players
+    // must not accept invitations or earn group rewards while persistence waits.
+    const gid = player?.guildId ?? '';
+    this.state.players.delete(client.sessionId);
+    this.maintainDungeonRun();
+    if (gid !== '') this.pruneGuildIfEmpty(gid);
     if (player) {
       // Etapa 3c: si se desconectó antes de que el load resolviera, no hay nada nuevo que
       // valga la pena persistir y guardar pisaría el registro real con defaults.
@@ -1473,9 +1526,5 @@ export class GameRoom extends Room<GameState> {
         }
       }
     }
-    const gid = player?.guildId ?? "";
-    this.state.players.delete(client.sessionId);
-    this.maintainDungeonRun();
-    if (gid !== "") this.pruneGuildIfEmpty(gid);
   }
 }

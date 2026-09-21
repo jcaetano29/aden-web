@@ -30,6 +30,8 @@ import {
   CRYPT_WAVE_TEMPLATES,
 } from "@aden/shared";
 import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
+import type { PartyInvitation } from '@aden/shared';
+import type { PartyPanelData, PartyMember } from '../render/PartyPanel.js';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
 
@@ -147,8 +149,10 @@ export interface RoomCallbacks {
 
 export class NetworkClient {
   private room!: Room;
+  private partyInvitation: PartyInvitation | null = null;
 
   async connect(name: string, password: string, className: string, cb: RoomCallbacks, mode = ""): Promise<void> {
+    this.partyInvitation = null;
     const client = new Client(SERVER_URL);
     this.room = await client.joinOrCreate("game", { name, password, className, mode });
     const selfId = this.room.sessionId;
@@ -221,6 +225,7 @@ export class NetworkClient {
     this.room.onMessage(MessageType.Achievement, (data: AchievementEvent) => cb.onAchievement(data));
     this.room.onMessage(MessageType.WorldAnnounce, (data: WorldAnnounceEvent) => cb.onWorldAnnounce(data));
     this.room.onMessage(MessageType.ItemResult, (data: { success: boolean; text: string }) => cb.onItemResult?.(data));
+    this.room.onMessage(MessageType.PartyInvitation, (data: PartyInvitation | null) => { this.partyInvitation = data; });
 
     // Etapa 16: objetos de mundo.
     const snapObj = (o: any): WorldObjectSnapshot => ({
@@ -273,6 +278,28 @@ export class NetworkClient {
   sendUseItem(itemTemplateId: string, targetItemId?: string) {
     const msg: UseItemMessage = targetItemId ? { itemTemplateId, targetItemId } : { itemTemplateId };
     this.room.send(MessageType.UseItem, msg);
+  }
+
+  sendPartyInvite(targetId: string) { this.room.send(MessageType.PartyInvite, { targetId }); }
+  sendPartyRespond(inviterId: string, accept: boolean) { this.room.send(MessageType.PartyRespond, { inviterId, accept }); }
+  sendPartyLeave() { this.room.send(MessageType.PartyLeave); }
+  sendPartyKick(targetId: string) { this.room.send(MessageType.PartyKick, { targetId }); }
+
+  getPartyPanelData(): PartyPanelData {
+    const selfId = this.room.sessionId;
+    const self = this.room.state.players.get(selfId);
+    const partyId = self?.partyId ?? '';
+    const party = this.room.state.parties?.get(partyId);
+    const members: PartyMember[] = [];
+    for (const id of party?.members ?? []) {
+      const p = this.room.state.players.get(id);
+      if (p) members.push({ id, name: p.name, level: p.level, mapId: p.mapId, hp: p.hp, maxHp: p.maxHp, mp: p.mp, maxMp: p.maxMp, dead: p.dead });
+    }
+    const candidates: PartyPanelData['candidates'] = [];
+    this.room.state.players.forEach((p: any, id: string) => {
+      if (id !== selfId && !p.partyId && p.mapId === self?.mapId) candidates.push({ id, name: p.name, level: p.level });
+    });
+    return { selfId, partyId, leaderId: party?.leaderId ?? '', members, candidates, invitation: this.partyInvitation };
   }
 
   /** Envía la intención de crear una guild nueva (el jugador local pasa a ser el líder). */

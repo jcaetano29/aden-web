@@ -15,6 +15,7 @@ import { Hud } from "./render/Hud.js";
 import { SkillBar } from "./render/SkillBar.js";
 import { InventoryPanel } from "./render/InventoryPanel.js";
 import { GuildPanel } from "./render/GuildPanel.js";
+import { PartyPanel } from './render/PartyPanel.js';
 import { LeaderboardPanel } from "./render/LeaderboardPanel.js";
 import { ProgressPanel } from "./render/ProgressPanel.js";
 import { BossBar } from "./render/BossBar.js";
@@ -98,6 +99,13 @@ async function main() {
     onLeave: () => net.sendLeaveGuild(),
   });
   guildPanel.mount(document.body);
+  const partyPanel = new PartyPanel({
+    onInvite: id => net.sendPartyInvite(id),
+    onRespond: (id, accept) => net.sendPartyRespond(id, accept),
+    onKick: id => net.sendPartyKick(id),
+    onLeave: () => net.sendPartyLeave(),
+  });
+  partyPanel.mount(document.body);
   const leaderboardPanel = new LeaderboardPanel();
   leaderboardPanel.mount(document.body);
   const progressPanel = new ProgressPanel((title) => net.sendSetTitle(title));
@@ -563,6 +571,8 @@ async function main() {
     if (e.key === "i" || e.key === "I" || e.code === "KeyI") {
       inventoryPanel.toggle();
     }
+    if (e.code === 'KeyP' && !e.repeat) { partyPanel.update(net.getPartyPanelData()); partyPanel.toggle(); }
+    if (e.key === 'Escape') partyPanel.setVisible(false);
     if (e.key === "g" || e.key === "G" || e.code === "KeyG") {
       guildPanelVisible = !guildPanelVisible;
       if (guildPanelVisible) guildPanel.update(net.getGuildPanelData());
@@ -706,6 +716,7 @@ async function main() {
       level: selfCombat?.level,
       attributes: selfCombat ? { str: selfCombat.str, agi: selfCombat.agi, vit: selfCombat.vit, ene: selfCombat.ene } : undefined,
     });
+    partyPanel.update(net.getPartyPanelData());
     if (guildPanelVisible) {
       guildPanel.update(net.getGuildPanelData());
     }

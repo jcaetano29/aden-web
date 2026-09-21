@@ -25,7 +25,22 @@ export const MessageType = {
   InteractObject: "interactObject",
   SkillCast: "skillCast",
   AllocateStat: "allocateStat",
+  PartyInvite: "partyInvite",
+  PartyRespond: "partyRespond",
+  PartyLeave: "partyLeave",
+  PartyKick: "partyKick",
+  PartyInvitation: "partyInvitation",
 } as const;
+
+export const PARTY_MAX_MEMBERS = 10;
+export const PARTY_REWARD_RANGE = 25;
+export const PARTY_INVITE_MS = 30000;
+
+export interface PartyInvitation {
+  inviterId: string;
+  inviterName: string;
+  expiresAt: number;
+}
 
 export interface MoveToMessage {
   x: number;
