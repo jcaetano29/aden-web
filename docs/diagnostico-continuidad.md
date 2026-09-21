@@ -39,3 +39,12 @@ Observación de navegador previa: 1280×720, personaje Caballero nuevo, entrada 
 - Mantener los tests de lógica; agregar scripts reproducibles de typecheck/build/validación y CI sin desplegar por sorpresa ni poner secretos en el repositorio.
 
 Mediciones adicionales del árbol de archivos: los GLB suman 24.236.476 bytes, pero Skeleton_Minion y Skeleton_Warrior (unos 9,45 MB juntos) no están en el manifiesto de enemigos actual; no atribuir todo ese peso a la carga inicial. CharacterFactory.preload recibe 18 variantes/nombres, varias resuelven a los mismos GLB. Revisar deduplicación de parseo, no asumir solicitudes de red duplicadas sin medir. EntityViews.update actualiza todos los CharacterView y mixers de todos los mapas aunque sus objetos estén ocultos; medir el coste y asegurar posiciones/animaciones correctas al volver a un mapa antes de omitir trabajo. InventoryPanel ya evita reconstrucción con una firma; no presentar como nueva una optimización que existe.
+
+## Preparación de recuperación de conexión (entrega 3)
+
+- Diseño y plan listos en docs/superpowers/specs/2026-09-21-recuperacion-conexion-design.md y docs/superpowers/plans/2026-09-21-recuperacion-conexion.md; no implementados todavía. Ejecutar después de aprobar la entrega 2.
+- Reingreso manual mediante recarga: ClassSelect inicia en modo login. Esto evita duplicar la escena, callbacks o una solicitud create; no necesita conservar contraseña en almacenamiento.
+- NetworkClient.catalog.test.ts inyecta room sin pasar por connect; al agregar un estado conectado explícito, actualizar el setup preservando la comprobación de payload real. No debilitar la guarda para acomodar el test antiguo.
+- main añade controles después de await storyCard.show(); una desconexión durante esa espera también requiere modal por encima de StoryCard y retorno al acceso utilizable.
+- main.showServerOffline actualmente interpola el endpoint del servidor en HTML; reemplazar su texto técnico por un diálogo de producto reutilizable al integrar recuperación. No hace falta un flujo de credenciales nuevo.
+- Precisión sobre chat: bottom:202px es un fallback CSS. ChatPanel.mount ya observa el HUD con ResizeObserver y ajusta bottom=alturaHUD+26px. Medir superposición real antes de modificar el anclaje; no atribuir toda la superposición a un valor fijo que ya se reemplaza en runtime.
