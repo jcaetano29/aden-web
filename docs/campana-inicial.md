@@ -4,6 +4,18 @@ La campaña conserva los IDs q1–q6 y agrega seis objetivos de recuperación, i
 
 ## Recorrido y experiencia
 
+### Arco narrativo del Bosque y el pueblo
+
+La caravana de Bram llevaba remedios para Elenya y una piedra de un santuario. Los exploradores óseos atacaron la carga sin interesarse por el oro. Rowan pide abrir paso y recuperar el cofre; el grabado de dos llamas conecta después el santuario de Umbra, los Guerreros Musgosos y las Ruinas de Nihil. Vencer al Alfa permite a la guardia investigar las piedras del noroeste y cierra la primera investigación.
+
+Las recompensas mantienen sus valores y fuentes: chaleco de la reserva de Varek, tres pociones de Elenya, arma de clase +2 preparada por Dorne y anillo de las reservas del pueblo. La piedra y los remedios son contexto narrativo del objetivo existente del cofre, no nuevos objetos de inventario ni un sistema de entrega entre NPC.
+
+Bram y Dorne comentan el avance desde sus tiendas. Elenya y Varek lo hacen en sus diálogos de servicio; Varek agrega consejos según la clase y las habilidades desbloqueadas al nivel actual. Al entregar una misión, el diálogo presenta también el próximo encargo que asignará el servidor. Los paneles admiten desplazamiento para leer el contenido extenso. Los cuatro NPC reconocen el final de la campaña.
+
+Esta revisión conserva los 12 IDs, objetivos, cantidades, EXP, oro, equipo, aprendizaje y guardados. Las entregas siguen siendo con Rowan. No introduce pruebas obligatorias de habilidades, cambios físicos persistentes del mundo ni nuevas ramas de misiones. El balance del arma +5 de la Cripta queda pendiente de una revisión específica.
+
+### Tabla de progresión
+
 La columna EXP incluye la recompensa de misión y únicamente las bajas obligatorias; no cuenta cofres, desafíos, bonificaciones, grupos ni enemigos adicionales. El recorrido alcanza todas las puertas de nivel sin exigir bajas repetidas fuera de sus objetivos. La dificultad real y duración requieren seguir ajustándose con partidas de las cinco clases.
 
 | ID | Objetivo | EXP misión | EXP bajas | EXP acumulada | Nivel al entregar |

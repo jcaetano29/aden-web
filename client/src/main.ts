@@ -28,6 +28,7 @@ import { ShopPanel } from "./render/ShopPanel.js";
 import { ClassSelect } from "./render/ClassSelect.js";
 import { Minimap } from "./render/Minimap.js";
 import { StoryCard } from "./render/StoryCard.js";
+import { classAdvice, npcStory, questTurnInText } from "@aden/shared";
 import { DialogPanel } from "./render/DialogPanel.js";
 import { ZoneIndicator } from "./render/ZoneIndicator.js";
 import { ZoneBanner } from "./render/ZoneBanner.js";
@@ -332,13 +333,14 @@ async function main() {
       if (self.questProgress >= q.amount) {
         dialog.open({
           speaker: ELDER_NAME,
-          text: q.done,
-          actionLabel: "Continuar",
+          text: questTurnInText(q.id),
+          actionLabel: "Recibir recompensa",
           onAction: () => net.sendInteractNpc(),
         });
       } else {
         // Misión en progreso: recordatorio + progreso
-        const progressText = `${q.intro}\n\n(Progreso: ${self.questProgress}/${q.amount})`;
+        const advice = q.id === "q_alpha" ? classAdvice(self.className, self.level) : "";
+        const progressText = `${q.intro}${advice ? `\n\n${advice}` : ""}\n\n(Progreso: ${self.questProgress}/${q.amount})`;
         dialog.open({
           speaker: ELDER_NAME,
           text: progressText,
@@ -358,11 +360,19 @@ async function main() {
     return !!pos && distance2D(pos.x, pos.z, TOWN.x, TOWN.z) <= TOWN_SERVICE_RADIUS;
   };
 
+  function serviceStory(npcId: string, text: string): string {
+    const self = net.getSelf();
+    if (!self) return text;
+    const story = npcStory(npcId, self.questId, self.className, self.level);
+    return story ? `${story}\n\n${text}` : text;
+  }
+
   // Interacción con el Mercader: abre la tienda si estás lo suficientemente cerca.
   function interactMerchant() {
     if (!net.getSelf()) return;
     if (!nearTown()) { hud.toast("Acercate al Mercader para comprar", "#ffe066"); return; }
     smithPanel.close();
+    shopPanel.setGreeting(serviceStory("merchant", ""));
     shopPanel.toggle();
   }
 
@@ -371,6 +381,7 @@ async function main() {
     if (!net.getSelf()) return;
     if (!nearTown()) { hud.toast(`Acercate al ${getNpc("smith").name} para forjar`, "#ffe066"); return; }
     shopPanel.close();
+    smithPanel.setGreeting(serviceStory("smith", ""));
     smithPanel.toggle();
   }
 
@@ -380,16 +391,16 @@ async function main() {
     if (!self) return;
     if (!nearTown()) { hud.toast(`Acercate a la ${getNpc("healer").name}`, "#ffe066"); return; }
     if (self.hp >= self.maxHp && self.mp >= self.maxMp) {
-      dialog.open({ speaker: getNpc("healer").name, text: "Ya estás en plena forma, aventurero. Volvé cuando el camino te haya golpeado.", actionLabel: "Gracias", onAction: () => {} });
+      dialog.open({ speaker: getNpc("healer").name, text: serviceStory("healer", "Ya estás en plena forma, aventurero. Volvé cuando el camino te haya golpeado."), actionLabel: "Gracias", onAction: () => {} });
       return;
     }
     if (self.gold < HEAL_COST_GOLD) {
-      dialog.open({ speaker: getNpc("healer").name, text: `Un descanso completo cuesta ${HEAL_COST_GOLD} de oro, y no te alcanza. Traé más y te dejaré como nuevo.`, actionLabel: "Entendido", onAction: () => {} });
+      dialog.open({ speaker: getNpc("healer").name, text: serviceStory("healer", `Un descanso completo cuesta ${HEAL_COST_GOLD} de oro, y no te alcanza. Traé más y te dejaré como nuevo.`), actionLabel: "Entendido", onAction: () => {} });
       return;
     }
     dialog.open({
       speaker: getNpc("healer").name,
-      text: `Sentate junto al fuego. Por ${HEAL_COST_GOLD} de oro te curo las heridas y te devuelvo el aliento (HP y MP al máximo).`,
+      text: serviceStory("healer", `Sentate junto al fuego. Por ${HEAL_COST_GOLD} de oro te curo las heridas y te devuelvo el aliento (HP y MP al máximo).`),
       actionLabel: `Descansar (${HEAL_COST_GOLD} oro)`,
       onAction: () => { net.sendInteractNpc("healer"); hud.toast("Descansaste: HP y MP al máximo ✚", "#5effc8"); },
     });
@@ -405,7 +416,7 @@ async function main() {
       const b = getBounty(firstBountyId());
       dialog.open({
         speaker: cap,
-        text: `¿Buscás trabajo, mercenario? Tengo un contrato: "${b.title}" — cazá ${b.amount}. Paga ${b.rewardGold} de oro y ${b.rewardExp} de experiencia.`,
+        text: serviceStory("captain", `¿Buscás trabajo, mercenario? Tengo un contrato: "${b.title}" — cazá ${b.amount}. Paga ${b.rewardGold} de oro y ${b.rewardExp} de experiencia.`),
         actionLabel: "Aceptar contrato",
         onAction: () => { net.sendInteractNpc("captain"); hud.toast(`Contrato aceptado: ${b.title}`, "#ff8a5a"); },
       });
@@ -416,14 +427,14 @@ async function main() {
       if (self.bountyProgress >= b.amount) {
         dialog.open({
           speaker: cap,
-          text: `Contrato cumplido: "${b.title}". Buen trabajo. Tomá tu paga — y si querés, tengo otro esperando.`,
+          text: serviceStory("captain", `Contrato cumplido: "${b.title}". Buen trabajo. Tomá tu paga — y si querés, tengo otro esperando.`),
           actionLabel: "Cobrar",
           onAction: () => { net.sendInteractNpc("captain"); hud.toast(`+${b.rewardGold} oro · +${b.rewardExp} exp`, "#ffd54f"); },
         });
       } else {
         dialog.open({
           speaker: cap,
-          text: `Contrato en curso: "${b.title}".\n\n(Progreso: ${self.bountyProgress}/${b.amount})`,
+          text: serviceStory("captain", `Contrato en curso: "${b.title}".\n\n(Progreso: ${self.bountyProgress}/${b.amount})`),
           actionLabel: "Sigo en eso",
           onAction: () => {},
         });

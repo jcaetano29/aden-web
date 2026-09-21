@@ -21,6 +21,7 @@ export class ShopPanel {
   private readonly itemsList: HTMLDivElement;
   private readonly goldLabel: HTMLDivElement;
   private readonly searchInput: HTMLInputElement;
+  private readonly greeting: HTMLParagraphElement;
   private visible = false;
   private onBuy: (itemTemplateId: string) => void;
   private readonly stock: string[];
@@ -39,7 +40,7 @@ export class ShopPanel {
     this.root.style.cssText =
       "position:fixed;left:14px;top:14px;display:none;pointer-events:none;z-index:1000;" +
       `width:min(440px,calc(100vw - 28px));max-height:calc(100vh - 28px);font-family:${FONT_BODY};` +
-      `color:${COLORS.text};padding:14px 16px;user-select:none;box-sizing:border-box;`;
+      `color:${COLORS.text};padding:14px 16px;user-select:none;box-sizing:border-box;overflow-y:auto;`;
 
     const header = document.createElement("div");
     header.style.cssText = "display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;";
@@ -60,6 +61,11 @@ export class ShopPanel {
     header.appendChild(closeBtn);
     this.root.appendChild(header);
 
+    this.greeting = document.createElement("p");
+    this.greeting.hidden = true;
+    this.greeting.style.cssText = `margin:0 0 10px;font-size:13px;line-height:1.45;color:${COLORS.parchment};`;
+    this.root.appendChild(this.greeting);
+
     this.goldLabel = document.createElement("div");
     this.goldLabel.style.cssText =
       `margin-bottom:12px;color:${COLORS.parchment};font-weight:600;display:flex;align-items:center;gap:6px;`;
@@ -78,13 +84,18 @@ export class ShopPanel {
 
     this.itemsList = document.createElement("div");
     this.itemsList.dataset.shopList = "";
-    this.itemsList.style.cssText = "display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 175px);overflow-y:auto;padding-right:4px;";
+    this.itemsList.style.cssText = "display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 280px);overflow-y:auto;padding-right:4px;";
     this.root.appendChild(this.itemsList);
 
     parent.appendChild(this.root);
 
     // Renderizar el stock
     this.renderItems();
+  }
+
+  setGreeting(text: string): void {
+    this.greeting.textContent = text;
+    this.greeting.hidden = !text;
   }
 
   /** Renderiza cada ítem del stock con nombre, precio y botón Comprar. */

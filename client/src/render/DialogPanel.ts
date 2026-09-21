@@ -21,7 +21,7 @@ export class DialogPanel {
     // Panel principal
     const panel = document.createElement("div");
     panel.className = "aden-panel aden-fadein";
-    panel.style.cssText = "padding:18px 20px;border-left:3px solid " + COLORS.gold + ";";
+    panel.style.cssText = "padding:18px 20px;max-height:calc(100dvh - 180px);overflow-y:auto;border-left:3px solid " + COLORS.gold + ";";
 
     // Header con el nombre del hablante
     this.speakerName = document.createElement("div");
