@@ -16,7 +16,7 @@ Autorización: el 21/09/2026 el usuario pidió ejecutar todas las tareas posible
 
 1. [x] Fallos de persistencia: lecturas y escrituras explícitas, acceso seguro y regresión de pérdida de progreso. Plan activo: `docs/superpowers/plans/2026-09-21-persistencia-segura.md`.
 2. [x] Guardados ordenados y sesiones: escrituras serializadas y snapshots independientes, sesión única por nombre autenticado y reintento de guardado final antes de reingreso. Garantías de un proceso; límites de memoria/reinicio documentados.
-3. [ ] Recuperación de conexión: estado visible, impedir acciones desconectadas y vía segura de reingreso. No guardar contraseñas en localStorage ni recrear personajes al reconectar.
+3. [x] Recuperación de conexión: estado visible, impedir acciones desconectadas y vía segura de reingreso. No guardar contraseñas en localStorage ni recrear personajes al reconectar.
 4. [ ] Experiencia inicial: reducir superposición de avisos/chat y mejorar descubrimiento de controles, objetivo, arma y pociones; revisar escritorio y pantalla pequeña con navegador.
 5. [ ] Balance 1–10: herramienta reproducible de análisis de cinco clases, curva de EXP, recompensas, arma +5 de Cripta, consumo y PvP inicial. Aplicar ajustes respaldados por pruebas; diferenciar simulación de partidas reales.
 6. [ ] Calidad y multijugador: comandos reproducibles de verificación, integración automática, prueba de varios clientes, desconexión, botín y grupos; registrar medidas de rendimiento y límites.
@@ -43,12 +43,12 @@ Autorización: el 21/09/2026 el usuario pidió ejecutar todas las tareas posible
 - Hallazgos de sesiones, conexión, interfaz y rendimiento: docs/diagnostico-continuidad.md (investigación, no correcciones).
 - Verificación conjunta final: 614 pruebas aprobadas (187 shared, 206 servidor, 221 cliente); TypeScript de los tres paquetes y build correctos. Evidencia: artifacts/persistence-final-tests.log y artifacts/persistence-final-build.log. Advertencia preexistente: bundle del cliente de 1109,34 kB minificado.
 - Entrega 2 completa: implementación 362870f, plan 04d9740. Cola y propiedad compartidas por proceso; auth.name canónico; cierre durante auth/dispose seguro; pendiente final recuperable; copias de learnedTomes. RED funcional de solapamiento/aliasing; GREEN 227/227 servidor y 21/21 enfocadas, TypeScript correcto. Logs artifacts/session-tests/server-final.log, green-final.log y tsc-final.log. Revisión independiente review_ordered_character_sessions aprobada sin hallazgos; ledger/informes .superpowers/sdd/2026-09-21-guardados-sesiones/. No repetir implementación ni pruebas sin nuevo motivo.
-- Próxima acción: ejecutar entrega 3 desde docs/superpowers/plans/2026-09-21-recuperacion-conexion.md y su spec (commit 941bb61). Diseño: comandos seguros, diálogo de corte, retorno manual al acceso mediante recarga, sin guardar contraseñas ni repetir create. Crear su propio ledger/brief, implementar con TDD, revisión independiente y navegador. No hay agentes ni procesos de prueba pendientes de esta ejecución; los informes de entregas anteriores se conservan.
-
-
-
-
-
+- Entrega 3 completa: implementación 6b409a5 y corrección de foco 4f6f5fe. Estado de transporte, guard central para 21 familias send*, bloqueo de controles y diálogo de corte/servidor ausente con retorno manual al acceso. Suite cliente 232/232 antes de corrección acotada; diálogo final 6/6, TypeScript y build correctos. Revisión independiente detectó P2 de foco al pulsar título/mensaje/padding: corregido y revisión final PASS. Navegador: corte real en partida y StoryCard, controles bloqueados, retorno con clic/teclado, panel visible en 1280x720, 1280x560 y 390x844; foco final verificado. Evidencia en .superpowers/sdd/2026-09-21-recuperacion-conexion/ y artifacts/connection-preview-final-build.log. Servidores, preview y pestañas propios cerrados; viewport restablecido. No repetir esta entrega sin nuevo motivo.
 
 ### Límites confirmados de la entrega 2
 La coordinación cubre todas las salas de un proceso que usan el mismo backend real. El modo InMemoryPersistence sigue aislado por sala; no demuestra continuidad a otra sala ni a reinicio. Los pendientes fallidos residen en memoria y se reintentan en próximo acceso, no son un diario duradero. Proveedor que no resuelve conserva el lease para impedir escrituras obsoletas. Multiproceso, cola acotada/coalescida para proveedores colgados y guardados de clanes siguen fuera de este contrato; medir o diseñar antes de ampliar garantías.
+
+
+## Próxima continuación
+
+Entrega 4: convertir docs/superpowers/specs/2026-09-21-interfaz-adaptable-design.md en plan acotado. Navegador confirmó superposición de HUD/barra de habilidades/chat en pantalla pequeña; propuesta preparada, todavía sin implementar. Después continuar balance 1–10, multijugador y rendimiento antes de ampliar 10–20. No hay agentes ni procesos de prueba activos. Automatización continúa activa; cambios conservados en codex/alfa-consolidacion, sin merge, push ni despliegue.

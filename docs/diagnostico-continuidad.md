@@ -48,3 +48,13 @@ Mediciones adicionales del árbol de archivos: los GLB suman 24.236.476 bytes, p
 - main añade controles después de await storyCard.show(); una desconexión durante esa espera también requiere modal por encima de StoryCard y retorno al acceso utilizable.
 - main.showServerOffline actualmente interpola el endpoint del servidor en HTML; reemplazar su texto técnico por un diálogo de producto reutilizable al integrar recuperación. No hace falta un flujo de credenciales nuevo.
 - Precisión sobre chat: bottom:202px es un fallback CSS. ChatPanel.mount ya observa el HUD con ResizeObserver y ajusta bottom=alturaHUD+26px. Medir superposición real antes de modificar el anclaje; no atribuir toda la superposición a un valor fijo que ya se reemplaza en runtime.
+
+## Medición visual de UI antes de la entrega 3
+
+Cliente 5177 y servidor temporal 2577, personaje Caballero ControlCorte21, navegador real. Vista 1280x720: entrada y pueblo correctos, sin error de consola; chat expandido ocupa gran parte izquierda pero habilidades visibles. En 1280x560 sigue habiendo centro y controles utilizables. Estas observaciones son de una escena inicial, no del recorrido completo.
+
+En 390x844, ancho del documento=390 (sin desbordamiento horizontal), pero hay superposiciones funcionales: HUD x14 y671 w309 h159 tapa skillbar x161 y744 w68 h78; chat x14 y364 w362 h295 tapa personaje y tracker; tracker x269 y272 w109 h331 vuelve la misión una columna estrecha. Minimap x194 y12 w184 h197 y audio x194 y224 w184 h34 consumen casi la mitad del ancho. La corrección necesita distribución responsive, no solo overflow-x:hidden.
+
+Propuesta para entrega 4: priorizar vida/maná, habilidades y objetivo; en ancho pequeño barra inferior de habilidades con espacio reservado, HUD compacto sobre ella, objetivo ancho legible y chat inicialmente minimizado con expansión deliberada. Reducir minimapa/audio y ubicar mensajes en una región que no cubra controles. Conservar acceso a contenido completo y preferencia explícita de chat. No prometer controles táctiles completos: hoy varios paneles/viajes requieren teclado. Medir con 6 skills y nombres/textos largos además de Caballero nivel 1.
+
+Para arrancar verificación en Windows: ejecutar ../node_modules/.bin/tsx.cmd src/index.ts desde server (su tsconfig habilita decoradores) con PORT=2577 y variables Supabase vacías; desde client ejecutar ../node_modules/.bin/vite.cmd --host 127.0.0.1 --port 5177 --strictPort con VITE_SERVER_URL=ws://127.0.0.1:2577. Ejecutar tsx desde raíz falla por decoradores; npm run dev con argumentos adicionales fue interpretado incorrectamente en PowerShell. Los binarios directos funcionaron. Cerrar solo sesiones propias.
