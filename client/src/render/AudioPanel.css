@@ -1,5 +1,4 @@
 .aden-audio {
-  position: fixed; top: 224px; right: 12px; width: 184px; z-index: 1250;
   color: var(--aden-text, #ddceb0); font-family: var(--aden-font-body, Georgia, serif);
   pointer-events: auto;
 }

@@ -1,0 +1,11 @@
+# Interfaz adaptable
+
+La interfaz de juego conserva el aspecto de Aden y distribuye sus regiones según el espacio disponible. En escritorio, el HUD permanece abajo a la izquierda, las habilidades abajo al centro y el radar, el audio y el objetivo a la derecha. En pantallas estrechas, la barra de habilidades ocupa una franja inferior con desplazamiento horizontal visible y el HUD se coloca encima. En paisaje de poca altura, el HUD usa el extremo inferior izquierdo y las habilidades el espacio restante hacia la derecha.
+
+El radar y el audio reducen su tamaño en ventanas compactas. El objetivo de aventura se mantiene como una región independiente con desplazamiento vertical, foco de teclado y texto completo; la copia abreviada de la misión dentro del HUD se oculta cuando el ancho es muy reducido. Los avisos diarios y anuncios envuelven el texto dentro de una región acotada.
+
+El chat comienza minimizado cuando coincide con `(max-width: 900px), (max-height: 500px)`. Enter lo abre y enfoca cuando existe conexión. Abrirlo desde Enter, un filtro o el botón, y minimizarlo desde el botón, son decisiones explícitas que se conservan durante la vida del componente aunque cambie el tamaño de la ventana. Un cambio automático tampoco interrumpe el foco ni descarta un borrador. El contador de no leídos, el envío, el eco autoritativo y los filtros mantienen su comportamiento anterior.
+
+La geometría compartida vive en `GameLayout.css`; cada componente conserva su paleta y estilo. El chat observa el HUD para situarse por encima de su posición real y libera sus listeners y observadores al desmontarse. Los componentes mantienen sus selectores públicos y el modal de desconexión conserva su capa superior.
+
+Esta entrega mejora visibilidad, lectura, scroll y acceso por teclado de las regiones descritas. No añade controles táctiles completos ni cambia estadísticas, misiones, recompensas o protocolo. Las pruebas DOM cubren el estado del chat; la aceptación geométrica en 1280×720, 1280×560, 390×844 y 844×390 corresponde a la verificación de navegador del controlador y no se afirma en este documento.

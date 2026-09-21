@@ -1,0 +1,264 @@
+/* Shared geometry for the in-game interface. Component styles keep Aden's theme. */
+.aden-player-hud[data-player-hud] {
+  position: fixed;
+  left: 14px;
+  bottom: 14px;
+  z-index: 1000;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  max-width: calc(100vw - 28px);
+  padding: 12px 14px 11px 12px;
+  box-sizing: border-box;
+}
+
+.aden-player-hud[data-player-hud] .aden-hud-details {
+  min-width: 0;
+  max-width: min(260px, calc(100vw - 100px));
+}
+
+.aden-player-hud[data-player-hud] .aden-hud-meta,
+.aden-player-hud[data-player-hud] .aden-hud-quest,
+.aden-player-hud[data-player-hud] .aden-hud-gold {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.aden-player-hud[data-player-hud] .aden-hud-medallion,
+.aden-player-hud[data-player-hud] .aden-hud-quest {
+  display: flex;
+}
+
+[data-skill-bar] {
+  position: fixed;
+  bottom: 22px;
+  left: 50%;
+  z-index: 999;
+  display: flex;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 4px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+  scrollbar-color: #8d713a rgba(8, 6, 4, .78);
+  scrollbar-width: auto;
+}
+
+[data-skill-bar]::-webkit-scrollbar { height: 8px; }
+[data-skill-bar]::-webkit-scrollbar-track { background: rgba(8, 6, 4, .78); border-radius: 4px; }
+[data-skill-bar]::-webkit-scrollbar-thumb { background: #8d713a; border-radius: 4px; }
+
+[data-adventure-tracker] {
+  position: fixed;
+  top: 272px;
+  right: 12px;
+  z-index: 1000;
+  width: min(260px, 28vw);
+  max-height: calc(100dvh - 296px);
+  padding: 13px 15px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+
+[data-adventure-tracker]:focus-visible {
+  outline: 2px solid #f2d896;
+  outline-offset: 2px;
+}
+
+.aden-minimap {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  z-index: 1000;
+  width: 184px;
+  box-sizing: border-box;
+}
+
+.aden-minimap canvas {
+  display: block;
+  width: 168px;
+  height: 168px;
+  max-width: 100%;
+  margin-inline: auto;
+  box-sizing: border-box;
+}
+
+.aden-audio {
+  position: fixed;
+  top: 224px;
+  right: 12px;
+  z-index: 1250;
+  width: 184px;
+  box-sizing: border-box;
+}
+
+.aden-chat {
+  position: fixed;
+  left: 14px;
+  bottom: var(--aden-chat-bottom, 202px);
+  z-index: 1000;
+  width: min(390px, calc(100vw - 28px));
+  box-sizing: border-box;
+}
+
+.aden-hud-death,
+.aden-hud-level-up {
+  position: fixed;
+  left: 50%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+  transform: translate(-50%, -50%);
+}
+
+.aden-hud-death { top: 42%; padding: 30px 60px; }
+.aden-hud-level-up { top: 32%; }
+
+.aden-hud-notices {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(820px, calc(100vw - 24px));
+  max-height: min(44dvh, calc(100dvh - 240px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+  transform: translateX(-50%);
+}
+
+.aden-hud-toast,
+.aden-hud-announcement {
+  position: relative;
+  flex: 0 0 auto;
+  width: 100%;
+  box-sizing: border-box;
+  overflow-wrap: anywhere;
+}
+
+.aden-hud-toast {
+  padding: 9px 20px;
+}
+.aden-hud-announcement {
+  padding: 12px 30px;
+}
+
+@keyframes aden-notice-flash {
+  0% { opacity: 0; transform: scale(.96); }
+  15%, 80% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+
+@media (max-width: 900px) {
+  [data-skill-bar] {
+    right: 8px;
+    bottom: 8px;
+    left: 8px;
+    gap: 8px;
+    max-width: none;
+    padding: 4px 4px 8px;
+    transform: none;
+  }
+
+  .aden-player-hud[data-player-hud] {
+    left: 8px;
+    bottom: 112px;
+    gap: 8px;
+    max-width: calc(100vw - 16px);
+    padding: 8px 10px 8px 8px;
+  }
+
+  [data-adventure-tracker] {
+    top: 8px;
+    right: 156px;
+    width: min(300px, calc(100vw - 176px));
+    max-height: min(42dvh, calc(100dvh - 116px));
+    padding: 10px 12px;
+  }
+
+  .aden-minimap {
+    top: 8px;
+    right: 8px;
+    width: 132px;
+  }
+
+  .aden-minimap canvas { width: 120px; height: 120px; }
+
+  .aden-audio {
+    top: 164px;
+    right: 8px;
+    width: 132px;
+  }
+
+  .aden-chat {
+    left: 8px;
+    width: min(390px, calc(100vw - 16px));
+  }
+}
+
+@media (max-width: 600px) {
+  .aden-player-hud[data-player-hud] .aden-hud-quest { display: none; }
+
+  [data-adventure-tracker] {
+    top: 56px;
+    right: 120px;
+    width: calc(100vw - 136px);
+    max-height: min(46dvh, calc(100dvh - 280px));
+  }
+
+  .aden-minimap { width: 104px; }
+  .aden-minimap canvas { width: 92px; height: 92px; }
+  .aden-audio { top: 146px; width: 104px; }
+  .aden-audio-toggle { padding: 6px; font-size: 10px; }
+
+  .aden-hud-toast,
+  .aden-hud-announcement { padding: 8px 12px; }
+}
+
+@media (max-height: 500px) and (min-width: 640px) {
+  .aden-player-hud[data-player-hud] {
+    left: 8px;
+    bottom: 8px;
+    width: 246px;
+    max-width: 246px;
+    padding: 8px;
+  }
+
+  .aden-player-hud[data-player-hud] .aden-hud-medallion,
+  .aden-player-hud[data-player-hud] .aden-hud-quest,
+  .aden-player-hud[data-player-hud] .aden-hud-meta .aden-hud-skill { display: none; }
+
+  .aden-player-hud[data-player-hud] .aden-hud-details { max-width: 222px; }
+
+  [data-skill-bar] {
+    right: 8px;
+    bottom: 8px;
+    left: 270px;
+    max-width: none;
+    transform: none;
+  }
+
+  [data-adventure-tracker] {
+    top: 8px;
+    right: 124px;
+    width: min(300px, calc(100vw - 420px));
+    max-height: 142px;
+    padding: 9px 11px;
+  }
+
+  .aden-minimap { top: 8px; right: 8px; width: 104px; }
+  .aden-minimap canvas { width: 88px; height: 88px; }
+  .aden-audio { top: 140px; right: 8px; width: 104px; }
+  .aden-audio-toggle { padding: 6px; font-size: 10px; }
+
+  .aden-hud-notices {
+    top: 8px;
+    max-height: calc(100dvh - 240px);
+  }
+}

@@ -1,5 +1,6 @@
 import { expToNextLevel, getQuest, getClass, getSkill } from "@aden/shared";
 import { COLORS, FONT_DISPLAY, makeThemedBar } from "./theme.js";
+import "./GameLayout.css";
 
 const BAR_WIDTH_PX = 190;
 const BAR_HEIGHT_PX = 15;
@@ -32,6 +33,7 @@ export class Hud {
   private levelUpTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly questLabel: HTMLDivElement;
   private readonly goldLabel: HTMLDivElement;
+  private readonly noticeStack: HTMLDivElement;
   private readonly toastBanner: HTMLDivElement;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly announceBanner: HTMLDivElement;
@@ -41,16 +43,15 @@ export class Hud {
   constructor(parent: HTMLElement = document.body) {
     this.root = document.createElement("div");
     this.root.dataset.playerHud = '';
-    this.root.className = "aden-panel aden-fadein";
+    this.root.className = "aden-panel aden-fadein aden-player-hud";
     this.root.style.cssText =
-      "position:fixed;left:14px;bottom:14px;pointer-events:none;z-index:1000;" +
-      "display:flex;gap:12px;align-items:flex-start;padding:12px 14px 11px 12px;" +
-      `font-family:${FONT_DISPLAY};color:${COLORS.text};user-select:none;`;
+      `pointer-events:none;font-family:${FONT_DISPLAY};color:${COLORS.text};user-select:none;`;
 
     // Medallón de nivel (círculo de oro grabado).
     this.levelMedallion = document.createElement("div");
+    this.levelMedallion.className = "aden-hud-medallion";
     this.levelMedallion.style.cssText =
-      "flex:0 0 auto;width:52px;height:52px;border-radius:50%;display:flex;flex-direction:column;" +
+      "flex:0 0 auto;width:52px;height:52px;border-radius:50%;flex-direction:column;" +
       "align-items:center;justify-content:center;line-height:1;" +
       "background:radial-gradient(circle at 50% 35%, #f4dc92, #c9a24b 55%, #6f5320);" +
       "border:2px solid #4a380f;box-shadow:0 3px 10px rgba(0,0,0,0.6), inset 0 1px 2px rgba(255,255,255,0.6);" +
@@ -67,15 +68,18 @@ export class Hud {
 
     // Columna derecha: clase/skill + barras + misión + oro.
     const col = document.createElement("div");
+    col.className = "aden-hud-details";
     col.style.cssText = "display:flex;flex-direction:column;gap:5px;";
     this.root.appendChild(col);
 
     const metaRow = document.createElement("div");
+    metaRow.className = "aden-hud-meta";
     metaRow.style.cssText = "display:flex;gap:10px;align-items:baseline;font-size:13px;";
     this.classLabel = document.createElement("div");
     this.classLabel.style.cssText = `color:${COLORS.goldBright};font-weight:600;letter-spacing:0.5px;`;
     this.classLabel.textContent = "—";
     this.skillLabel = document.createElement("div");
+    this.skillLabel.className = "aden-hud-skill";
     this.skillLabel.style.cssText = `color:${COLORS.textDim};font-size:12px;`;
     this.skillLabel.textContent = "";
     metaRow.append(this.classLabel, this.skillLabel);
@@ -91,59 +95,66 @@ export class Hud {
 
     // Misión (pergamino) + oro.
     this.questLabel = document.createElement("div");
+    this.questLabel.className = "aden-hud-quest";
     this.questLabel.style.cssText =
       `margin-top:3px;font-size:13px;color:${COLORS.exp1};font-weight:600;` +
-      "display:flex;align-items:center;gap:6px;";
+      "align-items:center;gap:6px;";
     this.questLabel.textContent = "⚑ Hablá con el Anciano";
     col.appendChild(this.questLabel);
 
     this.goldLabel = document.createElement("div");
+    this.goldLabel.className = "aden-hud-gold";
     this.goldLabel.style.cssText = `font-size:13px;color:${COLORS.parchment};display:flex;align-items:center;gap:6px;`;
     this.goldLabel.innerHTML = `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe9a6,#c9a24b 60%,#7a5c22);box-shadow:0 0 5px rgba(201,162,75,0.6);"></span><span data-gold>0</span>`;
     col.appendChild(this.goldLabel);
 
     this.deathBanner = document.createElement("div");
+    this.deathBanner.className = "aden-hud-death";
     this.deathBanner.textContent = "Has caído — renaciendo…";
     this.deathBanner.style.cssText =
-      "position:fixed;left:50%;top:42%;transform:translate(-50%,-50%);" +
       "pointer-events:none;z-index:1000;display:none;text-align:center;" +
       `font-family:${FONT_DISPLAY};font-weight:700;font-size:30px;color:${COLORS.danger};` +
       "text-shadow:0 0 10px #000,0 0 24px rgba(224,64,47,0.6);letter-spacing:2px;" +
       "background:radial-gradient(ellipse at center, rgba(30,0,0,0.55), rgba(0,0,0,0) 70%);padding:30px 60px;";
 
     this.levelUpBanner = document.createElement("div");
+    this.levelUpBanner.className = "aden-hud-level-up";
     this.levelUpBanner.style.cssText =
-      "position:fixed;left:50%;top:32%;transform:translate(-50%,-50%);" +
       "pointer-events:none;z-index:1000;display:none;text-align:center;" +
       `font-family:${FONT_DISPLAY};font-weight:700;font-size:34px;color:${COLORS.goldBright};` +
       "text-shadow:0 0 10px #000,0 0 28px rgba(242,216,150,0.7);letter-spacing:2px;";
 
+    this.noticeStack = document.createElement("div");
+    this.noticeStack.className = "aden-hud-notices";
+    this.noticeStack.setAttribute("aria-label", "Avisos del juego");
+
     this.toastBanner = document.createElement("div");
+    this.toastBanner.className = "aden-hud-toast";
     this.toastBanner.style.cssText =
-      "position:fixed;left:50%;top:20%;transform:translate(-50%,-50%);" +
       "pointer-events:none;z-index:1000;display:none;text-align:center;" +
       `font-family:${FONT_DISPLAY};font-weight:600;font-size:17px;color:#fff;` +
       "text-shadow:0 0 6px #000;letter-spacing:0.5px;" +
-      "background:linear-gradient(180deg, rgba(20,15,9,0.92), rgba(10,7,4,0.92));" +
-      "padding:9px 20px;border-radius:8px;max-width:70vw;border:1px solid rgba(201,162,75,0.4);" +
+      "background:linear-gradient(180deg, rgba(20,15,9,0.96), rgba(10,7,4,0.96));" +
+      "border-radius:8px;border:1px solid rgba(201,162,75,0.4);" +
       "box-shadow:0 6px 20px rgba(0,0,0,0.6);";
 
     // Banner de anuncio de evento de mundo (Etapa 14): más prominente que el toast.
     this.announceBanner = document.createElement("div");
+    this.announceBanner.className = "aden-hud-announcement";
     this.announceBanner.style.cssText =
-      "position:fixed;left:50%;top:11%;transform:translate(-50%,-50%);" +
       "pointer-events:none;z-index:1100;display:none;text-align:center;" +
       `font-family:${FONT_DISPLAY};font-weight:700;font-size:23px;color:${COLORS.goldBright};` +
       "text-shadow:0 0 10px #000,0 0 20px rgba(163,35,28,0.6);letter-spacing:1.5px;" +
-      "background:linear-gradient(180deg, rgba(38,10,10,0.85), rgba(16,6,6,0.85));" +
-      "padding:12px 30px;border-radius:10px;border:1px solid #6b2b2b;max-width:82vw;" +
+      "background:linear-gradient(180deg, rgba(38,10,10,0.96), rgba(16,6,6,0.96));" +
+      "border-radius:10px;border:1px solid #6b2b2b;" +
       "box-shadow:0 8px 28px rgba(0,0,0,0.7), inset 0 0 0 1px rgba(201,162,75,0.2);";
+
+    this.noticeStack.append(this.announceBanner, this.toastBanner);
 
     parent.appendChild(this.root);
     parent.appendChild(this.deathBanner);
     parent.appendChild(this.levelUpBanner);
-    parent.appendChild(this.toastBanner);
-    parent.appendChild(this.announceBanner);
+    parent.appendChild(this.noticeStack);
   }
 
   /** Fila `icono + barra + valor` temática. */
@@ -171,7 +182,7 @@ export class Hud {
     this.announceBanner.style.display = "";
     this.announceBanner.style.animation = "none";
     void this.announceBanner.offsetHeight;
-    this.announceBanner.style.animation = "aden-flash-in 4.5s ease forwards";
+    this.announceBanner.style.animation = "aden-notice-flash 4.5s ease forwards";
     if (this.announceTimer) clearTimeout(this.announceTimer);
     this.announceTimer = setTimeout(() => {
       this.announceBanner.style.display = "none";
@@ -286,7 +297,6 @@ export class Hud {
     this.root.remove();
     this.deathBanner.remove();
     this.levelUpBanner.remove();
-    this.toastBanner.remove();
-    this.announceBanner.remove();
+    this.noticeStack.remove();
   }
 }

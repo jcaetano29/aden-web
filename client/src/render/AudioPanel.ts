@@ -1,6 +1,7 @@
 import type { AudioEngine } from '../audio/AudioEngine.js';
 import type { AudioChannel } from '../audio/settings.js';
 import './AudioPanel.css';
+import './GameLayout.css';
 
 /** Compact mixer below the radar; the flyout follows the existing stone/gold HUD. */
 export class AudioPanel {

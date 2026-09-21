@@ -3,9 +3,11 @@ import {
   type ChatChannel, type ChatSendMessage, type ChatMessage, type ChatErrorEvent,
 } from '@aden/shared';
 import './ChatPanel.css';
+import './GameLayout.css';
 
 type ChatFilter = ChatChannel | 'all';
 const labels = { local: 'Cerca', global: 'Global', all: 'Todos' };
+const COMPACT_VIEW_QUERY = '(max-width: 900px), (max-height: 500px)';
 
 export class ChatPanel {
   readonly el = document.createElement('section');
@@ -26,6 +28,13 @@ export class ChatPanel {
   private pending: { draft: string; message: ChatSendMessage } | null = null;
   private pendingTimer?: ReturnType<typeof setTimeout>;
   private hudObserver?: ResizeObserver;
+  private readonly compactView?: MediaQueryList;
+  private expansionChosen = false;
+
+  private readonly followCompactView = () => {
+    if (this.expansionChosen || document.activeElement === this.input || this.input.value) return;
+    this.setExpanded(!(this.compactView?.matches ?? false));
+  };
 
   private readonly openFromKeyboard = (event: KeyboardEvent) => {
     if (event.target instanceof Node && this.el.contains(event.target)) return;
@@ -34,7 +43,7 @@ export class ChatPanel {
     const active = document.activeElement;
     if (active instanceof Element && active.closest('input,textarea,select,button,a,[contenteditable], [role="dialog"]')) return;
     event.preventDefault(); event.stopPropagation();
-    this.setExpanded(true); this.input.focus();
+    this.setExpanded(true, true); this.input.focus();
   };
 
   constructor(private readonly onSend: (message: ChatSendMessage) => boolean) {
@@ -51,13 +60,13 @@ export class ChatPanel {
       button.addEventListener('click', () => {
         this.filter = filter;
         this.filters.forEach((el, key) => el.setAttribute('aria-pressed', String(key === filter)));
-        this.renderHistory(); this.setExpanded(true);
+        this.renderHistory(); this.setExpanded(true, true);
       });
       this.filters.set(filter, button); filters.append(button);
     }
     this.toggle.type = 'button'; this.toggle.dataset.chatToggle = '';
     this.toggle.setAttribute('aria-controls', 'aden-chat-content');
-    this.toggle.addEventListener('click', () => this.setExpanded(this.content.hidden));
+    this.toggle.addEventListener('click', () => this.setExpanded(this.content.hidden, true));
     header.append(title, filters, this.toggle);
     this.content.id = 'aden-chat-content';
     this.log.className = 'aden-chat-log'; this.log.setAttribute('role', 'log');
@@ -101,7 +110,10 @@ export class ChatPanel {
     for (const type of ['click', 'pointerdown', 'pointermove', 'wheel']) {
       this.el.addEventListener(type, event => event.stopPropagation());
     }
-    this.setExpanded(true); this.setConnected(false); this.updateCounter(); this.renderHistory();
+    this.compactView = typeof window.matchMedia === 'function' ? window.matchMedia(COMPACT_VIEW_QUERY) : undefined;
+    this.compactView?.addEventListener('change', this.followCompactView);
+    this.setExpanded(!(this.compactView?.matches ?? false));
+    this.setConnected(false); this.updateCounter(); this.renderHistory();
   }
 
   mount(parent: HTMLElement = document.body): void {
@@ -109,7 +121,10 @@ export class ChatPanel {
     document.addEventListener('keydown', this.openFromKeyboard, true);
     const hud = document.querySelector<HTMLElement>('[data-player-hud]');
     if (hud && typeof ResizeObserver !== 'undefined') {
-      const position = () => { this.el.style.bottom = `${hud.offsetHeight + 26}px`; };
+      const position = () => {
+        const rect = hud.getBoundingClientRect();
+        this.el.style.setProperty('--aden-chat-bottom', `${Math.max(0, window.innerHeight - rect.top) + 8}px`);
+      };
       this.hudObserver = new ResizeObserver(position); this.hudObserver.observe(hud); position();
     }
   }
@@ -207,7 +222,8 @@ export class ChatPanel {
     empty.textContent = 'Saludá a los aventureros. Elegí Cerca o Global para empezar a conversar.'; this.log.append(empty);
   }
 
-  private setExpanded(expanded: boolean): void {
+  private setExpanded(expanded: boolean, chosen = false): void {
+    if (chosen) this.expansionChosen = true;
     this.content.hidden = !expanded;
     if (expanded) this.unread = 0;
     this.updateToggle();
@@ -221,6 +237,7 @@ export class ChatPanel {
 
   dispose(): void {
     this.clearPending(); this.hudObserver?.disconnect();
+    this.compactView?.removeEventListener('change', this.followCompactView);
     document.removeEventListener('keydown', this.openFromKeyboard, true); this.el.remove();
   }
 }

@@ -1,10 +1,4 @@
 .aden-chat {
-  position: fixed;
-  left: 14px;
-  bottom: 202px;
-  width: min(390px, calc(100vw - 28px));
-  box-sizing: border-box;
-  z-index: 1000;
   pointer-events: auto;
   color: #e9dcc2;
   background: rgba(12, 17, 23, .87);

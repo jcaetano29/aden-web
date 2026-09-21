@@ -1,5 +1,6 @@
 import { getSkill, skillRange } from "@aden/shared";
 import { COLORS, FONT_DISPLAY } from "./theme.js";
+import "./GameLayout.css";
 
 const SKILL_SLOT_WIDTH = 60;
 const SKILL_SLOT_HEIGHT = 70;
@@ -30,10 +31,10 @@ export class SkillBar {
     this.onUseSkill = onUseSkill;
     this.root = document.createElement("div");
     this.root.dataset.skillBar = "";
+    this.root.className = "aden-skill-bar";
     this.root.style.cssText =
-      "position:fixed;bottom:22px;left:50%;transform:translateX(-50%);pointer-events:auto;" +
-      "z-index:999;display:flex;gap:10px;user-select:none;max-width:calc(100vw - 24px);" +
-      "overflow-x:auto;overflow-y:hidden;padding:4px;box-sizing:border-box;";
+      "pointer-events:auto;user-select:none;max-width:calc(100vw - 24px);" +
+      "overflow-x:auto;overflow-y:hidden;";
     document.body.appendChild(this.root);
   }
 
