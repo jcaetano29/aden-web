@@ -1,6 +1,6 @@
-# Interfaz inicial adaptable — propuesta de entrega 4
+# Interfaz inicial adaptable — diseño de entrega 4
 
-Diseño preparado durante verificación de conexión. No implementado. Autorización general de consolidación cubre ajustes reversibles; preservar el estilo visual y los sistemas del juego.
+Diseño preparado durante verificación de conexión; interfaz implementada en 1e51cf8 y f833749. Acceso compatible con autofill implementado en 9106fbf; resultados de cierre en docs/entrega-consolidacion.md. Autorización general de consolidación cubre ajustes reversibles; preservar el estilo visual y los sistemas del juego.
 
 ## Problema medido
 Ver docs/diagnostico-continuidad.md: en 390x844 el HUD tapa habilidades y el chat tapa objetivo/personaje; el tracker queda de 109 px de ancho. No hay overflow horizontal del documento, por lo que ocultar overflow no resuelve el problema. En 1280x720 y 1280x560 los controles básicos siguen visibles. Usar esas medidas como línea base, no tratar una captura como prueba de todas las escenas.
@@ -20,7 +20,7 @@ En pantallas estrechas reservar la franja inferior para skills, poner HUD compac
 - No afirmar controles táctiles completos: viajes y ciertos paneles aún dependen del teclado; este alcance corrige visibilidad y claridad en ventanas pequeñas.
 
 ## Superficie sugerida
-Hud.ts (casing real del archivo), SkillBar.ts, AdventureTracker.ts, Minimap.ts, AudioPanel.css, ChatPanel.ts/css y una hoja de distribución compartida si evita reglas dispersas. Classes/data attributes e inline style deben coordinarse sin una cascada extensa de !important. ClassSelect.ts y sus tests para autofill como segunda tarea independiente. Antes de implementar convertir en plan con dos entregas verificables y leer estado actual posterior a entrega3.
+Hud.ts (casing real del archivo), SkillBar.ts, AdventureTracker.ts, Minimap.ts, AudioPanel.css, ChatPanel.ts/css y una hoja de distribución compartida si evita reglas dispersas. Classes/data attributes e inline style deben coordinarse sin una cascada extensa de !important. ClassSelect.ts y sus tests para autofill como segunda tarea independiente. La implementación se organizó en las dos tareas del plan docs/superpowers/plans/2026-09-21-interfaz-adaptable.md y conserva los contratos de entrega 3.
 
 ## Decisión tras verificación visual
 La revisión confirmó que exigir el objetivo visible incluso bajo avisos transitorios excedía la distribución prevista para ventanas pequeñas. Se acepta la superposición breve de los avisos sobre el objetivo/radar; nunca se elimina ni recorta su contenido, y se conserva la prioridad de HP/MP, habilidades y chat. Coste: durante esos segundos se puede perder de vista la misión; queda documentado para futuras mejoras. El estado normal y los seis botones deben mantenerse separados también a 1024x768, además de los cuatro tamaños iniciales.
