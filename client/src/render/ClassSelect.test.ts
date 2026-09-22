@@ -89,6 +89,26 @@ describe("ClassSelect", () => {
     select.remove();
   });
 
+  it("expone aria-invalid explícito y lo retira al corregir los campos", () => {
+    const select = new ClassSelect(document.body);
+    void select.create();
+    const { name, password, enter } = fields();
+
+    enter.click();
+
+    expect(name.getAttribute('aria-invalid')).toBe('true');
+    expect(password.getAttribute('aria-invalid')).toBe('true');
+
+    name.value = 'Aela';
+    password.value = 'clave123';
+    name.dispatchEvent(new Event('input'));
+    password.dispatchEvent(new Event('input'));
+
+    expect(name.hasAttribute('aria-invalid')).toBe(false);
+    expect(password.hasAttribute('aria-invalid')).toBe(false);
+    select.remove();
+  });
+
   it.each([
     ['change', (name: HTMLInputElement) => name.dispatchEvent(new Event('change'))],
     ['pageshow', () => window.dispatchEvent(new Event('pageshow'))],

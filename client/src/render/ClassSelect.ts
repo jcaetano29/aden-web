@@ -187,8 +187,10 @@ export class ClassSelect {
     this.errorDiv.textContent = error;
     const nameLength = this.nameInput.value.trim().length;
     const passwordLength = this.passwordInput.value.length;
-    this.nameInput.toggleAttribute('aria-invalid', nameLength === 0 || nameLength > this.nameInput.maxLength);
-    this.passwordInput.toggleAttribute('aria-invalid', passwordLength < this.passwordInput.minLength || passwordLength > this.passwordInput.maxLength);
+    if (nameLength === 0 || nameLength > this.nameInput.maxLength) this.nameInput.setAttribute('aria-invalid', 'true');
+    else this.nameInput.removeAttribute('aria-invalid');
+    if (passwordLength < this.passwordInput.minLength || passwordLength > this.passwordInput.maxLength) this.passwordInput.setAttribute('aria-invalid', 'true');
+    else this.passwordInput.removeAttribute('aria-invalid');
   }
 
   private confirm() {
