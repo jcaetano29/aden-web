@@ -1,0 +1,93 @@
+{
+  "assumptions": "Nivel 9, 24 puntos repartidos 8 STR/8 AGI/8 VIT, solo equipo garantizado, varianza 1; ataques nominales sin habilidades, movimiento, criticos ni curas; no es una simulacion de partida.",
+  "profiles": [
+    {
+      "cls": "knight",
+      "hp": 564,
+      "mp": 69,
+      "pAtk": 70,
+      "pDef": 79,
+      "nihilHit": 21,
+      "hitPercent": 3.7,
+      "hitsToDie": 27,
+      "autoHitsToKill": 19,
+      "autoSecondsWithFirstHitAtZero": 28.8,
+      "manaRegenPerSecond": 2.76
+    },
+    {
+      "cls": "mage",
+      "hp": 408,
+      "mp": 185,
+      "pAtk": 84,
+      "pDef": 54,
+      "nihilHit": 25,
+      "hitPercent": 6.1,
+      "hitsToDie": 17,
+      "autoHitsToKill": 16,
+      "autoSecondsWithFirstHitAtZero": 22.5,
+      "manaRegenPerSecond": 7.4
+    },
+    {
+      "cls": "barbarian",
+      "hp": 512,
+      "mp": 69,
+      "pAtk": 85,
+      "pDef": 65,
+      "nihilHit": 23,
+      "hitPercent": 4.5,
+      "hitsToDie": 23,
+      "autoHitsToKill": 16,
+      "autoSecondsWithFirstHitAtZero": 22.5,
+      "manaRegenPerSecond": 2.76
+    },
+    {
+      "cls": "rogue",
+      "hp": 455,
+      "mp": 100,
+      "pAtk": 81,
+      "pDef": 64,
+      "nihilHit": 23,
+      "hitPercent": 5.1,
+      "hitsToDie": 20,
+      "autoHitsToKill": 17,
+      "autoSecondsWithFirstHitAtZero": 17.6,
+      "manaRegenPerSecond": 4
+    },
+    {
+      "cls": "ranger",
+      "hp": 442,
+      "mp": 110,
+      "pAtk": 81,
+      "pDef": 63,
+      "nihilHit": 23,
+      "hitPercent": 5.2,
+      "hitsToDie": 20,
+      "autoHitsToKill": 17,
+      "autoSecondsWithFirstHitAtZero": 23.2,
+      "manaRegenPerSecond": 4.4
+    }
+  ],
+  "campaign": {
+    "questXp": 4980,
+    "killXp": 6300,
+    "totalXp": 11280,
+    "mandatoryKills": 41
+  },
+  "potionUses": [
+    {
+      "ok": true,
+      "hp": 70,
+      "remaining": 9
+    },
+    {
+      "ok": true,
+      "hp": 130,
+      "remaining": 8
+    },
+    {
+      "ok": true,
+      "hp": 190,
+      "remaining": 7
+    }
+  ]
+}
