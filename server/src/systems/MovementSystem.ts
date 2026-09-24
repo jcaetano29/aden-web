@@ -12,6 +12,7 @@ export interface Movable {
 
 interface Route {
   mapId: string;
+  aiState?: string;
   targetX: number;
   targetZ: number;
   points: Point2[];
@@ -45,10 +46,10 @@ export function advanceMovable(m: Movable, dtSeconds: number, speed = MOVE_SPEED
   const changedTarget = route && Math.hypot(route.targetX - m.targetX, route.targetZ - m.targetZ) > 0.05;
   // Moving chase targets replan at most four times per second; map changes and
   // teleports invalidate immediately. Every segment is still collision checked.
-  if (!route || route.mapId !== m.mapId || Math.hypot(route.x - m.x, route.z - m.z) > 0.01 ||
+  if (!route || route.mapId !== m.mapId || route.aiState !== m.aiState || Math.hypot(route.x - m.x, route.z - m.z) > 0.01 ||
       (changedTarget && (route.age >= (m.aiState ? 0.25 : 0) || route.points.length === 0))) {
     route = {
-      mapId: m.mapId, targetX: m.targetX, targetZ: m.targetZ,
+      mapId: m.mapId, aiState: m.aiState, targetX: m.targetX, targetZ: m.targetZ,
       points: findPath(m.mapId, m, { x: m.targetX, z: m.targetZ }),
       age: 0, x: m.x, z: m.z,
     };

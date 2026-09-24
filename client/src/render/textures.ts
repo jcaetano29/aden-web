@@ -399,6 +399,6 @@ export const foliageMat = (color = 0x69764b, repeat: [number, number] = [2, 2]) 
 export const boneMat = (color = 0xd9cfb0) =>
   texturedMaterial("bone", { color, roughness: 0.82, bumpScale: 0.025 });
 export function terrainMat(zone: string, repeat: [number, number]): THREE.MeshStandardMaterial {
-  const kind: Kind = ({ pueblo: "grass", bosque: "earth", ruinas: "gravel", yermo: "lava", trono: "cracked", cripta: "stone" } as Record<string, Kind>)[zone] ?? "grass";
-  return texturedMaterial(kind, { color: 0xbfc3b4, repeat, roughness: 1, bumpScale: 0.12 });
+  const kind: Kind = ({ pueblo: "grass", bosque: "earth", ruinas: "gravel", yermo: "lava", trono: "cracked", cripta: "stone", marismas: "earth", monasterio: "stone" } as Record<string, Kind>)[zone] ?? "grass";
+  return texturedMaterial(kind, { color: zone === 'marismas' ? 0x7da58c : 0xbfc3b4, repeat, roughness: 1, bumpScale: 0.12 });
 }

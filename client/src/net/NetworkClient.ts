@@ -35,6 +35,8 @@ import {
 import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
 import type { PartyInvitation } from '@aden/shared';
 import type { PartyPanelData, PartyMember } from '../render/PartyPanel.js';
+import { TRADE_RANGE, distance2D, type TradeSnapshot, type TradeOffer } from '@aden/shared';
+import type { TradePanelData } from '../render/TradePanel.js';
 
 import { characterGender, type CharacterGender } from '@aden/shared';
 
@@ -72,11 +74,14 @@ export interface PlayerSnapshot {
 
 /** Snapshot de mob: incluye combate (hp/maxHp/dead) para highlight/HUD. */
 export interface MobSnapshot extends PlayerSnapshot {
+  level?: number;
+  rank?: string;
   hp: number;
   maxHp: number;
   dead: boolean;
   windupMs: number;
   hazardMs?: number;
+  channeling?: boolean;
   hazardX?: number;
   hazardZ?: number;
   hazardRadius?: number;
@@ -84,6 +89,10 @@ export interface MobSnapshot extends PlayerSnapshot {
 
 /** Campos de combate del jugador local, leídos directamente del estado sincronizado (HUD). */
 export interface SelfCombatSnapshot {
+  veilContractId?: string;
+  veilContractProgress?: number;
+  hpPotionCooldownMs?: number;
+  mpPotionCooldownMs?: number;
   hp: number;
   maxHp: number;
   mp: number;
@@ -160,14 +169,16 @@ export class NetworkClient {
   private chatConnected = false;
   private room!: Room;
   private partyInvitation: PartyInvitation | null = null;
+  private trade: TradeSnapshot | null = null;
 
   async connect(name: string, password: string, className: string, cb: RoomCallbacks, mode = "", gender: CharacterGender = 'male'): Promise<void> {
     this.chatConnected = false;
     this.partyInvitation = null;
+    this.trade = null;
     const client = new Client(SERVER_URL);
     this.room = await client.joinOrCreate("game", { name, password, className, mode, gender });
     const selfId = this.room.sessionId;
-    this.room.onLeave(() => { this.chatConnected = false; cb.onConnectionChange?.(false); });
+    this.room.onLeave(() => { this.chatConnected = false; this.trade = null; cb.onConnectionChange?.(false); });
     this.room.onMessage(MessageType.ChatMessage, (message: ChatMessage) => cb.onChatMessage?.(message));
     this.room.onMessage(MessageType.ChatError, (error: ChatErrorEvent) => cb.onChatError?.(error));
 
@@ -202,6 +213,8 @@ export class NetworkClient {
     this.room.state.players.onRemove((_player: any, id: string) => cb.onRemove(id));
 
     const snapMob = (m: any): MobSnapshot => ({
+      level: m.level ?? getTemplate(m.templateId).level,
+      rank: m.rank ?? getTemplate(m.templateId).rank,
       name: "",
       x: m.x,
       z: m.z,
@@ -214,6 +227,7 @@ export class NetworkClient {
       stunMs: m.stunMs ?? 0, rootMs: m.rootMs ?? 0, poisonMs: m.dotMs ?? 0,
       windupMs: m.windupMs ?? 0,
       hazardMs: m.hazardMs ?? 0,
+      channeling: m.channeling ?? false,
       hazardX: m.hazardX ?? m.x,
       hazardZ: m.hazardZ ?? m.z,
       hazardRadius: m.hazardRadius ?? 0,
@@ -241,6 +255,7 @@ export class NetworkClient {
     this.room.onMessage(MessageType.WorldAnnounce, (data: WorldAnnounceEvent) => cb.onWorldAnnounce(data));
     this.room.onMessage(MessageType.ItemResult, (data: { success: boolean; text: string }) => cb.onItemResult?.(data));
     this.room.onMessage(MessageType.PartyInvitation, (data: PartyInvitation | null) => { this.partyInvitation = data; });
+    this.room.onMessage(MessageType.TradeState, (data: TradeSnapshot | null) => { this.trade = data; });
 
     // Etapa 16: objetos de mundo.
     const snapObj = (o: any): WorldObjectSnapshot => ({
@@ -304,6 +319,22 @@ export class NetworkClient {
   }
 
   sendPartyInvite(targetId: string) { this.room.send(MessageType.PartyInvite, { targetId }); }
+  sendDropItem(itemTemplateId: string, qty: number) { this.room.send(MessageType.DropItem, { itemTemplateId, qty }); }
+  sendTradeInvite(targetId: string) { this.room.send(MessageType.TradeInvite, { targetId }); }
+  sendTradeRespond(tradeId: string, accept: boolean) { this.room.send(MessageType.TradeRespond, { tradeId, accept }); }
+  sendTradeOffer(tradeId: string, revision: number, offer: TradeOffer) { this.room.send(MessageType.TradeOffer, { tradeId, revision, offer }); }
+  sendTradeConfirm(tradeId: string, revision: number) { this.room.send(MessageType.TradeConfirm, { tradeId, revision }); }
+  sendTradeCancel(tradeId: string) { this.room.send(MessageType.TradeCancel, { tradeId }); }
+
+  getTradePanelData(): TradePanelData {
+    const selfId = this.room.sessionId, self = this.room.state.players.get(selfId);
+    const candidates: TradePanelData['candidates'] = [];
+    if (self && !self.dead && self.hp > 0 && this.chatConnected) this.room.state.players.forEach((p: any, id: string) => {
+      if (id !== selfId && !p.dead && p.hp > 0 && p.mapId === self.mapId && distance2D(self.x, self.z, p.x, p.z) <= TRADE_RANGE)
+        candidates.push({ id, name: p.name });
+    });
+    return { selfId, connected: this.chatConnected, gold: self?.gold ?? 0, entries: this.getInventory(), candidates, trade: this.trade };
+  }
   sendPartyRespond(inviterId: string, accept: boolean) { this.room.send(MessageType.PartyRespond, { inviterId, accept }); }
   sendPartyLeave() { this.room.send(MessageType.PartyLeave); }
   sendPartyKick(targetId: string) { this.room.send(MessageType.PartyKick, { targetId }); }
@@ -401,7 +432,7 @@ export class NetworkClient {
     this.room.state.mobs.forEach((m: any) => {
       if (out) return;
       if (isBoss(m.templateId) && (m.mapId ?? "") === myMap) {
-        out = { name: getTemplate(m.templateId).name, hp: m.hp, maxHp: m.maxHp, dead: m.dead };
+        out = { name: `${getTemplate(m.templateId).name} · Nv. ${m.level ?? getTemplate(m.templateId).level}`, hp: m.hp, maxHp: m.maxHp, dead: m.dead };
       }
     });
     return out;
@@ -453,6 +484,8 @@ export class NetworkClient {
     if (!p) return null;
     return {
       hp: p.hp,
+      hpPotionCooldownMs: p.hpPotionCooldownMs ?? 0,
+      mpPotionCooldownMs: p.mpPotionCooldownMs ?? 0,
       maxHp: p.maxHp,
       mp: p.mp,
       maxMp: p.maxMp,
@@ -464,6 +497,8 @@ export class NetworkClient {
       questProgress: p.questProgress ?? 0,
       bountyId: p.bountyId ?? "",
       bountyProgress: p.bountyProgress ?? 0,
+      veilContractId: p.veilContractId ?? '',
+      veilContractProgress: p.veilContractProgress ?? 0,
       str: p.str ?? 0,
       agi: p.agi ?? 0,
       vit: p.vit ?? 0,

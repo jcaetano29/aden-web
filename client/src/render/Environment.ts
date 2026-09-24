@@ -1,5 +1,7 @@
 import { AUTHORED_STRUCTURES, STRUCTURE_SIZE, TOWN_FENCES } from "@aden/shared";
 import { addCryptEnvironment } from "./CryptEnvironment.js";
+import { addVeilEnvironment } from './VeilEnvironment.js';
+import { addMonasteryEnvironment } from './MonasteryEnvironment.js';
 import * as THREE from "three";
 import { addMapDressing } from "./MapDressing.js";
 import { ZONES, WORLD_OBJECTS, getZone, zoneAt, TOWN, SAFE_RADIUS, distance2D, type Zone } from "@aden/shared";
@@ -23,6 +25,8 @@ const SUN_DIR = new THREE.Vector3(0.55, 0.42, 0.72).normalize();
 
 /** Intensidad del sol por zona (más oscuro cuanto más profundo/peligroso). */
 const SUN_INTENSITY: Record<string, number> = {
+  marismas: 1.3,
+  monasterio: 1.4,
   pueblo: 1.65,
   bosque: 1.2,
   ruinas: 1.05,
@@ -198,6 +202,8 @@ export class Environment {
   // ── Estructuras (Etapa 17/20): landmarks arquitectónicos por mapa. En el pueblo,
   //    una CIUDAD amurallada con portón, mercado, calles y faroles. ────────────────
   private structures(): void {
+    addVeilEnvironment(this.scene);
+    addMonasteryEnvironment(this.scene);
     this.buildTown();
 
     for (const p of AUTHORED_STRUCTURES) {
@@ -982,7 +988,7 @@ export class Environment {
     // La luz hemisférica también toma el tinte del bioma (cielo).
     this.hemi.color.lerp(new THREE.Color(b.fog).lerp(new THREE.Color(0xb9d2ed), 0.65), k * 0.6);
     // Dungeon silhouettes must remain readable against the cold stone, including unlit sides.
-    this.hemi.intensity += ((zone.id === "cripta" ? 1.65 : 1.05) - this.hemi.intensity) * k;
+    this.hemi.intensity += ((['cripta','marismas','monasterio'].includes(zone.id) ? 1.65 : 1.05) - this.hemi.intensity) * k;
 
     // Brasas del Yermo: ascienden y se reciclan al llegar arriba.
     if (this.embers) {

@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { CharacterSave, ProgressSave } from "./CharacterSave.js";
 import { emptyProgress } from "./CharacterSave.js";
 import type { GuildSave } from "./GuildSave.js";
+import type { CharacterSaveEntry } from './CharacterSaveQueue.js';
 import type { AccountRecord, CharacterRank, GuildRank, PersistenceService } from "./PersistenceService.js";
 
 export class SupabasePersistence implements PersistenceService {
@@ -48,8 +49,13 @@ export class SupabasePersistence implements PersistenceService {
   }
 
   async save(name: string, data: CharacterSave): Promise<void> {
+    await this.saveMany([{name,data}]);
+  }
+
+  async saveMany(entries: CharacterSaveEntry[]): Promise<void> {
+    if(!entries.length)return;
     const { error } = await this.client.from("characters").upsert(
-      {
+      entries.map(({name,data})=>({
         name,
         level: data.level,
         exp: data.exp,
@@ -68,12 +74,12 @@ export class SupabasePersistence implements PersistenceService {
         equipment: data.equipment,
         progress: data.progress,
         updated_at: new Date().toISOString(),
-      },
+      })),
       { onConflict: "name" },
     );
 
     if (error) {
-      console.error("[aden] SupabasePersistence.save error:", error.message);
+      throw new Error(`No se pudieron guardar los personajes: ${error.message}`);
     }
   }
 

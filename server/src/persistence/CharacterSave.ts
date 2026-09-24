@@ -2,6 +2,8 @@ import { characterGender, type CharacterGender } from '@aden/shared';
 
 /** Appearance shares the existing JSON column, including in Supabase: no migration required. */
 export interface ProgressSave {
+  veilContractId?: string;
+  veilContractProgress?: number;
   gender?: CharacterGender;
   learnedTomes?: string[];
   loginStreak: number;
@@ -47,6 +49,8 @@ export interface CharacterSave {
 }
 
 export interface Persistable {
+  veilContractId?: string;
+  veilContractProgress?: number;
   gender?: CharacterGender;
   learnedTomes?: { forEach(cb: (v: string) => void): void };
   level: number;
@@ -131,6 +135,7 @@ export function toCharacterSave(p: Persistable): CharacterSave {
       achievements,
       bountyId: p.bountyId,
       bountyProgress: p.bountyProgress,
+      ...(p.veilContractId ? {veilContractId:p.veilContractId,veilContractProgress:p.veilContractProgress??0} : {}),
       str: p.str,
       agi: p.agi,
       vit: p.vit,

@@ -18,31 +18,36 @@ export const PLAYER_COMBAT: CombatStats = { maxHp: 100, maxMp: 50, pAtk: 15, pDe
 // Etapa 11: las stats escalan con la profundidad de la zona (ver world.ts). El salto
 // de dificultad entre zonas es lo que gatea la progresión sin muros.
 export const MOB_COMBAT: Record<string, CombatStats> = {
+  memory_guard: { maxHp:650, pAtk:80, pDef:42, attackCooldownMs:2200 },
+  memory_jailer: { maxHp:2300, pAtk:105, pDef:54, attackCooldownMs:2600 },
+  memory_prior: { maxHp:4200, pAtk:125, pDef:62, attackCooldownMs:2400 },
+  veil_raider: { maxHp: 440, pAtk: 58, pDef: 34, attackCooldownMs: 2300 },
+  veil_guardian: { maxHp: 1700, pAtk: 95, pDef: 48, attackCooldownMs: 2600 },
   umbra_alpha: { maxHp: 200, pAtk: 18, pDef: 14, attackCooldownMs: 2500 },
   crypt_acolyte: { maxHp: 65, pAtk: 18, pDef: 10, attackCooldownMs: 2400 },
   crypt_stalker: { maxHp: 70, pAtk: 19, pDef: 11, attackCooldownMs: 1800 },
   crypt_flameguard: { maxHp: 100, pAtk: 22, pDef: 17, attackCooldownMs: 2200 },
   crypt_emberbeast: { maxHp: 85, pAtk: 16, pDef: 12, attackCooldownMs: 1400 },
-  crypt_behemoth: { maxHp: 180, pAtk: 25, pDef: 20, attackCooldownMs: 3000 },
-  crypt_warden: { maxHp: 520, pAtk: 27, pDef: 24, attackCooldownMs: 2400 },
+  crypt_behemoth: { maxHp: 340, pAtk: 38, pDef: 25, attackCooldownMs: 3000 },
+  crypt_warden: { maxHp: 1300, pAtk: 60, pDef: 35, attackCooldownMs: 2400 },
   umbra_orc: { maxHp: 55, pAtk: 12, pDef: 10, attackCooldownMs: 2000 },
-  forest_troll: { maxHp: 95, pAtk: 17, pDef: 14, attackCooldownMs: 2600 },
+  forest_troll: { maxHp: 360, pAtk: 40, pDef: 25, attackCooldownMs: 2600 },
   crypt_wraith: { maxHp: 95, pAtk: 21, pDef: 10, attackCooldownMs: 1850 },
   bone_warden: { maxHp: 180, pAtk: 25, pDef: 24, attackCooldownMs: 2200 },
   infernal_demon: { maxHp: 300, pAtk: 34, pDef: 27, attackCooldownMs: 2000 },
-  ancient_drake: { maxHp: 650, pAtk: 36, pDef: 29, attackCooldownMs: 2400 },
+  ancient_drake: { maxHp: 1100, pAtk: 55, pDef: 35, attackCooldownMs: 2400 },
   // Bosque de Umbra (Lv 1-3)
   skeleton_minion: { maxHp: 30, pAtk: 8, pDef: 5, attackCooldownMs: 2000 },
   skeleton_warrior: { maxHp: 60, pAtk: 14, pDef: 12, attackCooldownMs: 1800 },
   // Ruinas de Nihil (Lv 3-6)
   crypt_minion: { maxHp: 80, pAtk: 17, pDef: 13, attackCooldownMs: 1900 },
   crypt_warrior: { maxHp: 140, pAtk: 23, pDef: 20, attackCooldownMs: 1800 },
-  crypt_sentinel: { maxHp: 340, pAtk: 30, pDef: 26, attackCooldownMs: 2000 }, // mini-jefe
+  crypt_sentinel: { maxHp: 700, pAtk: 52, pDef: 30, attackCooldownMs: 2000 }, // mini-jefe
   // Yermo Ceniciento (Lv 6-9) — élites
   ash_minion: { maxHp: 170, pAtk: 27, pDef: 22, attackCooldownMs: 1700 },
   ash_warrior: { maxHp: 280, pAtk: 35, pDef: 30, attackCooldownMs: 1600 },
   // Trono del Rey Nihil — jefe final
-  skeleton_king: { maxHp: 1000, pAtk: 38, pDef: 32, attackCooldownMs: 2100 },
+  skeleton_king: { maxHp: 2800, pAtk: 85, pDef: 40, attackCooldownMs: 2100 },
 };
 
 export function getMobCombat(templateId: string): CombatStats {

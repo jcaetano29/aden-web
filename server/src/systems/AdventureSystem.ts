@@ -1,8 +1,8 @@
-import { distance2D, getQuest, CRYPT_WAVE_SIZE, CRYPT_WAVE_TEMPLATES } from '@aden/shared';
+import { distance2D, getQuest, nextQuestId, MEMORY_COMPLETE, CRYPT_WAVE_SIZE, CRYPT_WAVE_TEMPLATES } from '@aden/shared';
 import type { PlayerState } from '../state/PlayerState.js';
 import type { MobState } from '../state/MobState.js';
 
-export type DungeonProgress = Pick<PlayerState,'mapId'|'dead'|'dungeonStage'|'dungeonKills'>;
+export type DungeonProgress = Pick<PlayerState,'mapId'|'dead'|'dungeonStage'|'dungeonKills'> & { questId?: string };
 
 export function resetDungeon(p: DungeonProgress): void {
   p.dungeonStage = 0;
@@ -11,6 +11,7 @@ export function resetDungeon(p: DungeonProgress): void {
 
 /** Future wings remain protected so killing ahead cannot strand a non-respawning run. */
 export function canFightDungeonMob(p: DungeonProgress, templateId: string): boolean {
+  if (templateId === 'memory_prior') return p.mapId === 'monasterio' && (p.questId === 'a2_prior' || p.questId === MEMORY_COMPLETE);
   if(templateId === 'crypt_warden') return p.mapId === 'cripta' && p.dungeonStage === 4;
   for(const [stage,templates] of Object.entries(CRYPT_WAVE_TEMPLATES)) {
     if(templates.includes(templateId))return p.mapId==='cripta' && p.dungeonStage===Number(stage);
@@ -49,30 +50,41 @@ export function advanceQuest(p: PlayerState, objective: 'kill'|'visit'|'interact
   if ((q.objective ?? 'kill') !== objective || (q.mapId && p.mapId !== q.mapId)) return;
   if ((objective === 'kill' ? q.mobTemplateId : q.targetId) !== targetId) return;
   p.questProgress = Math.min(q.amount, p.questProgress + 1);
+  if (q.autoAdvance && p.questProgress >= q.amount) {
+    p.questId = nextQuestId(q.id);
+    p.questProgress = 0;
+  }
 }
 
 /** Returns impacted player IDs; combat damage is applied by the room. */
 export function stepGuardianHazard(mob: MobState, players: Iterable<[string, PlayerState]>, dtMs: number): string[] {
-  if (!['crypt_warden','crypt_behemoth'].includes(mob.templateId)) return [];
-  const behemoth=mob.templateId==='crypt_behemoth';
-  const candidates = [...players].filter(([,p]) => !p.dead && p.mapId === mob.mapId);
+  if (!['crypt_warden','crypt_behemoth','skeleton_king','veil_guardian','memory_jailer','memory_prior'].includes(mob.templateId)) return [];
+  const behemoth=['crypt_behemoth','veil_guardian','memory_jailer'].includes(mob.templateId);
+  const king=mob.templateId==='skeleton_king';
+  const prior=mob.templateId==='memory_prior';
+  const candidates = [...players].filter(([,p]) => !p.dead && p.mapId === mob.mapId && (!prior || canFightDungeonMob(p,mob.templateId)));
   const target = candidates.find(([id]) => id === mob.aggroTargetId)?.[1];
   if (mob.dead || mob.stunMs > 0 || !target) {
     mob.hazardMs = 0;
+    mob.channeling = false;
     return [];
   }
   if (mob.hazardMs > 0) {
     mob.hazardMs = Math.max(0, mob.hazardMs - dtMs);
     if (mob.hazardMs > 0) return [];
-    mob.hazardCooldownMs = behemoth?9000:7000;
+    mob.channeling = false;
+    mob.hazardCooldownMs = king ? (mob.hp <= mob.maxHp / 2 ? 5000 : 8000) : prior ? 6000 : behemoth?9000:7000;
     return candidates.filter(([,p]) => distance2D(p.x,p.z,mob.hazardX,mob.hazardZ) <= mob.hazardRadius).map(([id]) => id);
   }
   mob.hazardCooldownMs = Math.max(0, mob.hazardCooldownMs - dtMs);
   if (mob.hazardCooldownMs === 0) {
-    mob.hazardX = target.x;
-    mob.hazardZ = target.z;
-    mob.hazardRadius = behemoth?5:6;
-    mob.hazardMs = behemoth?2000:1600;
+    mob.channeling = prior && mob.hp <= mob.maxHp / 2 && mob.hazardCount % 2 === 1;
+    mob.hazardCount++;
+    mob.hazardX = mob.channeling ? mob.x : target.x;
+    mob.hazardZ = mob.channeling ? mob.z : target.z;
+    mob.hazardRadius = mob.channeling ? 14 : behemoth?5:6;
+    mob.hazardMs = mob.channeling ? 6000 : (king || prior)?1800:behemoth?2000:1600;
+    mob.hazardPower = mob.channeling ? 3.2 : 2.4;
   }
   return [];
 }

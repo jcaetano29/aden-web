@@ -1,5 +1,7 @@
 import { CLASSES, isSkillLearned } from './classes.js';
 import { CAMPAIGN_COMPLETE, getQuest, nextQuestId, QUEST_ORDER } from './quests.js';
+import { VEIL_COMPLETE } from './veil.js';
+import { MEMORY_COMPLETE } from './monastery.js';
 
 /** Advice follows actual unlocks; it never grants or requires a skill. */
 export function classAdvice(className: string, level: number): string {
@@ -29,7 +31,7 @@ export function classAdvice(className: string, level: number): string {
 export function questTurnInText(questId: string): string {
   const quest = getQuest(questId);
   const nextId = nextQuestId(questId);
-  if (nextId === CAMPAIGN_COMPLETE) return quest.done;
+  if (nextId === CAMPAIGN_COMPLETE || nextId === VEIL_COMPLETE || nextId === MEMORY_COMPLETE) return quest.done;
   const next = getQuest(nextId);
   return `${quest.done}\n\nSiguiente misión · ${next.title}\n${next.intro}`;
 }

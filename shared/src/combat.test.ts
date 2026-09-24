@@ -28,12 +28,15 @@ describe("config", () => {
     expect(ATTACK_RANGE).toBe(2.5);
   });
 
-  it("skeleton_king (jefe final) tiene stats potentes", () => {
+  it("Nihil vence al caballero equipado que solo intercambia ataques básicos", () => {
     const boss = getMobCombat("skeleton_king");
-    expect(boss.maxHp).toBe(1000);
-    expect(boss.pAtk).toBe(38);
-    expect(boss.pDef).toBe(32);
-    expect(boss.attackCooldownMs).toBe(2100);
+    // Nivel 9, atributos repartidos y recompensas de campaña: ver probe.mts.
+    // Sin curas, críticos ni áreas; incluye el aviso de 700 ms de cada golpe del jefe.
+    const knight = { hp: 564, pAtk: 70, pDef: 79, cooldownMs: 1600 };
+    const playerSurvival = Math.ceil(knight.hp / computeDamage(boss.pAtk, knight.pDef, 1, 1)) * (boss.attackCooldownMs + 700);
+    const bossSurvival = Math.ceil(boss.maxHp / computeDamage(knight.pAtk, boss.pDef, 1, 1)) * knight.cooldownMs;
+    expect(playerSurvival).toBeLessThan(bossSurvival);
+    expect(boss.maxHp).toBeGreaterThan(getMobCombat('ancient_drake').maxHp);
   });
 
   it("las stats escalan con la profundidad de la zona (bosque < ruinas < yermo)", () => {

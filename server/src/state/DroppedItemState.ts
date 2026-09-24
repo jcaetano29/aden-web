@@ -9,6 +9,7 @@ export class DroppedItemState extends Schema {
   @type("string") mapId = "";
 
   // Server-only (NO @type)
+  droppedBy = ''; // Explicit pickup is required to recover one's own discarded item.
   despawnMs = 0;
   pickDelayMs = 0; // no pickable hasta que llegue a 0 (loot visible al caer)
 }

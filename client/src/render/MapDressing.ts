@@ -22,9 +22,9 @@ function instances(scene: THREE.Scene, name: string, geometry: THREE.BufferGeome
 /** Dense scenery uses batches per zone, not one draw call per decoration. */
 export function addMapDressing(scene: THREE.Scene): void {
   for (const zone of ZONES) {
-    if (zone.id === "cripta") continue; // Authored chambers have a separate, clear layout.
+    if (zone.id === "cripta" || zone.id === 'monasterio') continue; // Authored chambers have a separate, clear layout.
     const layout=dressingLayout(zone);
-    const forest=zone.id==="bosque" || zone.safe;
+    const forest=zone.id==="bosque" || zone.id==='marismas' || zone.safe;
     const burnt=zone.id==="yermo";
     const trees=layout.filter(p=>p.kind==="tree");
     const rocks=layout.filter(p=>p.kind==="rock");

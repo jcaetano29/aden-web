@@ -64,3 +64,8 @@
 @media (max-width: 580px) {
   .inventory-panel { right: 14px; top: var(--inventory-minimap-bottom, 220px); max-height: calc(100dvh - var(--inventory-minimap-bottom, 220px) - 14px); }
 }
+.inventory-drop-actions { margin-top:10px; padding-top:8px; border-top:1px solid #75694c; display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.inventory-drop-actions input { width:65px; padding:4px; color:#ddceb0; background:#171b16; border:1px solid #75694c; }
+.inventory-drop-confirmation { width:100%; color:#f2d896; }
+.inventory-drop-confirmation:empty { display:none; }
+.inventory-drop-confirmation button { margin-right:8px; margin-bottom:5px; }

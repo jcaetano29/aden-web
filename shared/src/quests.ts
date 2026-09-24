@@ -1,4 +1,8 @@
+import { VEIL_QUESTS, VEIL_QUEST_ORDER, VEIL_COMPLETE } from './veil.js';
+import { MONASTERY_QUESTS, MONASTERY_QUEST_ORDER, MEMORY_COMPLETE } from './monastery.js';
 export interface Quest {
+  returnNpcId?: string;
+  autoAdvance?: boolean;
   objective?: "kill" | "visit" | "interact" | "dungeon";
   targetId?: string;
   mapId?: string;
@@ -90,6 +94,8 @@ export const QUESTS: Record<string, Quest> = {
 };
 
 export const CAMPAIGN_COMPLETE = "campaign_complete";
+Object.assign(QUESTS, VEIL_QUESTS);
+Object.assign(QUESTS, MONASTERY_QUESTS);
 
 Object.assign(QUESTS, {
   q_supplies: { id: "q_supplies", title: "Provisiones extraviadas", objective: "interact", targetId: "bosque_chest_1", mapId: "bosque", mobTemplateId: "", amount: 1, rewardExp: 80, rewardGold: 20, rewardItemId: "health_potion", rewardItemQty: 3, intro: "Bram abandonó el cofre al oeste de la entrada del Bosque. Recuperá sus provisiones: Elenya necesita los remedios. Entre la carga también hay una piedra tallada del santuario. Quiero entender por qué interesó tanto a los muertos.", done: "Elenya ya tiene los remedios. Te dejó tres pociones para que puedas volver. La piedra lleva dos llamas grabadas; Bram la encontró junto al santuario de Umbra. No parece un simple adorno.", hint: "Buscá el cofre de Bram al oeste de la llegada del Bosque (250, 40). Acercate y hacé clic; después volvé con Rowan." },
@@ -127,6 +133,12 @@ export function firstQuestId(): string {
 }
 
 export function nextQuestId(current: string): string {
+  if (current === MEMORY_COMPLETE) return MEMORY_COMPLETE;
+  const monasteryIndex = MONASTERY_QUEST_ORDER.indexOf(current);
+  if (monasteryIndex >= 0) return MONASTERY_QUEST_ORDER[monasteryIndex + 1] ?? MEMORY_COMPLETE;
+  if (current === VEIL_COMPLETE) return VEIL_COMPLETE;
+  const veilIndex = VEIL_QUEST_ORDER.indexOf(current);
+  if (veilIndex >= 0) return VEIL_QUEST_ORDER[veilIndex + 1] ?? VEIL_COMPLETE;
   if (current === CAMPAIGN_COMPLETE) return CAMPAIGN_COMPLETE;
   const idx = QUEST_ORDER.indexOf(current);
   if (idx === -1) {

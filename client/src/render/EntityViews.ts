@@ -43,6 +43,13 @@ function applyTint(root: THREE.Object3D, tint: number): void {
 /** Mantiene sincronizadas las vistas de personajes con el mapa de jugadores del estado. */
 export class EntityViews {
   private readonly views = new Map<string, CharacterView>();
+  private selfLevel = 1;
+  private readonly mobDefinitions = new Map<string, {name:string; level:number; rank:string}>();
+  setSelfLevel(level: number): void {
+    if (this.selfLevel === level) return;
+    this.selfLevel = level;
+    for (const [id, mob] of this.mobDefinitions) this.nameplates.setEnemy(id, mob.name, mob.level, mob.rank, level);
+  }
   private readonly mobViews = new Map<string, CharacterView>();
   /** root Object3D del mob -> mobId, para resolver hits de raycast (R-E2b1-5). */
   private readonly mobRootToId = new Map<THREE.Object3D, string>();
@@ -191,12 +198,11 @@ export class EntityViews {
     if (snap.dead) view.playOnce("death");
     view.object.visible = (snap.mapId ?? "") === this.currentMapId;
 
-    // Nameplate: jefe final en rojo, mini-jefe de zona en violeta — ambos con nombre.
-    if (isBoss(templateId)) {
-      this.nameplates.add(id, getTemplate(templateId).name, view.object, "#ff5252");
-    } else if (isMiniBoss(templateId)) {
-      this.nameplates.add(id, getTemplate(templateId).name, view.object, "#b98bff");
-    }
+    const def = getTemplate(templateId);
+    const details = {name:def.name, level:snap.level ?? def.level, rank:snap.rank ?? def.rank};
+    this.mobDefinitions.set(id, details);
+    this.nameplates.add(id, def.name, view.object);
+    this.nameplates.setEnemy(id, details.name, details.level, details.rank, this.selfLevel);
 
     const bar = new HealthBar();
     bar.attach(view.object);
@@ -225,6 +231,9 @@ export class EntityViews {
   }
 
   updateMob(id: string, snap: MobSnapshot) {
+    const details = this.mobDefinitions.get(id);
+    if (details) this.nameplates.setEnemy(id, details.name, details.level, details.rank, this.selfLevel);
+    if (snap.channeling && !snap.dead) this.nameplates.setTitle(id, 'Canalizando · activá un anclaje o escapá');
     this.mobViews.get(id)?.setServerState(snap);
     this.mobHealthBars.get(id)?.update(snap.hp, snap.maxHp);
     const wasDead = this.mobDead.get(id) ?? false;
@@ -254,6 +263,7 @@ export class EntityViews {
   }
 
   removeMob(id: string) {
+    this.mobDefinitions.delete(id);
     const view = this.mobViews.get(id);
     if (view) {
       this.scene.remove(view.object);

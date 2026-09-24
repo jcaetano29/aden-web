@@ -32,6 +32,8 @@ export interface ItemTemplate {
 }
 
 export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
+  veil_charm: {id:'veil_charm',name:'Amuleto del Regreso',type:'equipment',stackable:false,slot:'accessory',rarity:'uncommon',requiredLevel:12,bonuses:{maxHp:50,pDef:4},description:'Boren lo entrega a quienes hacen posible el regreso de los viajeros.'},
+  memory_locket: { id:'memory_locket', name:'Relicario de los Nombres', type:'equipment', stackable:false, slot:'accessory', rarity:'rare', requiredLevel:15, bonuses:{pAtk:8,pDef:6,maxMp:65}, description:'Los recuerdos devueltos a los vivos. Recompensa de la Vigilia.' },
   ...CATALOG_ITEMS,
   gold: { id: "gold", name: "Oro", type: "currency", stackable: true },
   bone: { id: "bone", name: "Hueso", type: "material", stackable: true },
@@ -227,6 +229,17 @@ export const DROP_TABLES: Record<string, DropEntry[]> = {
     { itemTemplateId: "ember_band", chance: 0.11, qtyMin: 1, qtyMax: 1 },
   ],
   // Trono del Rey Nihil — botín de jefe (legendarios como cima del chase)
+  veil_raider: [
+    { itemTemplateId: 'gold', chance: 1, qtyMin: 25, qtyMax: 45 },
+    { itemTemplateId: 'greater_potion', chance: .3, qtyMin: 1, qtyMax: 1 },
+  ],
+  memory_guard: [{ itemTemplateId:'gold', chance:1, qtyMin:35, qtyMax:55 }],
+  memory_jailer: [{ itemTemplateId:'gold', chance:1, qtyMin:120, qtyMax:200 }, { itemTemplateId:'greater_potion', chance:1, qtyMin:2, qtyMax:3 }],
+  memory_prior: [{ itemTemplateId:'gold', chance:1, qtyMin:200, qtyMax:320 }, { itemTemplateId:'ancient_relic', chance:1, qtyMin:3, qtyMax:5 }],
+  veil_guardian: [
+    { itemTemplateId: 'gold', chance: 1, qtyMin: 100, qtyMax: 180 },
+    { itemTemplateId: 'greater_potion', chance: 1, qtyMin: 2, qtyMax: 3 },
+  ],
   skeleton_king: [
     { itemTemplateId: "gold", chance: 1.0, qtyMin: 120, qtyMax: 220 },
     { itemTemplateId: "greater_potion", chance: 1.0, qtyMin: 3, qtyMax: 4 },

@@ -33,6 +33,31 @@ describe('Cripta: avance de expedición', () => {
 });
 
 describe('Golpe anunciado del guardián', () => {
+  it('el Prior protege el ritual y alterna un canal interrumpible bajo media vida', () => {
+    const mob=new MobState(); mob.templateId='memory_prior'; mob.mapId='monasterio'; mob.hp=1000; mob.maxHp=4200; mob.aggroTargetId='p';
+    const p=new PlayerState(); p.mapId='monasterio'; p.questId='a2_anchor_2';
+    const players=new Map([['p',p]]);
+    expect(canFightDungeonMob(p,mob.templateId)).toBe(false);
+    stepGuardianHazard(mob,players,50); expect(mob.hazardMs).toBe(0);
+    p.questId='a2_prior'; stepGuardianHazard(mob,players,50);
+    expect(mob.channeling).toBe(false); expect(mob.hazardMs).toBe(1800);
+    p.x=7; expect(stepGuardianHazard(mob,players,1800)).toEqual([]);
+    stepGuardianHazard(mob,players,6000);
+    expect(mob.channeling).toBe(true); expect(mob.hazardMs).toBe(6000); expect(mob.hazardRadius).toBe(14);
+    p.x=15; expect(stepGuardianHazard(mob,players,6000)).toEqual([]); expect(mob.channeling).toBe(false);
+    stepGuardianHazard(mob,players,6000); expect(mob.channeling).toBe(false); expect(mob.hazardMs).toBe(1800);
+  });
+  it('Nihil fija el área y acelera sus ataques bajo media vida', () => {
+    const mob=new MobState();mob.templateId='skeleton_king';mob.mapId='trono';mob.hp=mob.maxHp=2500;mob.aggroTargetId='p';
+    const p=new PlayerState();p.mapId='trono';
+    const players=new Map([['p',p]]);
+    stepGuardianHazard(mob,players,50);expect(mob.hazardMs).toBe(1800);
+    p.x=8;expect(stepGuardianHazard(mob,players,1800)).toEqual([]);
+    expect(mob.hazardCooldownMs).toBe(8000);
+    mob.hp=1000;stepGuardianHazard(mob,players,8000);
+    expect(stepGuardianHazard(mob,players,1800)).toEqual(['p']);
+    expect(mob.hazardCooldownMs).toBe(5000);
+  });
   it('el behemoth avisa durante dos segundos y golpea un área menor',()=>{
     const mob=new MobState();mob.templateId='crypt_behemoth';mob.mapId='cripta';mob.aggroTargetId='p';
     const p=new PlayerState();p.mapId='cripta';

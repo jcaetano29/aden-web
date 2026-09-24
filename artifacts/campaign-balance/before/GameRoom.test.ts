@@ -1,0 +1,1538 @@
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
+import { ColyseusTestServer, boot } from "@colyseus/testing";
+import { MessageType, getZone, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN, getDailyQuest, HEAL_COST_GOLD, firstBountyId, nextBountyId, getBounty } from "@aden/shared";
+import appConfig from "../testServer.js";
+import { GameRoom } from './GameRoom.js';
+import { MobState } from "../state/MobState.js";
+import { InventoryItemState } from "../state/InventoryItemState.js";
+import { CATALOG_ITEMS, createItemInstance } from '@aden/shared';
+import { grantItem } from '../systems/ItemSystem.js';
+import { toCharacterSave } from '../persistence/CharacterSave.js';
+import { CRYPT_BOSS, CRYPT_SEALS, getMobExp } from '@aden/shared';
+import { isWalkable } from '@aden/shared';
+import { DroppedItemState } from '../state/DroppedItemState.js';
+
+describe("GameRoom", () => {
+  let colyseus: ColyseusTestServer;
+
+  beforeAll(async () => {
+    colyseus = await boot(appConfig);
+  });
+  afterAll(async () => {
+    await colyseus.shutdown();
+  });
+  beforeEach(async () => {
+    await colyseus.cleanup();
+  });
+
+  it.each(['knight', 'mage', 'barbarian', 'rogue', 'ranger'])('guarda y sincroniza la apariencia femenina de %s al reconectar', async (className) => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const observer = await colyseus.connectTo(room, { name: 'Observer' });
+    const options = { name: 'Heroina', password: 'clave123', className, gender: 'female', mode: 'create' };
+    const client = await colyseus.connectTo(room, options);
+    await vi.waitFor(() => {
+      expect(client.state.players.get(client.sessionId)?.gender).toBe('female');
+      expect(observer.state.players.get(client.sessionId)?.gender).toBe('female');
+    });
+    const p = room.state.players.get(client.sessionId)!;
+    expect(p.gender).toBe('female');
+    expect(client.state.players.get(client.sessionId)?.gender).toBe('female');
+    expect(p.maxHp).toBe(statsForClass(className, 1).maxHp);
+    expect(toCharacterSave(p).progress.gender).toBe('female');
+    await client.leave();
+    await room.waitForNextPatch();
+    const returned = await colyseus.connectTo(room, { ...options, mode: 'login', gender: 'male', className: 'knight' });
+    await room.waitForNextPatch();
+    expect(room.state.players.get(returned.sessionId)).toMatchObject({ className, gender: 'female' });
+  });
+
+  it('rechaza una apariencia inválida antes de registrar la cuenta', async () => {
+    const room = await colyseus.createRoom('game', {});
+    await colyseus.connectTo(room, { name: 'Observer' });
+    await expect(colyseus.connectTo(room, { name: 'InvalidGender', password: 'clave123', mode: 'create', gender: 'invalid' })).rejects.toBeDefined();
+    const valid = await colyseus.connectTo(room, { name: 'InvalidGender', password: 'clave123', mode: 'create', gender: 'male' });
+    await room.waitForNextPatch();
+    expect(room.state.players.get(valid.sessionId).gender).toBe('male');
+  });
+
+  it('conserva la apariencia masculina de guardados anteriores aunque el cliente pida femenino', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const client = await colyseus.connectTo(room, { name: 'LegacySource', className: 'mage' });
+    const legacy = toCharacterSave(room.state.players.get(client.sessionId)!);
+    delete legacy.progress.gender;
+    await room['persistence'].save('LegacyHero', legacy);
+    const restored = await colyseus.connectTo(room, { name: 'LegacyHero', className: 'knight', gender: 'female' });
+    expect(room.state.players.get(restored.sessionId)).toMatchObject({ className: 'mage', gender: 'male' });
+  });
+
+  it('rechaza golpes fuera de alcance y publica posiciones y daño al conectar', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const c = await colyseus.connectTo(room, { name: 'SkillRange', className: 'mage' });
+    await room.waitForNextPatch();
+    room.setSimulationInterval(() => {}, 50);
+    const p = room.state.players.get(c.sessionId)!;
+    p.mapId = 'bosque'; p.x = 300; p.z = 0; p.level = 40; p.mp = 100;
+    const mob = room.spawnMob('skill-target', 'skeleton_minion', 308, 0, 'bosque');
+    mob.hp = mob.maxHp = 500; p.targetId = 'skill-target';
+    const events: any[] = [], damage: any[] = [];
+    c.onMessage(MessageType.SkillCast, e => events.push(e));
+    c.onMessage(MessageType.Damage, e => damage.push(e));
+    c.send(MessageType.UseSkill, { skillId: 'frost_nova' });
+    await room.waitForNextPatch();
+    expect(mob.hp).toBe(500); expect(p.mp).toBe(100); expect(events).toHaveLength(0);
+    c.send(MessageType.UseSkill, { skillId: 'fireball' });
+    await room.waitForNextPatch();
+    expect(mob.hp).toBeLessThan(500);
+    expect(events[0]).toMatchObject({ origin: { x: 300, z: 0 }, targetPosition: { x: 308, z: 0 }, mapId: 'bosque' });
+    expect(damage).toHaveLength(1);
+    expect(damage[0].amount).toBe(500 - mob.hp);
+    expect(damage[0].skillId).toBe('fireball');
+  });
+
+  it('cada tick de veneno PvP publica su número de daño', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const a = await colyseus.connectTo(room, { name: 'PoisonSource', className: 'rogue' });
+    const b = await colyseus.connectTo(room, { name: 'PoisonVictim', className: 'knight' });
+    await room.waitForNextPatch(); room.setSimulationInterval(() => {}, 50);
+    const source = room.state.players.get(a.sessionId)!, victim = room.state.players.get(b.sessionId)!;
+    source.mapId = victim.mapId = 'bosque'; source.x = victim.x = 300; source.z = victim.z = 0;
+    source.targetId = victim.targetId = ''; source.moving = victim.moving = false;
+    victim.poisonMs = 1000; victim.poisonDps = 14; victim.poisonAttackerId = a.sessionId;
+    const events = vi.spyOn(room, 'broadcast');
+    room.tick(.5); room.tick(.5);
+    const calls = events.mock.calls as unknown as Array<[string, import('@aden/shared').DamageEvent]>;
+    const ticks = calls.filter(([type, event]) => type === MessageType.Damage && event.targetId === b.sessionId);
+    expect(ticks).toHaveLength(2);
+    expect(ticks.map(([, e]) => e.amount)).toEqual([7, 7]);
+    expect(ticks.every(([, e]) => e.periodic === true)).toBe(true);
+  });
+
+  it('dos clientes disputan loot real, preservan identidad y ven recogida, expiración y limpieza',async()=>{
+    const room=await colyseus.createRoom('game',{}) as GameRoom;
+    const killer=await colyseus.connectTo(room,{name:'LootKiller'}),thief=await colyseus.connectTo(room,{name:'LootThief'});
+    await room.waitForNextPatch();
+    // Freeze simulation, not transport: exercise real incoming messages in controlled order.
+    room.setSimulationInterval(()=>{},50);
+    const a=room.state.players.get(killer.sessionId)!,b=room.state.players.get(thief.sessionId)!;
+    const [mobId,mob]=[...room.state.mobs.entries()].find(([,m])=>m.templateId==='crypt_acolyte')!;
+    a.mapId=b.mapId=mob.mapId;
+    room['killMob'](mob,mobId,killer.sessionId);
+    await room.waitForNextPatch();
+    const [realId,real]=[...room.state.droppedItems.entries()].find(([,d])=>d.mapId===mob.mapId)!;
+    expect((killer.state as any).droppedItems.has(realId)).toBe(true);expect((thief.state as any).droppedItems.has(realId)).toBe(true);
+    a.x=real.x+20;a.z=real.z;b.x=real.x;b.z=real.z;
+    real.pickDelayMs=0;
+    const beforeGold=b.gold;
+    thief.send(MessageType.PickupItem,{dropId:realId});await room.waitForNextPatch();
+    expect(room.state.droppedItems.has(realId)).toBe(false);expect(b.gold).toBe(beforeGold+real.qty);
+    expect((killer.state as any).droppedItems.has(realId)).toBe(false);expect((thief.state as any).droppedItems.has(realId)).toBe(false);
+
+    const id=createItemInstance(getItem('aden_punal_del_umbral'),{quality:'magic',level:4,luck:true},'race');
+    const drop=new DroppedItemState();drop.itemTemplateId=id;drop.qty=1;drop.mapId=b.mapId;drop.x=b.x;drop.z=b.z;drop.despawnMs=5000;
+    room.state.droppedItems.set('race',drop);a.x=b.x;a.z=b.z;
+    killer.send(MessageType.PickupItem,{dropId:'race'});thief.send(MessageType.PickupItem,{dropId:'race'});await room.waitForNextPatch();
+    expect((a.inventory.get(id)?.qty??0)+(b.inventory.get(id)?.qty??0)).toBe(1);
+    expect((killer.state as any).droppedItems.has('race')).toBe(false);expect((thief.state as any).droppedItems.has('race')).toBe(false);
+
+    const blocked=new DroppedItemState();Object.assign(blocked,{itemTemplateId:'bone',qty:1,mapId:b.mapId,x:b.x,z:b.z,despawnMs:5000});room.state.droppedItems.set('blocked',blocked);
+    for(const reason of ['far','dead','map','delay']) {
+      b.x=blocked.x;b.mapId=blocked.mapId;b.dead=false;blocked.pickDelayMs=0;
+      if(reason==='far')b.x+=100;if(reason==='dead')b.dead=true;if(reason==='map')b.mapId='pueblo';if(reason==='delay')blocked.pickDelayMs=300;
+      thief.send(MessageType.PickupItem,{dropId:'blocked'});await room.waitForNextPatch();expect(room.state.droppedItems.has('blocked'),reason).toBe(true);
+    }
+    b.dead=false;b.mapId=blocked.mapId;b.x=blocked.x+100;a.x=blocked.x+100;blocked.despawnMs=1;
+    room.tick(.05);await room.waitForNextPatch();expect((killer.state as any).droppedItems.has('blocked')).toBe(false);expect((thief.state as any).droppedItems.has('blocked')).toBe(false);
+    room['dropLoot']('crypt_warden',mob.x,mob.z,'cripta');
+    expect(room.state.droppedItems.size).toBeGreaterThan(0);
+    a.mapId=b.mapId='pueblo';room.tick(.05);await room.waitForNextPatch();
+    expect([...room.state.droppedItems.values()].filter(d=>d.mapId==='cripta')).toHaveLength(0);
+    expect((killer.state as any).droppedItems.size).toBe(0);expect((thief.state as any).droppedItems.size).toBe(0);
+  });
+
+  it('mantiene la cripta despejada, comparte avance al entrar y sólo reinicia al quedar vacía',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'RunLeader'});
+    const d=await colyseus.connectTo(room,{name:'RunLate'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!,ally=room.state.players.get(d.sessionId)!;
+    p.level=6;ally.level=6;
+    c.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    const wave=[...room.state.mobs.entries()].filter(([,m])=>m.mapId==='cripta'&&['crypt_acolyte','crypt_stalker'].includes(m.templateId));
+    expect(wave).toHaveLength(6);
+    for(const [id,m] of wave)room['killMob'](m,id,c.sessionId);
+    expect(p.dungeonStage).toBe(1);
+    for(const [,m] of wave)m.respawnMs=1;
+    await room.waitForNextSimulationTick();expect(wave.every(([,m])=>m.dead)).toBe(true);
+    d.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    expect(ally.dungeonStage).toBe(1);
+    room['killPlayer'](p,c.sessionId);
+    expect(p.mapId).toBe('pueblo');expect(ally.dungeonStage).toBe(1);
+    expect(wave.every(([,m])=>m.dead)).toBe(true);
+    d.send(MessageType.WarpTo,{mapId:'pueblo'});await room.waitForNextPatch();
+    expect(wave.every(([,m])=>!m.dead)).toBe(true);
+    d.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    expect(ally.dungeonStage).toBe(0);expect(ally.dungeonKills).toBe(0);
+  });
+
+  it('cierra una expedición completada a nuevas entradas y la reinicia al desconectarse el último participante',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'RunFinished'});
+    const d=await colyseus.connectTo(room,{name:'RunWaiting'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!,ally=room.state.players.get(d.sessionId)!;
+    p.level=6;ally.level=6;
+    c.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    room['dungeonRun'].dungeonStage=4;
+    const [id,boss]=[...room.state.mobs.entries()].find(([,m])=>m.templateId==='crypt_warden')!;
+    room['killMob'](boss,id,c.sessionId);
+    expect(p.dungeonStage).toBe(5);
+    await room['persistence'].save('RunReconnect',toCharacterSave(p));
+    const returning=await colyseus.connectTo(room,{name:'RunReconnect'});await room.waitForNextPatch();
+    expect(room.state.players.get(returning.sessionId)!.mapId).toBe('pueblo');
+    d.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    expect(ally.mapId).toBe('pueblo');expect(boss.dead).toBe(true);
+    await c.leave();await room.waitForNextPatch();
+    expect(boss.dead).toBe(false);
+    d.send(MessageType.WarpTo,{mapId:'cripta'});await room.waitForNextPatch();
+    expect(ally.mapId).toBe('cripta');expect(ally.dungeonStage).toBe(0);
+  });
+
+  it('el movimiento por red rodea la fuente y nunca entra en su volumen', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const client = await colyseus.connectTo(room, { name: 'RutaSolida' });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = 0; p.z = 10;
+    client.send(MessageType.MoveTo, { x: 0, z: -10 });
+    await room.waitForNextPatch();
+    for (let i = 0; i < 200 && p.moving; i++) {
+      room.tick(0.1);
+      expect(isWalkable('pueblo', p)).toBe(true);
+      expect(Math.hypot(p.x, p.z)).toBeGreaterThan(3.6);
+    }
+    expect(p.x).toBeCloseTo(0);
+    expect(p.z).toBeCloseTo(-10);
+  });
+
+  it('Parpadeo se detiene ante la fuente aunque el destino esté al otro lado', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const client = await colyseus.connectTo(room, { name: 'BlinkSolido', className: 'mage' });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.level = 30; p.mp = 999; p.x = 0; p.z = 6; p.targetId = ''; p.moving = false;
+    client.send(MessageType.UseSkill, { skillId: 'blink' });
+    await room.waitForNextPatch();
+    expect(p.z).toBeLessThan(6);
+    expect(p.z).toBeGreaterThan(3.6);
+    expect(isWalkable('pueblo', p)).toBe(true);
+    expect(p.targetZ).toBe(p.z);
+  });
+
+  it('reubica apariciones dentro de edificios a un punto transitable', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const mob = room.spawnMob('spawn-solid', 'skeleton_minion', 0, 0, 'pueblo');
+    expect(isWalkable('pueblo', mob)).toBe(true);
+    expect(mob.homeX).toBe(mob.x);
+    expect(mob.homeZ).toBe(mob.z);
+  });
+
+  it('rechaza una carga bloqueada sin mover gratis al jugador ni aplicar daño', async () => {
+    const room = await colyseus.createRoom('game', {}) as GameRoom;
+    const client = await colyseus.connectTo(room, { name: 'CargaSolida', className: 'barbarian' });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.level = 30; p.mp = 30; p.x = 0; p.z = 6; p.moving = false;
+    const mob = room.spawnMob('charge-wall', 'skeleton_minion', 0, -6, 'pueblo');
+    mob.stunMs = 10000;
+    p.targetId = 'charge-wall';
+    const hp = mob.hp;
+    client.send(MessageType.UseSkill, { skillId: 'charge' });
+    await room.waitForNextPatch();
+    expect(p.x).toBe(0); expect(p.z).toBe(6);
+    expect(p.mp).toBe(30);
+    expect(p.skillCooldowns.get('charge') ?? 0).toBe(0);
+    expect(mob.hp).toBe(hp);
+  });
+
+  it('valida provisiones por distancia y visitas por viaje real; cierra la campaña sin repetir premio', async () => {
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'QuestJourney'}); await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;
+    p.questId='q_supplies'; p.mapId='bosque'; p.x=300;p.z=50;
+    c.send(MessageType.InteractObject,{objectId:'bosque_chest_1'}); await room.waitForNextPatch();
+    expect(p.questProgress).toBe(0);
+    p.x=250;p.z=40;
+    c.send(MessageType.InteractObject,{objectId:'bosque_chest_1'}); await room.waitForNextPatch();
+    expect(p.questProgress).toBe(1);
+    p.questId='q_ruins';p.questProgress=0;p.level=3;
+    c.send(MessageType.WarpTo,{mapId:'ruinas'}); await room.waitForNextPatch();
+    expect(p.questProgress).toBe(1);
+    p.questId='q6';p.questProgress=1;p.mapId='pueblo';p.x=0;p.z=0;
+    c.send(MessageType.InteractNpc,{});await room.waitForNextPatch();
+    expect(p.questId).toBe('campaign_complete');
+    const gold=p.gold;
+    c.send(MessageType.InteractNpc,{});await room.waitForNextPatch();
+    expect(p.gold).toBe(gold);
+  });
+
+  it('la cripta exige sellos de expedición, rechaza ataque prematuro y paga una sola vez por recorrido', async () => {
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'AdventureDungeon'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;
+    p.level=6;p.mapId='cripta';p.x=CRYPT_BOSS.x;p.z=CRYPT_BOSS.z;p.targetX=p.x;p.targetZ=p.z;
+    p.questId='q_crypt';p.questProgress=0;
+    const mob=room.spawnMob('dungeon-test','crypt_warden',CRYPT_BOSS.x,CRYPT_BOSS.z,'cripta');
+    mob.stunMs=999999;mob.hp=1;p.targetId='dungeon-test';p.attackCooldownMs=0;
+    await room.waitForNextSimulationTick();expect(mob.dead).toBe(false);
+    room['dungeonRun'].dungeonStage=1;room['syncDungeonRun']();p.x=CRYPT_SEALS[0].x;p.z=CRYPT_SEALS[0].z;
+    c.send(MessageType.InteractObject,{objectId:'crypt_seal_2'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(1);
+    c.send(MessageType.InteractObject,{objectId:'crypt_seal_1'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(2);
+    expect(room.state.worldObjects.get('crypt_seal_1')!.active).toBe(true);
+    room['dungeonRun'].dungeonStage=3;p.x=CRYPT_SEALS[1].x;p.z=CRYPT_SEALS[1].z;
+    c.send(MessageType.InteractObject,{objectId:'crypt_seal_2'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(4);
+    p.x=CRYPT_BOSS.x;p.z=CRYPT_BOSS.z;p.attackCooldownMs=0;
+    await room.waitForNextSimulationTick();
+    expect(p.dungeonStage).toBe(5);expect(p.questProgress).toBe(1);
+    const prizes=()=>[...p.inventory.keys()].filter(id=>getItem(id).options?.level===5);
+    expect(prizes()).toHaveLength(1);
+    room.spawnMob('dungeon-test','crypt_warden',CRYPT_BOSS.x,CRYPT_BOSS.z,'cripta').stunMs=999999;
+    p.attackCooldownMs=0;await room.waitForNextSimulationTick();expect(prizes()).toHaveLength(1);
+    c.send(MessageType.WarpTo,{mapId:'pueblo'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(0);
+  });
+
+  it('comparte avance cercano sin saltar sellos y reinicia al morir por el área anunciada',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'CriptaAliado'});
+    const d=await colyseus.connectTo(room,{name:'CriptaGrupo'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!, ally=room.state.players.get(d.sessionId)!;
+    for(const player of [p,ally]){player.mapId='cripta';player.x=900;player.z=30;player.pAtk=1000;player.hp=1000;player.maxHp=1000;}
+    for(let i=0;i<6;i++){
+      const m=room.spawnMob(`shared-${i}`,'crypt_acolyte',900,30,'cripta');m.stunMs=999999;m.hp=1;
+      p.targetId=`shared-${i}`;p.attackCooldownMs=0;await room.waitForNextSimulationTick();
+    }
+    expect(p.dungeonStage).toBe(1);expect(ally.dungeonStage).toBe(1);
+    room['dungeonRun'].dungeonStage=4;p.x=CRYPT_BOSS.x;p.z=CRYPT_BOSS.z;p.hp=1;p.targetId='';
+    const boss=room.spawnMob('hazard-death','crypt_warden',CRYPT_BOSS.x,CRYPT_BOSS.z,'cripta');
+    boss.hazardMs=1;boss.hazardX=p.x;boss.hazardZ=p.z;boss.aggroTargetId=c.sessionId;
+    await room.waitForNextSimulationTick();
+    expect(p.dead).toBe(true);expect(p.dungeonStage).toBe(0);expect(p.dungeonKills).toBe(0);
+    expect(ally.dungeonStage).toBe(4);
+  });
+
+  it.each(['alive', 'dead', 'missing'] as const)('la cripta comparte crédito y EXP una sola vez cuando el autor está %s', async (ownerState) => {
+    const room = (await colyseus.createRoom('game', {})) as GameRoom;
+    const authorClient = await colyseus.connectTo(room, { name: `Author${ownerState}` });
+    const allyClient = await colyseus.connectTo(room, { name: `Ally${ownerState}` });
+    await room.waitForNextPatch();
+    room.state.mobs.clear();
+    const author = room.state.players.get(authorClient.sessionId)!;
+    const ally = room.state.players.get(allyClient.sessionId)!;
+    for (const p of [author, ally]) {
+      p.mapId = 'cripta'; p.x = 900; p.z = 30; p.moving = false;
+      p.level = 6; p.exp = 0; p.dailyQuestId = ''; p.targetId = '';
+    }
+    if (ownerState === 'dead') { author.dead = true; author.respawnMs = 100000; }
+    if (ownerState === 'missing') room.state.players.delete(authorClient.sessionId);
+    const mob = room.spawnMob('shared-poison', 'crypt_acolyte', 900, 30, 'cripta');
+    mob.hp = 1; mob.stunMs = 100000;
+    mob.dotMs = 1000; mob.dotDps = 20; mob.dotAccumMs = 450; mob.dotAttackerId = authorClient.sessionId;
+    room.tick(.05);
+    expect(mob.dead).toBe(true);
+    expect(ally.dungeonKills).toBe(1);
+    expect(ally.exp).toBe(getMobExp('crypt_acolyte'));
+    expect(author.exp).toBe(ownerState === 'alive' ? getMobExp('crypt_acolyte') : 0);
+    room.tick(.05);
+    expect(ally.dungeonKills).toBe(1);
+    expect(ally.exp).toBe(getMobExp('crypt_acolyte'));
+  });
+
+  it('el Custodio persigue y anuncia su área frente a un Explorador a nueve metros', async () => {
+    const room = (await colyseus.createRoom('game', {})) as GameRoom;
+    const c = await colyseus.connectTo(room, { name: 'GuardianRanged', className: 'ranger' });
+    await room.waitForNextPatch();
+    room.state.mobs.clear();
+    const p = room.state.players.get(c.sessionId)!;
+    p.mapId = 'cripta'; p.x = 909; p.z = CRYPT_BOSS.z; p.moving = false; room['dungeonRun'].dungeonStage = 4;
+    const boss = room.spawnMob('ranged-guardian', 'crypt_warden', CRYPT_BOSS.x, CRYPT_BOSS.z, 'cripta');
+    p.targetId = 'ranged-guardian'; p.attackCooldownMs = 0;
+    room.tick(.05);
+    expect(boss.hp).toBeLessThan(boss.maxHp);
+    expect(boss.aggroTargetId).toBe(c.sessionId);
+    expect(boss.aiState).toBe('chase');
+    expect(boss.hazardMs).toBe(1600);
+    expect(boss.hazardX).toBe(909);
+    expect(boss.hazardRadius).toBe(6);
+  });
+
+  it('Explorador empieza equipado y dispara a distancia sólo con munición',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;
+    const c=await colyseus.connectTo(room,{name:'RangerCatalog',className:'ranger'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;
+    expect(getItem(p.equipment.get('weapon')!).ammo).toBe('arrow');
+    p.mapId='bosque';p.x=300;p.z=0;p.moving=false;
+    const mob=room.spawnMob('range-test','skeleton_minion',308,0,'bosque');mob.hp=500;mob.maxHp=500;mob.stunMs=10000;
+    p.targetId='range-test';
+    const ammo=[...p.inventory.keys()].find(id=>getItem(id).category==='municion')!;
+    const before=p.inventory.get(ammo)!.qty;
+    await room.waitForNextSimulationTick();
+    expect(mob.hp).toBeLessThan(500);expect(p.inventory.get(ammo)!.qty).toBe(before-1);
+    p.inventory.delete(ammo);p.attackCooldownMs=0;const hp=mob.hp;
+    await room.waitForNextSimulationTick();expect(mob.hp).toBe(hp);
+  });
+
+  it('rechaza equipo de otra clase y escudo con dos manos sin consumir objetos',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'EquipCatalog',className:'knight'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;p.level=40;
+    const staff=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='skull_staff')!;
+    grantItem(p,staff.id,1);const staffId=[...p.inventory.keys()].find(k=>getItem(k).ref_origen==='skull_staff')!;
+    c.send(MessageType.EquipItem,{itemTemplateId:staffId});await room.waitForNextPatch();expect(p.inventory.has(staffId)).toBe(true);expect(p.equipment.has('weapon')).toBe(false);
+    const blade=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='giant_sword')!;
+    const shield=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='small_shield')!;
+    grantItem(p,blade.id,1);grantItem(p,shield.id,1);
+    const bladeId=[...p.inventory.keys()].find(k=>getItem(k).ref_origen==='giant_sword')!;
+    const shieldId=[...p.inventory.keys()].find(k=>getItem(k).ref_origen==='small_shield')!;
+    c.send(MessageType.EquipItem,{itemTemplateId:bladeId});await room.waitForNextPatch();
+    c.send(MessageType.EquipItem,{itemTemplateId:shieldId});await room.waitForNextPatch();
+    expect(p.equipment.get('weapon')).toBe(bladeId);expect(p.inventory.has(shieldId)).toBe(true);
+  });
+
+  it('aprende un tomo una sola vez y restaura tomo y modificadores desde el guardado',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'TomeCatalog',className:'mage'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;
+    const tome=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='scroll_of_energy_ball')!;
+    grantItem(p,tome.id,2);c.send(MessageType.UseItem,{itemTemplateId:tome.id});await room.waitForNextPatch();
+    expect([...p.learnedTomes]).toEqual(['tome_energy_ball']);
+    c.send(MessageType.UseItem,{itemTemplateId:tome.id});await room.waitForNextPatch();expect(p.inventory.get(tome.id)!.qty).toBe(1);
+    const staff=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='skull_staff')!;
+    const id=createItemInstance(staff,{quality:'excellent',level:4,luck:true,excellent:[0,3]},'save-roundtrip');
+    grantItem(p,id,1);c.send(MessageType.EquipItem,{itemTemplateId:id});await room.waitForNextPatch();
+    const save=toCharacterSave(p);await (room as any).persistence.save('RestoredCatalog',save);
+    const restored=await colyseus.connectTo(room,{name:'RestoredCatalog'});await room.waitForNextPatch();
+    const q=room.state.players.get(restored.sessionId)!;
+    expect([...q.learnedTomes]).toEqual(['tome_energy_ball']);expect(q.equipment.get('weapon')).toBe(id);
+    expect(q.pAtk).toBe(p.pAtk);expect(getItem(id).options?.excellent).toEqual([0,3]);
+  });
+
+  it('compra dos ejemplares distintos y mejora solamente el objetivo propio',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'UpgradeCatalog'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;p.gold=10000;p.x=TOWN.x;p.z=TOWN.z;
+    const blade=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='kris')!;
+    c.send(MessageType.BuyItem,{itemTemplateId:blade.id,qty:2});await room.waitForNextPatch();
+    const ids=[...p.inventory.keys()].filter(k=>getItem(k).ref_origen==='kris');expect(ids).toHaveLength(2);
+    const jewel=Object.values(CATALOG_ITEMS).find(i=>i.ref_origen==='jewel_of_bless')!;grantItem(p,jewel.id,1);
+    c.send(MessageType.UseItem,{itemTemplateId:jewel.id,targetItemId:ids[0]});await room.waitForNextPatch();
+    expect(p.inventory.has(ids[0])).toBe(false);expect(p.inventory.has(ids[1])).toBe(true);
+    expect([...p.inventory.keys()].some(k=>getItem(k).options?.level===1)).toBe(true);
+  });
+
+  it('el reflejo letal conserva IDs y no revive al jugador con recuperación por baja',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'ReflectCatalog'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;
+    p.mapId='bosque';p.x=p.targetX=300;p.z=p.targetZ=0;p.moving=false;p.hp=20;p.msSinceCombat=0;
+    p.itemEffects.reflect=.3;p.itemEffects.hpOnKill=.125;
+    const mob=room.spawnMob('reflect-test','skeleton_minion',300,0,'bosque');mob.hp=1;mob.pAtk=1000;mob.windupMs=1;mob.windupTargetId=c.sessionId;
+    room.tick(.01);
+    expect(mob.dead).toBe(true);expect(p.dead).toBe(true);expect(p.hp).toBe(0);
+  });
+
+  it('el reflejo PvP informa la muerte de ambas entidades con sus IDs',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const ca=await colyseus.connectTo(room,{name:'ReflectA'});const cb=await colyseus.connectTo(room,{name:'ReflectB'});await room.waitForNextPatch();
+    const a=room.state.players.get(ca.sessionId)!;const b=room.state.players.get(cb.sessionId)!;
+    for(const p of [a,b]){p.mapId='bosque';p.x=p.targetX=100;p.z=p.targetZ=0;p.moving=false;p.msSinceCombat=0;p.hp=1;}
+    a.pAtk=1000;a.targetId=cb.sessionId;a.attackCooldownMs=0;b.itemEffects.reflect=1;
+    const events=vi.spyOn(room,'broadcast');room.tick(.01);
+    expect(a.dead).toBe(true);expect(b.dead).toBe(true);
+    const deaths=events.mock.calls.filter(([type])=>String(type)===MessageType.Death).map(([,event])=>(event as {entityId:string}).entityId);
+    expect(deaths).toContain(ca.sessionId);expect(deaths).toContain(cb.sessionId);expect(deaths).not.toContain('');events.mockRestore();
+  });
+  it('la mascota guardiana acumula regeneración fraccionaria durante combate',async()=>{
+    const room=(await colyseus.createRoom('game',{})) as GameRoom;const c=await colyseus.connectTo(room,{name:'GuardianCatalog'});await room.waitForNextPatch();
+    const p=room.state.players.get(c.sessionId)!;p.maxHp=100;p.hp=20;p.itemEffects.regen=.01;p.msSinceCombat=0;
+    for(let i=0;i<20;i++)room.tick(.1);
+    expect(p.hp).toBe(22);
+  });
+
+  it("crea un jugador al unirse", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Zeus" });
+    await room.waitForNextPatch();
+    expect(room.state.players.get(client.sessionId)?.name).toBe("Zeus");
+  });
+
+  it("mueve al jugador hacia el target tras recibir moveTo", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Zeus" });
+    await room.waitForNextPatch();
+
+    // Etapa 15: el movimiento se clampea a los bounds del MAPA ACTUAL (pueblo).
+    const puebloMax = getZone("pueblo").bounds.maxX;
+    client.send(MessageType.MoveTo, { x: 1000, z: 0 });
+    // targetX se fija sincronicamente en el handler de moveTo, antes de cualquier tick
+    await room.waitForNextPatch();
+    const target = room.state.players.get(client.sessionId)!;
+    expect(target.targetX).toBe(puebloMax); // recortado a los bounds del mapa
+
+    // avanzar ~0.5s de simulacion
+    await room.waitForNextSimulationTick();
+    await room.waitForNextSimulationTick();
+
+    const p = room.state.players.get(client.sessionId)!;
+    expect(p.x).toBeGreaterThan(0);
+    expect(p.x).toBeLessThanOrEqual(puebloMax); // nunca supera el bound clampeado
+  });
+
+  it("asigna la primera mision al unirse", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Quester" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    expect(p.questId).toBe(firstQuestId());
+    expect(p.questProgress).toBe(0);
+  });
+
+  it("no entrega la mision si el progreso no esta completo (no-op)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Quester" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = TOWN.x; p.z = TOWN.z; // en el pueblo (radio de entrega)
+    p.questProgress = 0; // incompleta
+    const gold0 = p.gold;
+    client.send(MessageType.InteractNpc, {});
+    await room.waitForNextPatch();
+    expect(p.questId).toBe(firstQuestId()); // no avanzo
+    expect(p.gold).toBe(gold0); // sin cambio de oro
+  });
+
+  it("entrega la mision completa en el NPC: da exp+oro y encadena la siguiente", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Quester" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = TOWN.x; p.z = TOWN.z; // en el pueblo, dentro del radio de entrega
+    const q = getQuest(p.questId);
+    const expBefore = p.exp;
+    const gold0 = p.gold;
+    p.questProgress = q.amount; // simula haber matado los mobs requeridos
+
+    client.send(MessageType.InteractNpc, {});
+    await room.waitForNextPatch();
+
+    expect(p.gold).toBe(gold0 + q.rewardGold);
+    expect(p.exp).toBe(expBefore + q.rewardExp);
+    expect(p.questId).not.toBe(q.id); // encadeno a la siguiente
+    expect(p.questProgress).toBe(0);
+  });
+
+  it("no entrega si el jugador esta lejos del pueblo", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Quester" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = 50; p.z = 50; // lejos del NPC
+    const q = getQuest(p.questId);
+    p.questProgress = q.amount;
+    const gold0 = p.gold;
+    client.send(MessageType.InteractNpc, {});
+    await room.waitForNextPatch();
+    expect(p.questId).toBe(q.id); // no entrego
+    expect(p.gold).toBe(gold0); // sin cambio de oro
+  });
+
+  it("compra una pocion en el mercader: baja el oro y la agrega al inventario", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Comprador" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = TOWN.x; p.z = TOWN.z; // en el pueblo
+    p.gold = 20;
+    const price = getShopPrice("health_potion"); // 15
+    client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
+    await room.waitForNextPatch();
+    expect(p.gold).toBe(20 - price);
+    expect(p.inventory.get("health_potion")?.qty).toBe(1);
+  });
+
+  it("no compra si no alcanza el oro (no-op)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Comprador" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = TOWN.x; p.z = TOWN.z;
+    p.gold = 5; // < 15
+    client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
+    await room.waitForNextPatch();
+    expect(p.gold).toBe(5); // intacto
+    expect(p.inventory.get("health_potion")).toBeUndefined();
+  });
+
+  it("usa una pocion: sube el HP y descuenta del inventario (borra si queda en 0)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Herido" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = TOWN.x; p.z = TOWN.z;
+    p.gold = 20;
+    client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
+    await room.waitForNextPatch();
+    const heal = getItem("health_potion").heal!;
+    p.hp = Math.max(1, p.maxHp - heal - 5); // asegura hp < maxHp con margen
+    const hpBefore = p.hp;
+    client.send(MessageType.UseItem, { itemTemplateId: "health_potion" });
+    await room.waitForNextPatch();
+    expect(p.hp).toBe(Math.min(p.maxHp, hpBefore + heal));
+    expect(p.inventory.get("health_potion")).toBeUndefined(); // entrada borrada al llegar a 0
+  });
+
+  it("no usa la pocion a HP lleno (no-op)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const client = await colyseus.connectTo(room, { name: "Sano" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(client.sessionId)!;
+    p.x = TOWN.x; p.z = TOWN.z;
+    p.gold = 20;
+    client.send(MessageType.BuyItem, { itemTemplateId: "health_potion", qty: 1 });
+    await room.waitForNextPatch();
+    p.hp = p.maxHp; // lleno
+    client.send(MessageType.UseItem, { itemTemplateId: "health_potion" });
+    await room.waitForNextPatch();
+    expect(p.hp).toBe(p.maxHp);
+    expect(p.inventory.get("health_potion")?.qty).toBe(1); // no se gastó
+  });
+
+  it("aplica los stats de la clase elegida al entrar (mage vs knight)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const knightC = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+    const mageC = await colyseus.connectTo(room, { name: "Mag", className: "mage" });
+    await room.waitForNextPatch();
+    const knight = room.state.players.get(knightC.sessionId)!;
+    const mage = room.state.players.get(mageC.sessionId)!;
+    expect(knight.className).toBe("knight");
+    expect(mage.className).toBe("mage");
+    // El caballero tiene más HP; el mago más MP (stats por clase).
+    expect(knight.maxHp).toBeGreaterThan(mage.maxHp);
+    expect(mage.maxMp).toBeGreaterThan(knight.maxMp);
+    // Coinciden exactamente con statsForClass a nivel 1.
+    expect(knight.maxHp).toBe(statsForClass("knight", 1).maxHp);
+    expect(mage.maxMp).toBe(statsForClass("mage", 1).maxMp);
+  });
+
+  it("className inválido cae a knight por defecto", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Raro", className: "brujo_inexistente" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    expect(p.className).toBe("knight");
+    expect(getClass(p.className).skillId).toBe("shield_bash");
+  });
+
+  it("skill de curación (second_wind) sube el HP y gasta MP", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    p.level = 8; // Etapa 22: second_wind se aprende a nivel 8
+    p.msSinceCombat = 0; // en combate → sin regen de HP que ensucie el assert
+    p.hp = 10; // herido
+    const mpBefore = p.mp;
+    c.send(MessageType.UseSkill, { skillId: "second_wind" });
+    await room.waitForNextPatch();
+    expect(p.hp).toBeGreaterThan(10); // se curó ~40% maxHp
+    expect(p.mp).toBeLessThan(mpBefore); // gastó MP
+  });
+
+  it("skill de buff (rage) activa el multiplicador de ataque temporal", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Barb", className: "barbarian" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)! as any;
+    p.level = 3; // Etapa 22: rage se aprende a nivel 3
+    c.send(MessageType.UseSkill, { skillId: "rage" });
+    await room.waitForNextPatch();
+    expect(p.atkBuffMs).toBeGreaterThan(0);
+    expect(p.atkBuffMult).toBe(1.5);
+  });
+
+  it("una skill fuera del kit de la clase es no-op (knight no castea fireball)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    const mpBefore = p.mp;
+    c.send(MessageType.UseSkill, { skillId: "fireball" }); // no está en el kit del knight
+    await room.waitForNextPatch();
+    expect(p.mp).toBe(mpBefore); // no gastó nada
+  });
+
+  it("la misma skill en cooldown no se puede recastear inmediatamente", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    p.level = 8; // Etapa 22: second_wind se aprende a nivel 8
+    p.msSinceCombat = 0; // en combate → sin regen de HP que ensucie el assert
+    p.hp = 10;
+    c.send(MessageType.UseSkill, { skillId: "second_wind" });
+    await room.waitForNextPatch();
+    const hpAfterFirst = p.hp;
+    p.hp = 10; // volver a herir
+    c.send(MessageType.UseSkill, { skillId: "second_wind" }); // en cooldown
+    await room.waitForNextPatch();
+    expect(p.hp).toBe(10); // no curó de nuevo
+    expect(hpAfterFirst).toBeGreaterThan(10); // la primera sí curó
+  });
+
+  // Helper: arma un mob con aggro sobre el jugador, pegado a él, en un mapa de combate.
+  function setupMeleeMob(room: any, sessionId: string, p: any) {
+    p.mapId = "bosque"; // mapa de combate (Etapa 15)
+    p.x = p.targetX = 300; p.z = p.targetZ = 0;
+    const mob = new MobState();
+    mob.templateId = "skeleton_minion";
+    mob.mapId = "bosque";
+    const mc = getMobCombat("skeleton_minion");
+    mob.hp = mob.maxHp = mc.maxHp; mob.pAtk = mc.pAtk; mob.pDef = mc.pDef; mob.dead = false;
+    mob.x = mob.homeX = p.x; mob.z = mob.homeZ = p.z; // home = su posición → no leashea
+    mob.aggroTargetId = sessionId;
+    room.state.mobs.set("mob-atk", mob);
+    return mob;
+  }
+
+  it("el ataque del mob es telegrafiado: hace wind-up y pega si el jugador sigue en rango", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Blanco", className: "knight" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    setupMeleeMob(room, c.sessionId, p);
+    const hpBefore = p.hp;
+    await room.waitForNextSimulationTick(); // primer tick: inicia el wind-up
+    const mob = room.state.mobs.get("mob-atk")!;
+    expect(mob.windupMs).toBeGreaterThan(0); // está cargando (avisa)
+    // el jugador NO se mueve → sigue en rango; avanzar hasta que resuelva
+    for (let i = 0; i < 16; i++) await room.waitForNextSimulationTick();
+    expect(p.hp).toBeLessThan(hpBefore); // el golpe conectó
+  });
+
+  it("el jugador esquiva si sale del rango durante el wind-up", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Escurridizo", className: "rogue" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    const mob = setupMeleeMob(room, c.sessionId, p);
+    const hpBefore = p.hp;
+    await room.waitForNextSimulationTick(); // inicia el wind-up (el mob queda plantado)
+    expect(mob.windupMs).toBeGreaterThan(0);
+    // ESQUIVAR: salir del rango mientras el mob carga (el mob no se mueve)
+    p.x = p.targetX = 45; p.z = p.targetZ = 45;
+    for (let i = 0; i < 16; i++) await room.waitForNextSimulationTick();
+    expect(p.hp).toBe(hpBefore); // no le pegó: lo esquivó
+  });
+
+  it("el Rey Nihil spawnea con 1000 HP", async () => {
+    const room = await colyseus.createRoom("game", {});
+    await room.waitForNextPatch();
+    let boss: any;
+    room.state.mobs.forEach((m: any) => {
+      if (m.templateId === "skeleton_king") boss = m;
+    });
+    expect(boss).toBeDefined();
+    expect(boss.hp).toBe(1000);
+  });
+
+  it("matar al Rey Nihil dropea la corona, da exp y completa la q6 (final)", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Heroe", className: "barbarian" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    let bossId = ""; let boss: any;
+    room.state.mobs.forEach((m: any, id: string) => {
+      if (m.templateId === "skeleton_king") { bossId = id; boss = m; }
+    });
+    // Preparar: jugador con la q6 (final) activa, en el mapa del jefe, pegado, jefe casi muerto.
+    p.questId = "q6"; p.questProgress = 0;
+    p.mapId = boss.mapId; p.x = boss.x; p.z = boss.z;
+    boss.hp = 1;
+    p.targetId = bossId;
+    c.send(MessageType.SetTarget, { targetId: bossId });
+    // Avanzar la simulación para que el auto-attack lo remate.
+    for (let i = 0; i < 6; i++) await room.waitForNextSimulationTick();
+    expect(boss.dead).toBe(true);
+    // La corona quedó en el suelo.
+    let hasCrown = false;
+    room.state.droppedItems.forEach((d: any) => {
+      if (d.itemTemplateId === "skull_crown") hasCrown = true;
+    });
+    expect(hasCrown).toBe(true);
+    // 900 exp mata seguro sube al menos un nivel desde nv1.
+    expect(p.level).toBeGreaterThan(1);
+    // q6 (amount 1) queda completa.
+    expect(p.questProgress).toBe(1);
+  });
+
+  it("veneno (poison) hace daño por tiempo al mob objetivo", async () => {
+    const room = await colyseus.createRoom("game", {});
+    const c = await colyseus.connectTo(room, { name: "Pica", className: "rogue" });
+    await room.waitForNextPatch();
+    const p = room.state.players.get(c.sessionId)!;
+    // Crear un mob pegado al jugador (dentro de rango)
+    const mob = new MobState();
+    mob.templateId = "skeleton_minion";
+    mob.mapId = p.mapId; // mismo mapa que el jugador (Etapa 15)
+    mob.hp = 100; mob.maxHp = 100; mob.pDef = 5; mob.dead = false;
+    mob.x = p.x; mob.z = p.z;
+    room.state.mobs.set("mob-test", mob);
+    p.targetId = "mob-test";
+    c.send(MessageType.UseSkill, { skillId: "poison" });
+    await room.waitForNextPatch();
+    // Avanzar ~1s de simulación para que el veneno tickee (cada 0.5s)
+    for (let i = 0; i < 16; i++) await room.waitForNextSimulationTick();
+    expect(mob.hp).toBeLessThan(100); // el veneno bajó su HP sin volver a atacar
+  });
+
+  describe("PvP (Etapa 9a)", () => {
+    it("un jugador puede pegarle a otro fuera del pueblo y le baja la HP", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Atacante", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Victima", className: "knight" });
+      // ambos en un mapa de combate (bosque), pegados
+      const pa = room.state.players.get(a.sessionId)!;
+      const pb = room.state.players.get(b.sessionId)!;
+      pa.mapId = "bosque"; pb.mapId = "bosque";
+      pa.x = 300; pa.z = 0; pa.targetX = 300; pa.targetZ = 0; pa.moving = false;
+      pb.x = 301; pb.z = 0; pb.targetX = 301; pb.targetZ = 0; pb.moving = false;
+      const hp0 = pb.hp;
+      a.send("setTarget", { targetId: b.sessionId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(pb.hp).toBeLessThan(hp0);
+    });
+
+    it("no hay daño si la víctima está en el pueblo (zona segura)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Atk2", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Vic2", className: "knight" });
+      const pa = room.state.players.get(a.sessionId)!;
+      const pb = room.state.players.get(b.sessionId)!;
+      // Ambos DENTRO de la zona segura del pueblo y en rango de ataque:
+      // el PvP debe quedar desactivado por estar la víctima en el pueblo.
+      pa.x = TOWN.x + 1; pa.z = TOWN.z; pa.targetX = TOWN.x + 1; pa.targetZ = TOWN.z;
+      pb.x = TOWN.x; pb.z = TOWN.z; pb.targetX = TOWN.x; pb.targetZ = TOWN.z;   // víctima en el centro del pueblo
+      const hp0 = pb.hp;
+      a.send("setTarget", { targetId: b.sessionId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(pb.hp).toBe(hp0);
+    });
+
+    it("al morir en PvP: víctima muere, pierde oro y el asesino suma pvpKills", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Killer", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Dead", className: "knight" });
+      const pa = room.state.players.get(a.sessionId)!;
+      const pb = room.state.players.get(b.sessionId)!;
+      pa.mapId = "bosque"; pb.mapId = "bosque";
+      pa.x = 300; pa.z = 0; pa.targetX = 300; pa.targetZ = 0;
+      pb.x = 301; pb.z = 0; pb.targetX = 301; pb.targetZ = 0;
+      pb.hp = 1; pb.gold = 100;
+      a.send("setTarget", { targetId: b.sessionId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(pb.dead).toBe(true);
+      expect(pb.gold).toBe(90);       // floor(100*0.9)
+      expect(pa.pvpKills).toBe(1);
+    });
+
+    it("no se puede targetear a uno mismo", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Solo", className: "knight" });
+      const pa = room.state.players.get(a.sessionId)!;
+      a.send("setTarget", { targetId: a.sessionId });
+      await room.waitForNextSimulationTick();
+      expect(pa.targetId).toBe("");
+    });
+  });
+
+  describe("Guilds (Etapa 9b)", () => {
+    it("crear guild setea id/tag/name en el jugador y la registra viva", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Lider", className: "knight" });
+      a.send("createGuild", { name: "Los Lobos", tag: "WOLF" });
+      await room.waitForNextSimulationTick();
+      const pa = room.state.players.get(a.sessionId)!;
+      expect(pa.guildTag).toBe("WOLF");
+      expect(pa.guildId).not.toBe("");
+      const g = room.state.guilds.get(pa.guildId)!;
+      expect(g.name).toBe("Los Lobos");
+      expect(g.leaderName).toBe("Lider");
+    });
+
+    it("rechaza tag inválido y tag duplicado", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "L1", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "L2", className: "knight" });
+      a.send("createGuild", { name: "AAA", tag: "toolong" }); // inválido
+      await room.waitForNextSimulationTick();
+      expect(room.state.players.get(a.sessionId)!.guildId).toBe("");
+      a.send("createGuild", { name: "Uno", tag: "WOLF" });
+      await room.waitForNextSimulationTick();
+      b.send("createGuild", { name: "Dos", tag: "WOLF" }); // duplicado
+      await room.waitForNextSimulationTick();
+      expect(room.state.players.get(b.sessionId)!.guildId).toBe("");
+    });
+
+    it("unirse copia la identidad de la guild", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Jefe", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Miembro", className: "knight" });
+      a.send("createGuild", { name: "Halcones", tag: "HAWK" });
+      await room.waitForNextSimulationTick();
+      const gid = room.state.players.get(a.sessionId)!.guildId;
+      b.send("joinGuild", { guildId: gid });
+      await room.waitForNextSimulationTick();
+      expect(room.state.players.get(b.sessionId)!.guildId).toBe(gid);
+      expect(room.state.players.get(b.sessionId)!.guildTag).toBe("HAWK");
+    });
+
+    it("miembros de la misma guild NO se hacen daño (fuego amigo)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Aliado1", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Aliado2", className: "knight" });
+      const pa = room.state.players.get(a.sessionId)!;
+      const pb = room.state.players.get(b.sessionId)!;
+      pa.mapId = "bosque"; pb.mapId = "bosque";
+      pa.x = 300; pa.z = 0; pa.targetX = 300; pa.targetZ = 0;
+      pb.x = 301; pb.z = 0; pb.targetX = 301; pb.targetZ = 0;
+      a.send("createGuild", { name: "Pactados", tag: "PAX" });
+      await room.waitForNextSimulationTick();
+      b.send("joinGuild", { guildId: pa.guildId });
+      await room.waitForNextSimulationTick();
+      const hp0 = pb.hp;
+      a.send("setTarget", { targetId: b.sessionId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(pb.hp).toBe(hp0); // sin daño entre aliados
+    });
+
+    it("salir limpia la identidad y poda la guild vacía", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Solo", className: "knight" });
+      a.send("createGuild", { name: "Efímera", tag: "TMP" });
+      await room.waitForNextSimulationTick();
+      const gid = room.state.players.get(a.sessionId)!.guildId;
+      expect(room.state.guilds.has(gid)).toBe(true);
+      a.send("leaveGuild", {});
+      await room.waitForNextSimulationTick();
+      expect(room.state.players.get(a.sessionId)!.guildId).toBe("");
+      expect(room.state.guilds.has(gid)).toBe(false); // podada (sin miembros online)
+    });
+  });
+
+  describe("Boss contestado (Etapa 9c)", () => {
+    function findBoss(room: any): string {
+      let id = "";
+      room.state.mobs.forEach((m: any, k: string) => { if (m.templateId === "skeleton_king") id = k; });
+      return id;
+    }
+
+    it("el golpe final al jefe acredita bossKills a la guild del que remata", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Campeon", className: "knight" });
+      a.send("createGuild", { name: "Los Reyes", tag: "KING" });
+      await room.waitForNextSimulationTick();
+      const pa = room.state.players.get(a.sessionId)!;
+      const gid = pa.guildId;
+      const bossId = findBoss(room);
+      const boss = room.state.mobs.get(bossId)!;
+      boss.hp = 1;
+      pa.mapId = boss.mapId; pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
+      a.send("setTarget", { targetId: bossId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(boss.dead).toBe(true);
+      expect(room.state.guilds.get(gid)!.bossKills).toBe(1);
+    });
+
+    it("si el que remata no tiene guild, no incrementa nada ni crashea", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Solitario", className: "knight" });
+      const pa = room.state.players.get(a.sessionId)!;
+      const bossId = findBoss(room);
+      const boss = room.state.mobs.get(bossId)!;
+      boss.hp = 1;
+      pa.mapId = boss.mapId; pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
+      a.send("setTarget", { targetId: bossId });
+      await room.waitForNextSimulationTick();
+      await room.waitForNextSimulationTick();
+      expect(boss.dead).toBe(true); // no crash, muere normal
+    });
+  });
+
+  describe("Leaderboard (Etapa 9d)", () => {
+    it("incluye guilds vivas y jugadores online con sus stats actuales", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Campeon", className: "knight" });
+      a.send("createGuild", { name: "Los Reyes", tag: "KING" });
+      await room.waitForNextSimulationTick();
+      const pa = room.state.players.get(a.sessionId)!;
+      pa.level = 9;
+      room.state.guilds.get(pa.guildId)!.bossKills = 5;
+      await (room as any).refreshLeaderboard();
+      const guilds = [...room.state.leaderboard.guilds];
+      const players = [...room.state.leaderboard.players];
+      expect(guilds.some((g: any) => g.tag === "KING" && g.bossKills === 5)).toBe(true);
+      expect(players.some((p: any) => p.name === "Campeon" && p.level === 9)).toBe(true);
+    });
+
+    it("ordena jugadores por nivel desc y guilds por bossKills desc", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const a = await colyseus.connectTo(room, { name: "Nivel3", className: "knight" });
+      const b = await colyseus.connectTo(room, { name: "Nivel8", className: "mage" });
+      room.state.players.get(a.sessionId)!.level = 3;
+      room.state.players.get(b.sessionId)!.level = 8;
+      await (room as any).refreshLeaderboard();
+      const players = [...room.state.leaderboard.players].map((p: any) => p.name);
+      expect(players.indexOf("Nivel8")).toBeLessThan(players.indexOf("Nivel3"));
+    });
+  });
+
+  describe("Equipo (Etapa 12)", () => {
+    async function buy(room: any, client: any, p: any, itemId: string): Promise<void> {
+      p.x = TOWN.x; p.z = TOWN.z; p.gold = 1000;
+      client.send(MessageType.BuyItem, { itemTemplateId: itemId, qty: 1 });
+      await room.waitForNextPatch();
+    }
+
+    it("equipar un arma sube el pAtk y ocupa el slot (sale del inventario)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Herrero", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      await buy(room, c, p, "worn_sword");
+      const atk0 = p.pAtk;
+      c.send(MessageType.EquipItem, { itemTemplateId: "worn_sword" });
+      await room.waitForNextPatch();
+      expect(p.equipment.get("weapon")).toBe("worn_sword");
+      expect(p.pAtk).toBe(atk0 + 4); // bonus de worn_sword
+      expect(p.inventory.get("worn_sword")).toBeUndefined();
+    });
+
+    it("desequipar devuelve el ítem al inventario y restaura el stat", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Desarmado", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      await buy(room, c, p, "worn_sword");
+      const atk0 = p.pAtk;
+      c.send(MessageType.EquipItem, { itemTemplateId: "worn_sword" });
+      await room.waitForNextPatch();
+      c.send(MessageType.UnequipItem, { slot: "weapon" });
+      await room.waitForNextPatch();
+      expect(p.equipment.get("weapon")).toBeUndefined();
+      expect(p.pAtk).toBe(atk0);
+      expect(p.inventory.get("worn_sword")?.qty).toBe(1);
+    });
+
+    it("equipar en un slot ocupado hace swap (el anterior vuelve al inventario)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Cambista", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      await buy(room, c, p, "worn_sword");
+      // iron_sword no se vende en la tienda → se inyecta directo al inventario (como un drop).
+      const iron = new InventoryItemState(); iron.itemTemplateId = "iron_sword"; iron.qty = 1;
+      p.inventory.set("iron_sword", iron);
+      const atk0 = p.pAtk;
+      c.send(MessageType.EquipItem, { itemTemplateId: "worn_sword" });
+      await room.waitForNextPatch();
+      c.send(MessageType.EquipItem, { itemTemplateId: "iron_sword" });
+      await room.waitForNextPatch();
+      expect(p.equipment.get("weapon")).toBe("iron_sword");
+      expect(p.pAtk).toBe(atk0 + 9); // iron_sword +9 (worn ya no cuenta)
+      expect(p.inventory.get("worn_sword")?.qty).toBe(1); // el viejo volvió
+    });
+
+    it("subir de nivel conserva el bonus del equipo", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Veterano", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      await buy(room, c, p, "worn_sword");
+      c.send(MessageType.EquipItem, { itemTemplateId: "worn_sword" });
+      await room.waitForNextPatch();
+      // Entregar q5 (900 exp) parado en el pueblo → sube varios niveles.
+      p.questId = "q5"; p.questProgress = getQuest("q5").amount;
+      p.x = TOWN.x; p.z = TOWN.z;
+      c.send(MessageType.InteractNpc, {});
+      await room.waitForNextPatch();
+      expect(p.level).toBeGreaterThan(1);
+      expect(p.pAtk).toBe(statsForClass("knight", p.level).pAtk + 4); // el +4 del arma sobrevive al level-up
+    });
+  });
+
+  describe("Retención (Etapa 13)", () => {
+    // Mata un enemigo cercano al jugador avanzando la simulación (auto-attack).
+    async function killOneMob(room: any, client: any, p: any, templateId: string): Promise<void> {
+      let mobId = ""; let mob: any;
+      room.state.mobs.forEach((m: any, id: string) => {
+        if (mobId === "" && m.templateId === templateId && !m.dead) { mobId = id; mob = m; }
+      });
+      mob.hp = 1;
+      p.mapId = mob.mapId; p.x = p.targetX = mob.x; p.z = p.targetZ = mob.z + 1; p.moving = false; p.hp = 500;
+      client.send(MessageType.SetTarget, { targetId: mobId });
+      for (let i = 0; i < 8; i++) await room.waitForNextSimulationTick();
+    }
+
+    it("al entrar arranca la racha en 1 y asigna una misión diaria", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Nuevo", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      expect(p.loginStreak).toBe(1);
+      expect(p.dailyQuestId).not.toBe("");
+    });
+
+    it("matar un enemigo desbloquea 'Primera Sangre' y otorga el título Novato", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Novicio", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      await killOneMob(room, c, p, "skeleton_minion");
+      expect(p.totalKills).toBeGreaterThanOrEqual(1);
+      expect([...p.achievements]).toContain("first_blood");
+      expect(p.title).toBe("Novato");
+    });
+
+    it("la misión diaria progresa al matar y se auto-recompensa al completar", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Diario", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      // Forzar la diaria "caza cualquiera" (amount 12) a falta de 1.
+      const dq = getDailyQuest("d_hunt");
+      p.dailyQuestId = "d_hunt"; p.dailyDone = false; p.dailyProgress = dq.amount - 1;
+      const gold0 = p.gold;
+      await killOneMob(room, c, p, "skeleton_minion");
+      expect(p.dailyDone).toBe(true);
+      expect(p.gold).toBe(gold0 + dq.rewardGold);
+    });
+
+    it("lucir un título rechaza los no ganados y acepta los desbloqueados", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Titular", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      // Antes de ganar nada: un título no ganado se rechaza.
+      const rejectedTitle = room.waitForMessage(MessageType.SetTitle);
+      c.send(MessageType.SetTitle, { title: "Matarreyes" });
+      await rejectedTitle;
+      expect(p.title).not.toBe("Matarreyes");
+      // Desbloquear first_blood → título Novato ganado y luego seleccionable.
+      await killOneMob(room, c, p, "skeleton_minion");
+      const removedTitle = room.waitForMessage(MessageType.SetTitle);
+      c.send(MessageType.SetTitle, { title: "" }); // sacárselo
+      await removedTitle;
+      expect(p.title).toBe("");
+      const selectedTitle = room.waitForMessage(MessageType.SetTitle);
+      c.send(MessageType.SetTitle, { title: "Novato" });
+      await selectedTitle;
+      expect(p.title).toBe("Novato");
+    });
+  });
+
+  describe("Eventos de mundo (Etapa 14)", () => {
+    it("abatir al jefe emite un anuncio de mundo server-wide", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Anunciante", className: "barbarian" });
+      await room.waitForNextPatch();
+      const announces: string[] = [];
+      c.onMessage(MessageType.WorldAnnounce, (ev: any) => announces.push(ev.text));
+      const p = room.state.players.get(c.sessionId)!;
+      let bossId = ""; let boss: any;
+      room.state.mobs.forEach((m: any, id: string) => {
+        if (m.templateId === "skeleton_king") { bossId = id; boss = m; }
+      });
+      boss.hp = 1;
+      p.mapId = boss.mapId; p.x = p.targetX = boss.x; p.z = p.targetZ = boss.z + 1; p.moving = false; p.hp = 500;
+      c.send(MessageType.SetTarget, { targetId: bossId });
+      for (let i = 0; i < 10; i++) await room.waitForNextSimulationTick();
+      expect(boss.dead).toBe(true);
+      expect(announces.some((t) => t.includes("caído"))).toBe(true);
+    });
+  });
+
+  describe("Mapas / viaje (Etapa 15)", () => {
+    it("arranca en el pueblo y los mobs spawnean con su mapId", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Viajero", className: "knight" });
+      await room.waitForNextPatch();
+      expect(room.state.players.get(c.sessionId)!.mapId).toBe("pueblo");
+      let boss: any;
+      room.state.mobs.forEach((m: any) => { if (m.templateId === "skeleton_king") boss = m; });
+      expect(boss.mapId).toBe("trono");
+    });
+
+    it("warpear a un mapa habilitado mueve al jugador y setea su mapId", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Warp", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 1; // habilita bosque (req 1)
+      c.send(MessageType.WarpTo, { mapId: "bosque" });
+      await room.waitForNextPatch();
+      expect(p.mapId).toBe("bosque");
+      expect(p.x).toBe(getZone("bosque").spawn.x);
+      expect(p.z).toBe(getZone("bosque").spawn.z);
+    });
+
+    it("no se puede warpear a un mapa si el nivel es insuficiente", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Novato", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 1; // trono requiere 9
+      c.send(MessageType.WarpTo, { mapId: "trono" });
+      await room.waitForNextPatch();
+      expect(p.mapId).toBe("pueblo"); // no viajó
+    });
+  });
+
+  describe("Objetos de mundo (Etapa 16)", () => {
+    function findObject(room: any, kind: string): any {
+      let obj: any;
+      room.state.worldObjects.forEach((o: any) => { if (!obj && o.kind === kind) obj = o; });
+      return obj;
+    }
+
+    it("abrir un cofre suelta loot y lo desactiva", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Buscatesoros", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      const chest = findObject(room, "chest");
+      p.mapId = chest.mapId; p.x = chest.x; p.z = chest.z;
+      const drops0 = room.state.droppedItems.size;
+      c.send(MessageType.InteractObject, { objectId: chest.id });
+      await room.waitForNextPatch();
+      expect(chest.active).toBe(false);
+      expect(room.state.droppedItems.size).toBeGreaterThan(drops0);
+    });
+
+    it("un santuario otorga una bendición temporal (buff)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Peregrino", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      const shrine = room.state.worldObjects.get('pueblo_shrine')!;
+      p.mapId = shrine.mapId; p.x = shrine.x; p.z = shrine.z;
+      c.send(MessageType.InteractObject, { objectId: shrine.id });
+      await room.waitForNextPatch();
+      expect(shrine.active).toBe(false);
+      expect(p.atkBuffMs > 0 || p.defBuffMs > 0).toBe(true);
+    });
+
+    it("no se puede interactuar desde otro mapa", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Lejano", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      const chest = findObject(room, "chest");
+      p.mapId = "yermo"; p.x = chest.x; p.z = chest.z; // mismo lugar pero otro mapa
+      c.send(MessageType.InteractObject, { objectId: chest.id });
+      await room.waitForNextPatch();
+      expect(chest.active).toBe(true); // no se abrió
+    });
+  });
+
+  describe("NPCs de servicio y contratos (Etapa 20)", () => {
+    async function killOneMob(room: any, client: any, p: any, templateId: string): Promise<void> {
+      let mobId = ""; let mob: any;
+      room.state.mobs.forEach((m: any, id: string) => {
+        if (mobId === "" && m.templateId === templateId && !m.dead) { mobId = id; mob = m; }
+      });
+      mob.hp = 1;
+      p.mapId = mob.mapId; p.x = p.targetX = mob.x; p.z = p.targetZ = mob.z + 1; p.moving = false; p.hp = 500;
+      client.send(MessageType.SetTarget, { targetId: mobId });
+      for (let i = 0; i < 8; i++) await room.waitForNextSimulationTick();
+    }
+
+    it("la Sanadora restaura HP y MP a full y cobra oro", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Herido", className: "mage" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z; p.gold = 50; p.hp = 1; p.mp = 0;
+      c.send(MessageType.InteractNpc, { npcId: "healer" });
+      await room.waitForNextPatch();
+      expect(p.hp).toBe(p.maxHp);
+      expect(p.mp).toBe(p.maxMp);
+      expect(p.gold).toBe(40); // 50 - HEAL_COST_GOLD
+      expect(HEAL_COST_GOLD).toBe(10);
+    });
+
+    it("la Sanadora no cobra si ya estás a full (no-op)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Sano", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z; p.gold = 50; p.hp = p.maxHp; p.mp = p.maxMp;
+      c.send(MessageType.InteractNpc, { npcId: "healer" });
+      await room.waitForNextPatch();
+      expect(p.gold).toBe(50); // sin cambio
+    });
+
+    it("el Capitán asigna el primer contrato si no tenés ninguno", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Merc", className: "rogue" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z;
+      expect(p.bountyId).toBe("");
+      c.send(MessageType.InteractNpc, { npcId: "captain" });
+      await room.waitForNextPatch();
+      expect(p.bountyId).toBe(firstBountyId());
+      expect(p.bountyProgress).toBe(0);
+    });
+
+    it("el contrato progresa al matar el enemigo correcto", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Cazador", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.bountyId = "b_forest"; p.bountyProgress = 0; // caza de skeleton_minion
+      await killOneMob(room, c, p, "skeleton_minion");
+      expect(p.bountyProgress).toBeGreaterThanOrEqual(1);
+    });
+
+    it("el Capitán entrega el contrato completo: da exp+oro y rota al siguiente", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Cumplidor", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z;
+      const b = getBounty("b_forest");
+      p.bountyId = "b_forest"; p.bountyProgress = b.amount; // completo
+      const gold0 = p.gold; const exp0 = p.exp;
+      c.send(MessageType.InteractNpc, { npcId: "captain" });
+      await room.waitForNextPatch();
+      expect(p.gold).toBe(gold0 + b.rewardGold);
+      expect(p.exp).toBe(exp0 + b.rewardExp);
+      expect(p.bountyId).toBe(nextBountyId("b_forest"));
+      expect(p.bountyProgress).toBe(0);
+    });
+
+    it("hablar con la Sanadora no toca la misión de la campaña", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Campaña", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z; p.gold = 50; p.hp = 1;
+      const quest0 = p.questId;
+      c.send(MessageType.InteractNpc, { npcId: "healer" });
+      await room.waitForNextPatch();
+      expect(p.questId).toBe(quest0); // el router no confundió healer con elder
+    });
+  });
+
+  describe("Cuentas y atributos (Etapa 21)", () => {
+    it("registra una cuenta con contraseña y rechaza la contraseña incorrecta", async () => {
+      const room = await colyseus.createRoom("game", {});
+      await colyseus.connectTo(room, { name: 'AuthObserver' });
+      // Registro (cuenta nueva): entra bien.
+      const original = await colyseus.connectTo(room, { name: "Cuenta", password: "secreta", className: "knight" });
+      await original.leave();
+      await room.waitForNextPatch();
+      // Otro cliente con la MISMA cuenta y contraseña equivocada: rechazado.
+      await expect(colyseus.connectTo(room, { name: "Cuenta", password: "mala" })).rejects.toBeDefined();
+      // Con la contraseña correcta: entra.
+      const ok = await colyseus.connectTo(room, { name: "Cuenta", password: "secreta" });
+      await room.waitForNextPatch();
+      expect(room.state.players.get(ok.sessionId)?.name).toBe("Cuenta");
+    });
+
+    it("una cuenta protegida no se puede tomar sin contraseña", async () => {
+      const room = await colyseus.createRoom("game", {});
+      await colyseus.connectTo(room, { name: 'AuthObserver' });
+      const original = await colyseus.connectTo(room, { name: "Protegido", password: "clave1" });
+      await original.leave();
+      await room.waitForNextPatch();
+      await expect(colyseus.connectTo(room, { name: "Protegido" })).rejects.toBeDefined();
+    });
+
+    it("asignar un punto de atributo sube el stat y baja los puntos disponibles", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "AttrGuy", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.statPoints = 5; p.str = 0;
+      const atk0 = p.pAtk;
+      c.send(MessageType.AllocateStat, { attr: "str" });
+      await room.waitForNextPatch();
+      expect(p.str).toBe(1);
+      expect(p.statPoints).toBe(4);
+      expect(p.pAtk).toBe(atk0 + 2); // +2 ataque por punto de Fuerza
+    });
+
+    it("no se puede asignar sin puntos disponibles (no-op)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "SinPuntos", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.statPoints = 0; p.vit = 0;
+      c.send(MessageType.AllocateStat, { attr: "vit" });
+      await room.waitForNextPatch();
+      expect(p.vit).toBe(0);
+    });
+
+    it("subir de nivel otorga puntos de atributo", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "SubeNivel", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z;
+      const pts0 = p.statPoints;
+      // Entregar q5 (900 exp) parado en el pueblo → sube varios niveles.
+      p.questId = "q5"; p.questProgress = getQuest("q5").amount;
+      c.send(MessageType.InteractNpc, {});
+      await room.waitForNextPatch();
+      expect(p.level).toBeGreaterThan(1);
+      expect(p.statPoints).toBeGreaterThan(pts0);
+    });
+
+    it("modo login: rechaza una cuenta inexistente", async () => {
+      const room = await colyseus.createRoom("game", {});
+      await expect(colyseus.connectTo(room, { name: "Fantasma", password: "clave1", mode: "login" })).rejects.toBeDefined();
+    });
+
+    it("modo login: entra a una cuenta existente con la contraseña correcta", async () => {
+      const room = await colyseus.createRoom("game", {});
+      await colyseus.connectTo(room, { name: 'AuthObserver' });
+      // Crear la cuenta primero.
+      const original = await colyseus.connectTo(room, { name: "Vuelve", password: "clave1", className: "mage", mode: "create" });
+      await original.leave();
+      await room.waitForNextPatch();
+      // Volver a entrar con login.
+      const c = await colyseus.connectTo(room, { name: "Vuelve", password: "clave1", mode: "login" });
+      await room.waitForNextPatch();
+      expect(room.state.players.get(c.sessionId)?.name).toBe("Vuelve");
+    });
+
+    it("modo create: rechaza un nombre ya tomado", async () => {
+      const room = await colyseus.createRoom("game", {});
+      await colyseus.connectTo(room, { name: 'AuthObserver' });
+      const original = await colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "knight", mode: "create" });
+      await original.leave();
+      await room.waitForNextPatch();
+      await expect(colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "rogue", mode: "create" })).rejects.toBeDefined();
+    });
+
+    it("entregar una misión con recompensa de equipo la agrega al inventario", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Botin", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.x = TOWN.x; p.z = TOWN.z;
+      const q = getQuest("q1"); // rewardItemId: leather_vest
+      p.questId = "q1"; p.questProgress = q.amount;
+      c.send(MessageType.InteractNpc, {});
+      await room.waitForNextPatch();
+      expect(p.inventory.get(q.rewardItemId!)?.qty).toBe(1);
+    });
+  });
+
+  describe("Combate competitivo (Etapa 22)", () => {
+    function adjacentMob(room: any, p: any, id = "cc-mob"): any {
+      const mob = new MobState();
+      mob.templateId = "skeleton_minion";
+      mob.mapId = p.mapId;
+      mob.hp = 300; mob.maxHp = 300; mob.pDef = 5; mob.dead = false;
+      mob.x = p.x; mob.z = p.z;
+      room.state.mobs.set(id, mob);
+      return mob;
+    }
+
+    it("Golpe de Escudo aturde al objetivo", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      const mob = adjacentMob(room, p);
+      p.targetId = "cc-mob";
+      c.send(MessageType.UseSkill, { skillId: "shield_bash" });
+      await room.waitForNextPatch();
+      expect(mob.stunMs).toBeGreaterThan(0);
+    });
+
+    it("un jugador aturdido no puede castear", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 8; p.msSinceCombat = 0; p.hp = 10; p.stunMs = 2000;
+      c.send(MessageType.UseSkill, { skillId: "second_wind" });
+      await room.waitForNextPatch();
+      expect(p.hp).toBe(10); // no curó: estaba aturdido
+    });
+
+    it("el maná regenera con el tiempo", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Mago", className: "mage" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.mp = 0;
+      for (let i = 0; i < 40; i++) await room.waitForNextSimulationTick();
+      expect(p.mp).toBeGreaterThan(0);
+    });
+
+    it("Embestida (gap-closer) acerca al caster y aturde", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Barb", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 15; // charge se aprende a nivel 15
+      p.x = p.targetX = 0; p.z = p.targetZ = 14; p.moving = false;
+      const mob = adjacentMob(room, p);
+      mob.x = mob.homeX = 8; mob.z = mob.homeZ = 14; // lejos, en una calle transitable
+      p.targetId = "cc-mob";
+      const distBefore = Math.hypot(mob.x - p.x, mob.z - p.z);
+      c.send(MessageType.UseSkill, { skillId: "charge" });
+      await room.waitForNextPatch();
+      const distAfter = Math.hypot(mob.x - p.x, mob.z - p.z);
+      expect(distAfter).toBeLessThan(distBefore); // se acercó
+      expect(mob.stunMs).toBeGreaterThan(0);
+    });
+
+    it("Voluntad de Hierro limpia el enraizamiento (cleanse)", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 25; // iron_will se aprende a nivel 25
+      p.rootMs = 3000; // enraizado (puede castear)
+      c.send(MessageType.UseSkill, { skillId: "iron_will" });
+      await room.waitForNextPatch();
+      expect(p.rootMs).toBe(0);
+      expect(p.defBuffMs).toBeGreaterThan(0);
+    });
+
+    it("Sed de Sangre cura al caster por robo de vida", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Barb", className: "barbarian" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 25; p.msSinceCombat = 0; p.hp = 50;
+      adjacentMob(room, p);
+      p.targetId = "cc-mob";
+      c.send(MessageType.UseSkill, { skillId: "bloodthirst" });
+      await room.waitForNextPatch();
+      expect(p.hp).toBeGreaterThan(50); // el lifesteal curó
+    });
+
+    it("no se puede castear un skill aún no aprendido", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Caba", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 1; p.msSinceCombat = 0; p.hp = 10;
+      c.send(MessageType.UseSkill, { skillId: "second_wind" }); // se aprende a nivel 8
+      await room.waitForNextPatch();
+      expect(p.hp).toBe(10); // no curó: aún no lo aprendió
+    });
+  });
+});

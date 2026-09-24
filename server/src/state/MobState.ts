@@ -7,6 +7,8 @@ export class MobState extends Schema {
   @type("number") targetZ = 0;
   @type("boolean") moving = false;
   @type("string") templateId = "";
+  @type("number") level = 1;
+  @type("string") rank = "normal";
   @type("string") aiState = "wander";
   /** Mapa al que pertenece el mob (Etapa 15). El cliente sólo renderiza su mapa actual. */
   @type("string") mapId = "";
@@ -19,6 +21,9 @@ export class MobState extends Schema {
   @type("boolean") dead = false;
   @type("number") windupMs = 0;
   @type("number") hazardMs = 0;
+  @type("boolean") channeling = false;
+  hazardCount = 0;
+  hazardPower = 2.2;
   @type("number") hazardX = 0;
   @type("number") hazardZ = 0;
   @type("number") hazardRadius = 6;
@@ -42,5 +47,7 @@ export class MobState extends Schema {
   @type("number") dotMs = 0;
   dotDps = 0;
   dotAttackerId = "";
+  /** Snapshot retained when the caster disconnects before the poison expires. */
+  dotAttackerLevel = 1;
   dotAccumMs = 0;
 }

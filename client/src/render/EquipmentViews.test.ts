@@ -1,6 +1,26 @@
 import {it,expect} from 'vitest';
 import * as THREE from 'three';
 import {EquipmentViews} from './EquipmentViews.js';
+it('fits equipped armor to the existing hero silhouette and restores it on unequip',()=>{
+  const root=new THREE.Group();root.userData.heroClass='Knight';
+  const torso=new THREE.Bone();torso.name='Torso';root.add(torso);
+  const original=new THREE.MeshStandardMaterial({color:0x112233});
+  const body=new THREE.Mesh(new THREE.SphereGeometry(),original);body.name='hero_cuirass';root.add(body);
+  const otherPlayer=body.clone();
+  const equipment=new EquipmentViews(root);
+  equipment.update({armor:'iron_mail'});
+  expect(body.material).not.toBe(original);
+  expect(otherPlayer.material).toBe(original);
+  expect(root.getObjectByName('equipped_armor')).toBeUndefined();
+  equipment.update({});expect(body.material).toBe(original);
+});
+it('keeps both sides of fitted cloth visible after changing armor',()=>{
+  const root=new THREE.Group();root.userData.heroClass='Mage';
+  const mantle=new THREE.Mesh(new THREE.PlaneGeometry(),new THREE.MeshStandardMaterial({side:THREE.DoubleSide}));
+  mantle.name='hero_mantle';root.add(mantle);
+  new EquipmentViews(root).update({armor:'iron_mail'});
+  expect(mantle.material.side).toBe(THREE.DoubleSide);
+});
 it('replaces equipment without accumulating meshes and restores original weapons',()=>{
   const root=new THREE.Group(),hand=new THREE.Bone(),original=new THREE.Mesh();hand.name='WeaponR';original.name='Warrior_Sword';hand.add(original);root.add(hand);
   const equipment=new EquipmentViews(root);

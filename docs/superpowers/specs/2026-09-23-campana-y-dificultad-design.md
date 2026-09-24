@@ -1,6 +1,6 @@
 # Campaña de Aden: dificultad y capítulo de la Memoria
 
-Fecha: 2026-09-23. Estado: propuesta escrita para revisión; no implementada.
+Fecha: 2026-09-23; actualizada el 24. Estado: dificultad por nivel, recuperación de pociones, campaña principal Marismas → Monasterio → Prior y tres encargos opcionales de Boren implementados. Quedan las partidas completas de balance. Ver `../../campaign-delivery-2026-09-23.md` para el alcance exacto y las comprobaciones.
 
 ## 1. Intención y alcance
 
@@ -210,4 +210,4 @@ La primera calibración no borra objetos ni reasigna atributos gastados. Si camb
 5. Monasterio, aprendizaje de movilidad, prior y epílogo.
 6. Recorridos de balance, cooperación y revisión visual final.
 
-Este documento define la propuesta y sus criterios. Los valores finales de calibración se obtienen con los perfiles y los recorridos descritos; no se afirma que el juego ya sea más difícil. El siguiente paso del proceso es la revisión de este diseño antes de escribir el plan de implementación.
+Este documento conserva la visión completa y sus criterios. La entrega y sus comprobaciones se registran en `../../campaign-delivery-2026-09-23.md`. Las ocho misiones narrativas se representan como quince pasos persistidos para ordenar pistas, celdas y anclajes; los pasos intermedios del Monasterio avanzan automáticamente. Los tres encargos de Boren guardan progreso independiente. Los recorridos completos con cinco clases continúan pendientes.

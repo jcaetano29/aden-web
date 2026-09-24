@@ -56,13 +56,13 @@ describe('party integration', () => {
   it('removes a disconnecting player before awaiting persistence, preventing a new invitation', async () => {
     const { room, a, b, c } = await setup();
     let release!: () => void;
-    vi.spyOn(room['persistence'], 'save').mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
+    vi.spyOn(room['persistence'], 'saveMany').mockImplementationOnce(() => new Promise<void>(resolve => { release = resolve; }));
     const leaving = room.onLeave(room.clients.find(client => client.sessionId === b.sessionId)!);
     try {
       expect(room.state.players.has(b.sessionId)).toBe(false);
       expect(room['parties'].invite(c.sessionId, b.sessionId).success).toBe(false);
       expect(room.state.players.get(a.sessionId)!.partyId).toBe('');
-    } finally { release(); await leaving; }
+    } finally { await vi.waitFor(() => expect(release).toBeTypeOf('function')); release(); await leaving; }
   });
 
   it('preserves full public crypt EXP without granting it twice to a party member', async () => {

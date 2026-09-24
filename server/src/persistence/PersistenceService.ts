@@ -1,5 +1,6 @@
 import type { CharacterSave } from "./CharacterSave.js";
 import type { GuildSave } from "./GuildSave.js";
+import type { CharacterSaveEntry } from './CharacterSaveQueue.js';
 
 export interface CharacterRank { name: string; level: number; pvpKills: number; className: string; }
 export interface GuildRank { name: string; tag: string; bossKills: number; }
@@ -10,6 +11,7 @@ export interface AccountRecord { name: string; passwordHash: string; passwordSal
 export interface PersistenceService {
   load(name: string): Promise<CharacterSave | null>;
   save(name: string, data: CharacterSave): Promise<void>;
+  saveMany(entries: CharacterSaveEntry[]): Promise<void>;
   loadGuild(id: string): Promise<GuildSave | null>;
   saveGuild(g: GuildSave): Promise<void>;
   topCharacters(limit: number): Promise<CharacterRank[]>;
@@ -38,6 +40,11 @@ export class InMemoryPersistence implements PersistenceService {
 
   async save(name: string, data: CharacterSave): Promise<void> {
     this.store.set(name, cloneCharacterSave(data));
+  }
+
+  async saveMany(entries: CharacterSaveEntry[]): Promise<void> {
+    const copies=entries.map(({name,data})=>({name,data:cloneCharacterSave(data)}));
+    for(const {name,data} of copies)this.store.set(name,data);
   }
 
   private readonly guilds = new Map<string, GuildSave>();

@@ -90,13 +90,14 @@ export class ClassSelect {
               <div><dt><kbd>C</kbd></dt><dd>Atributos del personaje</dd></div>
               <div><dt><kbd>M</kbd></dt><dd>Mapa y viajes</dd></div>
               <div><dt><kbd>P</kbd></dt><dd>Grupo (party)</dd></div>
+              <div><dt><kbd>R</kbd></dt><dd>Trade de oro y objetos con jugadores cercanos</dd></div>
               <div><dt><kbd>G</kbd></dt><dd>Clan (guild)</dd></div>
               <div><dt><kbd>T</kbd></dt><dd>Progreso, logros y misión diaria</dd></div>
               <div><dt><kbd>L</kbd></dt><dd>Clasificación de jugadores y clanes</dd></div>
               <div><dt><kbd>N</kbd></dt><dd>Silenciar o activar el sonido</dd></div>
               <div><dt><kbd>Enter</kbd></dt><dd>Escribir y enviar en el chat. Cerca habla con vecinos; Global con todo el servidor.</dd></div>
             </dl>
-            <p class="character-guide-note">Volvé a pulsar la misma tecla para cerrar un panel. <kbd>Esc</kbd> sale del chat o cierra el grupo. En el chat, usá /g para Global y /s para Cerca.</p>
+            <p class="character-guide-note">Volvé a pulsar la misma tecla para cerrar un panel. <kbd>Esc</kbd> sale del chat o cierra el grupo y el trade. En el inventario podés tirar objetos al suelo. En el chat, usá /g para Global y /s para Cerca.</p>
           </div>
         </div>
         <p class="character-guide-tip"><strong>Tu primera misión:</strong> al entrar, hablá con el Anciano del pueblo para comenzar la aventura.</p>

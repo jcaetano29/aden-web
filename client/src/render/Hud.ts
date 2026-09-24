@@ -1,4 +1,4 @@
-import { expToNextLevel, getQuest, getClass, getSkill } from "@aden/shared";
+import { expToNextLevel, getQuest, getClass, getSkill, getNpc, VEIL_COMPLETE, MEMORY_COMPLETE } from "@aden/shared";
 import { COLORS, FONT_DISPLAY, makeThemedBar } from "./theme.js";
 
 const BAR_WIDTH_PX = 190;
@@ -32,6 +32,7 @@ export class Hud {
   private levelUpTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly questLabel: HTMLDivElement;
   private readonly goldLabel: HTMLDivElement;
+  private readonly potionLabel = document.createElement('div');
   private readonly toastBanner: HTMLDivElement;
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private readonly announceBanner: HTMLDivElement;
@@ -101,6 +102,9 @@ export class Hud {
     this.goldLabel.style.cssText = `font-size:13px;color:${COLORS.parchment};display:flex;align-items:center;gap:6px;`;
     this.goldLabel.innerHTML = `<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#ffe9a6,#c9a24b 60%,#7a5c22);box-shadow:0 0 5px rgba(201,162,75,0.6);"></span><span data-gold>0</span>`;
     col.appendChild(this.goldLabel);
+    this.potionLabel.style.cssText='font:11px system-ui,sans-serif;color:#c8c2ad';
+    this.potionLabel.dataset.potionRecovery='';
+    col.appendChild(this.potionLabel);
 
     this.deathBanner = document.createElement("div");
     this.deathBanner.textContent = "Has caído — renaciendo…";
@@ -166,6 +170,11 @@ export class Hud {
   }
 
   /** Anuncio de evento de mundo (más prominente/duradero que un toast). */
+  updatePotionRecovery(hpMs: number, mpMs: number): void {
+    const text=`Q · Vida: ${hpMs>0?Math.ceil(hpMs/1000)+' s':'lista'} · Maná: ${mpMs>0?Math.ceil(mpMs/1000)+' s':'lista'}`;
+    if(this.potionLabel.textContent!==text)this.potionLabel.textContent=text;
+  }
+
   announce(msg: string, ms = 4500): void {
     this.announceBanner.textContent = msg;
     this.announceBanner.style.display = "";
@@ -250,14 +259,18 @@ export class Hud {
 
     if (questId === "") {
       this.questLabel.textContent = "⚑ Hablá con el Anciano";
+    } else if (questId === VEIL_COMPLETE) {
+      this.questLabel.textContent = '✦ Paso abierto · hablá con Maera';
+    } else if (questId === MEMORY_COMPLETE) {
+      this.questLabel.textContent = '✦ La Memoria del Velo completada';
     } else if (questId === "campaign_complete") {
-      this.questLabel.textContent = "✦ Campaña completada";
+      this.questLabel.textContent = "✦ Nihil cayó — hablá con Rowan";
     } else {
       try {
         const quest = getQuest(questId);
         const questText = `⚑ ${quest.title} — ${questProgress}/${quest.amount}`;
         this.questLabel.textContent =
-          questProgress >= quest.amount ? questText + " — ¡Volvé al Anciano!" : questText;
+          questProgress >= quest.amount ? questText + ` — Volvé con ${getNpc(quest.returnNpcId ?? 'elder').name}` : questText;
       } catch {
         this.questLabel.textContent = "⚑ Misión desconocida";
       }

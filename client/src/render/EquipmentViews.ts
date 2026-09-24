@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { getItem,itemVisual } from '@aden/shared';
 import { createItemModel } from './ItemModels.js';
+import { HeroEquipment } from './HeroEquipment.js';
 
 /** Shared item meshes fitted in character units, then attached to animated bones. */
 export class EquipmentViews {
@@ -8,7 +9,9 @@ export class EquipmentViews {
   private meshes:THREE.Object3D[]=[];
   private originals:{object:THREE.Object3D;visible:boolean}[]=[];
   private readonly reference=new Map<THREE.Object3D,THREE.Matrix4>();
+  private readonly hero:HeroEquipment;
   constructor(private readonly root:THREE.Object3D) {
+    this.hero=new HeroEquipment(root);
     // Captured before the character mixer starts; never fit against a moving bone.
     root.updateWorldMatrix(true,true);
     const inverse=root.matrixWorld.clone().invert();
@@ -32,6 +35,7 @@ export class EquipmentViews {
     };
     for(const [slot,id] of Object.entries(equipment)) {
       if(!id||!anchors[slot])continue;
+      if(this.hero.apply(slot,id))continue;
       if(['gloves','boots','pants'].includes(slot)) {
         for(const side of [-1,1] as const) {
           const boneName=`${slot==='gloves'?'Fist':slot==='boots'?'Foot':'UpperLeg'}.${side===1?'L':'R'}`;
@@ -56,6 +60,6 @@ export class EquipmentViews {
       this.attach(mesh,anchor,new THREE.Vector3(x,y,z).multiplyScalar(h/2.5),scale*h/2.5);
     }
   }
-  private clear(){for(const mesh of this.meshes)mesh.removeFromParent();this.meshes=[];for(const {object,visible} of this.originals)object.visible=visible;this.originals=[];}
+  private clear(){this.hero.clear();for(const mesh of this.meshes)mesh.removeFromParent();this.meshes=[];for(const {object,visible} of this.originals)object.visible=visible;this.originals=[];}
   dispose(){this.clear();this.signature='';}
 }

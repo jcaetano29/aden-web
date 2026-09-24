@@ -2,14 +2,18 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { CharacterGender } from '@aden/shared';
 import { addRangerEquipment } from './HeroDetails.js';
-import { surfaceMaps, type SurfaceKind } from './materialAtlas.js';
+import { heroMaterial } from './HeroMaterials.js';
+import { addHeroBody } from './HeroBody.js';
+import { heroFaceMaterial } from './HeroFaces.js';
+import { createHeroHair } from './HeroHair.js';
+import { heroEquipmentSlot } from './HeroEquipment.js';
 
 const PALETTES: Record<string, { armor: number; cloth: number; trim: number; hair: number; skin: number }> = {
-  Knight: { armor: 0x60798f, cloth: 0x722e3d, trim: 0xc5a367, hair: 0x39251d, skin: 0xc99573 },
-  Mage: { armor: 0x334477, cloth: 0x242a51, trim: 0xb7cddd, hair: 0xc4c8d2, skin: 0xd1a188 },
-  Barbarian: { armor: 0x614431, cloth: 0x713628, trim: 0xb79b68, hair: 0x753925, skin: 0xb97c55 },
-  Rogue: { armor: 0x303c4c, cloth: 0x3c294f, trim: 0x929daa, hair: 0x191c29, skin: 0xbe9781 },
-  Ranger: { armor: 0x465b3c, cloth: 0x293b2e, trim: 0xb69256, hair: 0x754125, skin: 0xc79972 },
+  Knight: { armor: 0x9da6b3, cloth: 0x642c39, trim: 0xbfa36e, hair: 0x392b24, skin: 0xc99573 },
+  Mage: { armor: 0x535079, cloth: 0x302b49, trim: 0xb7cddd, hair: 0xa5a6b0, skin: 0xd1a188 },
+  Barbarian: { armor: 0x79604b, cloth: 0x563c33, trim: 0xb79b68, hair: 0x593528, skin: 0xb97c55 },
+  Rogue: { armor: 0x515363, cloth: 0x43364d, trim: 0x929daa, hair: 0x25232a, skin: 0xbe9781 },
+  Ranger: { armor: 0x667451, cloth: 0x3d4936, trim: 0xb69256, hair: 0x533b29, skin: 0xc79972 },
 };
 
 /** Sculpted modular meshes use the original animated rig and equipment anchors.
@@ -34,15 +38,11 @@ export function buildHeroAppearance(root: THREE.Object3D, model: string, gender:
   };
   const point = (name: string) => bone(name).getWorldPosition(new THREE.Vector3());
   const mat = (color: number, metalness = 0, roughness = .78) => new THREE.MeshStandardMaterial({ color, metalness, roughness });
-  const armor = mat(palette.armor, model === 'Knight' ? .72 : .15, model === 'Knight' ? .34 : .7);
-  const cloth = mat(palette.cloth), trim = mat(palette.trim, .7, .32), leather = mat(0x302720);
-  const skin = mat(palette.skin, 0, .88), hair = mat(palette.hair), dark = mat(0x17171c), white = mat(0xe5dcc8);
+  const armor = heroMaterial(model === 'Knight' ? 'metal' : model === 'Mage' ? 'cloth' : 'leather', palette.armor);
+  const cloth = heroMaterial('cloth', palette.cloth), trim = heroMaterial('metal', palette.trim), leather = heroMaterial('leather', 0x514436);
+  const skin = mat(palette.skin, 0, .92), hair = heroMaterial('hair', palette.hair), dark = mat(0x17171c), white = mat(0xb3aaa0);
   const iris = mat(model === 'Mage' ? 0x638da5 : model === 'Ranger' ? 0x677d43 : 0x685341);
-  const lip = mat(0x925e51), fur = mat(model === 'Barbarian' ? 0x9d8a6c : 0x343942);
-  for (const [material, kind] of [[armor, model === 'Knight' ? 'metal' : 'leather'], [cloth, 'cloth'], [leather, 'leather'], [trim, 'metal']] as [THREE.MeshStandardMaterial, SurfaceKind][]) {
-    const maps = surfaceMaps(kind);
-    if (maps) { material.bumpMap = maps.bump; material.bumpScale = kind === 'metal' ? .009 : .018; material.roughnessMap = maps.roughness; }
-  }
+  const lip = mat(0x925e51), fur = heroMaterial('hair', model === 'Barbarian' ? 0x91816a : 0x343942);
   const orb = new THREE.SphereGeometry(1, 16, 12);
   const part = (name: string, anchor: string, geometry: THREE.BufferGeometry, material: THREE.Material, position: THREE.Vector3, scale?: THREE.Vector3) => {
     const mesh = new THREE.Mesh(geometry, material); mesh.name = name; mesh.position.copy(position);
@@ -53,31 +53,41 @@ export function buildHeroAppearance(root: THREE.Object3D, model: string, gender:
   const ellipsoid = (name: string, anchor: string, pos: THREE.Vector3, x: number, y: number, z: number, material: THREE.Material) =>
     part(name, anchor, orb, material, pos, new THREE.Vector3(x * h, y * h, z * h));
   const offset = (p: THREE.Vector3, x: number, y: number, z: number) => p.clone().add(new THREE.Vector3(x, y, z).multiplyScalar(h));
-  const tube = (name: string, anchor: string, from: THREE.Vector3, to: THREE.Vector3, r1: number, r2: number, material: THREE.Material) => {
+  const tube = (name: string, anchor: string, from: THREE.Vector3, to: THREE.Vector3, r1: number, r2: number, material: THREE.Material, roundedRoot = false) => {
     const length = from.distanceTo(to);
-    const profile = [[r1, -.5], [r1 * 1.04, -.3], [(r1 + r2) * .51, .1], [r2, .4], [r2 * .96, .5]];
-    const mesh = new THREE.Mesh(new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r * h, y * length)), 12), material);
+    const profile = roundedRoot
+      ? [[0, -.56], [r1 * .38, -.49], [r1 * .82, -.38], [r1 * 1.03, -.17], [(r1 + r2) * .49, .17], [r2, .45], [0, .56]]
+      : [[0, -.56], [r1 * .87, -.51], [r1, -.4], [r1 * 1.035, -.24], [(r1 + r2) * .51, .07], [r2, .4], [r2 * .87, .51], [0, .56]];
+    const curve = new THREE.SplineCurve(profile.map(([r, y]) => new THREE.Vector2(r * h, y * length)));
+    const mesh = new THREE.Mesh(new THREE.LatheGeometry(curve.getPoints(12), 16), material);
     mesh.name = name; mesh.position.copy(from).lerp(to, .5);
     mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), to.clone().sub(from).normalize());
     root.add(mesh); root.updateMatrixWorld(true); bone(anchor).attach(mesh); mesh.castShadow = true;
     return mesh;
   };
   const lathe = (name: string, anchor: string, pos: THREE.Vector3, profile: number[][], depth: number, material: THREE.Material) => {
-    const geometry = new THREE.LatheGeometry(profile.map(([r, y]) => new THREE.Vector2(r * h, y * h)), 16);
+    const curve = new THREE.SplineCurve(profile.map(([r, y]) => new THREE.Vector2(r * h, y * h)));
+    const geometry = new THREE.LatheGeometry(curve.getPoints(12), 24);
     return part(name, anchor, geometry, material, pos, new THREE.Vector3(1, 1, depth));
   };
   const hips = point('Hips'), neck = point('Neck'), head = point('Head');
-  const waist = offset(hips, 0, .06, 0);
-  const torsoHeight = (neck.y - waist.y) / h;
-  const chest = female ? .127 : .151, waistR = female ? .084 : .108;
-  lathe('hero_cuirass', 'Torso', waist, [[waistR, 0], [waistR, .045], [chest, torsoHeight * .65], [chest * .88, torsoHeight * .86], [.062, torsoHeight]], .65, armor);
-  lathe('hero_undercoat', 'Hips', offset(hips, 0, -.10, 0), [[female ? .139 : .143, 0], [.123, .085], [waistR, .16]], .68, cloth);
-  lathe('hero_belt', 'Abdomen', waist, [[waistR + .007, 0], [waistR + .007, .027]], .72, leather);
+  const waist = new THREE.Vector3(hips.x, THREE.MathUtils.lerp(hips.y - h * .07, neck.y, .38), hips.z);
+  const chest = female ? .124 : .151, waistR = female ? .080 : .098;
+  addHeroBody(root, female, armor);
+  const body = root.getObjectByName('hero_cuirass') as THREE.SkinnedMesh;
+  body.skeleton.update();
+  const ray = new THREE.Raycaster();
+  const fitFront = (position: THREE.Vector3) => {
+    ray.set(new THREE.Vector3(position.x, position.y, h * 2), new THREE.Vector3(0, 0, -1));
+    const hit = ray.intersectObject(body, false)[0];
+    return hit ? hit.point.add(new THREE.Vector3(0, 0, h * .003)) : position;
+  };
+  lathe('hero_belt', 'Abdomen', offset(waist, 0, -.006, 0), [[waistR + .006, 0], [waistR + .005, .018]], .72, leather);
   const clasp = part('hero_buckle', 'Abdomen', new THREE.BoxGeometry(.033 * h, .026 * h, .012 * h), trim, offset(waist, 0, .015, waistR * .73));
   clasp.userData.heroDetail = true;
   tube('hero_neck', 'Neck', offset(neck, 0, -.018, 0), offset(head, 0, -.005, 0), .039, .035, skin);
   // Gorget and a raised class emblem catch light at the game's camera distance.
-  lathe('hero_collar', 'Torso', offset(neck, 0, -.033, 0), [[.064, 0], [.058, .037]], .8, trim);
+  lathe('hero_collar', 'Torso', offset(neck, 0, -.010, 0), [[female ? .041 : .046, 0], [female ? .039 : .044, .012]], .85, trim);
   const emblem = part('hero_emblem', 'Torso', new THREE.OctahedronGeometry(h * .032), trim, offset(neck, 0, -.105, chest * .65));
   emblem.scale.z *= .35;
   for (const sign of [-1, 1]) {
@@ -88,39 +98,53 @@ export function buildHeroAppearance(root: THREE.Object3D, model: string, gender:
   }
   if (model === 'Ranger' || model === 'Rogue' || model === 'Barbarian') {
     const start = offset(neck, -.078, -.045, chest * .59), end = offset(waist, .065, .025, waistR * .72);
-    tube('hero_crossbelt', 'Torso', start, end, .012, .012, leather);
-    part('hero_crossbelt_clasp', 'Torso', new THREE.BoxGeometry(h * .027, h * .03, h * .012), trim, start.clone().lerp(end, .48));
+    const path = new THREE.CatmullRomCurve3(Array.from({ length: 13 }, (_, i) => fitFront(start.clone().lerp(end, i / 12))));
+    const geometry = new THREE.TubeGeometry(path, 24, h * .009, 6, false);
+    const strap = part('hero_crossbelt', 'Torso', geometry, leather, new THREE.Vector3());
+    strap.castShadow = true;
+    part('hero_crossbelt_clasp', 'Torso', new THREE.BoxGeometry(h * .023, h * .026, h * .009), trim, fitFront(start.clone().lerp(end, .48)));
   }
   for (const side of ['L', 'R']) {
     const sign = side === 'L' ? 1 : -1;
     const upper = point(`UpperArm.${side}`), elbow = point(`LowerArm.${side}`), hand = point(`Fist.${side}`);
-    tube(`hero_sleeve_${side}`, `UpperArm.${side}`, upper, elbow, female ? .043 : .052, .037, model === 'Barbarian' ? skin : cloth);
-    tube(`hero_bracer_${side}`, `LowerArm.${side}`, elbow, hand, .038, .029, armor);
+    tube(`hero_sleeve_${side}`, `UpperArm.${side}`, upper, elbow, female ? .040 : .052, female ? .029 : .037, model === 'Barbarian' ? skin : cloth);
+    ellipsoid(`hero_elbow_${side}`, `LowerArm.${side}`, elbow, female ? .030 : .036, .036, .032, model === 'Barbarian' ? skin : cloth);
+    tube(`hero_bracer_${side}`, `LowerArm.${side}`, elbow, hand, female ? .033 : .039, female ? .023 : .028, armor);
     tube(`hero_cuff_${side}`, `LowerArm.${side}`, elbow.clone().lerp(hand, .78), elbow.clone().lerp(hand, .86), .035, .033, trim);
-    ellipsoid(`hero_glove_${side}`, `Fist.${side}`, hand, .034, .05, .035, leather);
-    ellipsoid(`hero_pauldron_${side}`, `UpperArm.${side}`, offset(upper, sign * .008, 0, 0), female ? .059 : .074, .045, .068, model === 'Barbarian' ? fur : armor);
+    ellipsoid(`hero_glove_${side}`, `Fist.${side}`, hand, female ? .026 : .031, .045, .025, leather);
+    const pauldron = ellipsoid(`hero_pauldron_${side}`, `UpperArm.${side}`, offset(upper, sign * .007, .006, 0), female ? .054 : .066, .029, .058, model === 'Barbarian' ? fur : armor);
+    pauldron.rotation.z += sign * -.18;
+    if (model === 'Knight') {
+      const plate = ellipsoid(`hero_pauldron_lame_${side}`, `UpperArm.${side}`, offset(upper, sign * .013, -.014, 0), female ? .058 : .070, .015, .061, trim);
+      plate.rotation.z += sign * -.22;
+    }
     tube(`hero_shoulder_trim_${side}`, `UpperArm.${side}`, upper.clone().lerp(elbow, .15), upper.clone().lerp(elbow, .20), female ? .049 : .06, female ? .047 : .058, trim);
     ellipsoid(`hero_thumb_${side}`, `Fist.${side}`, offset(hand, -sign * .023, -.016, .023), .013, .026, .017, leather);
     const hip = point(`UpperLeg.${side}`), knee = point(`LowerLeg.${side}`), foot = point(`Foot.${side}`);
-    tube(`hero_trouser_${side}`, `UpperLeg.${side}`, hip, knee, female ? .059 : .064, .039, cloth);
-    tube(`hero_greave_${side}`, `LowerLeg.${side}`, knee, offset(foot, 0, .035, 0), .043, .034, model === 'Knight' ? armor : leather);
-    ellipsoid(`hero_knee_${side}`, `LowerLeg.${side}`, offset(knee, 0, .006, .022), .046, .048, .027, armor);
+    tube(`hero_trouser_${side}`, `UpperLeg.${side}`, offset(hip, -sign * .012, .025, 0), knee, female ? .065 : .064, female ? .033 : .039, model === 'Knight' ? armor : cloth, true);
+    tube(`hero_greave_${side}`, `LowerLeg.${side}`, knee, offset(foot, 0, .025, 0), female ? .036 : .043, female ? .025 : .030, model === 'Knight' ? armor : leather);
+    ellipsoid(`hero_knee_${side}`, `LowerLeg.${side}`, offset(knee, 0, .004, .015), female ? .033 : .040, .041, .022, armor);
     ellipsoid(`hero_boot_${side}`, `Foot.${side}`, new THREE.Vector3(foot.x, h * .037, foot.z + h * .023), .044, .037, .076, leather);
-    part(`hero_sole_${side}`, `Foot.${side}`, new THREE.BoxGeometry(h * .087, h * .016, h * .144), dark, new THREE.Vector3(foot.x, h * .009, foot.z + h * .024));
+    ellipsoid(`hero_sole_${side}`, `Foot.${side}`, new THREE.Vector3(foot.x, h * .012, foot.z + h * .024), .044, .012, .074, dark);
   }
-  // A tailored tabard / split robe instead of a rigid full-length cone.
+  // Curved, draped panels with folds and pointed hems, rather than box slabs.
   if (model === 'Mage' || model === 'Knight') {
+    const fabric = cloth.clone(); fabric.side = THREE.DoubleSide;
     for (const sign of [-1, 1]) {
-      const panel = part(`hero_tabard_${sign}`, 'Hips', new THREE.BoxGeometry(h * .085, h * (model === 'Mage' ? .25 : .13), h * .015), cloth, offset(hips, sign * .046, model === 'Mage' ? -.10 : -.047, .097));
-      panel.rotation.z += sign * .08;
-      part(`hero_tabard_trim_${sign}`, 'Hips', new THREE.BoxGeometry(h * .012, h * (model === 'Mage' ? .245 : .125), h * .018), trim, offset(hips, sign * .083, model === 'Mage' ? -.10 : -.047, .099));
+      const length = model === 'Mage' ? .30 : .15;
+      const geometry = new THREE.PlaneGeometry(h * .081, h * length, 8, 16);
+      const position = geometry.getAttribute('position'), uv = geometry.getAttribute('uv');
+      for (let i = 0; i < position.count; i++) {
+        const u = uv.getX(i), v = uv.getY(i), drop = 1 - v;
+        position.setXYZ(i, position.getX(i) * (.72 + drop * .4), position.getY(i) - Math.sin(u * Math.PI) * drop ** 4 * h * .028,
+          h * (.008 * Math.cos(u * Math.PI * 4) + .028 * drop * drop));
+      }
+      geometry.computeVertexNormals();
+      part(`hero_tabard_${sign}`, 'Hips', geometry, fabric, offset(hips, sign * .047, .025 - length / 2, .087));
     }
   }
   if (model === 'Barbarian') {
-    for (let i = 0; i < 10; i++) {
-      const angle = i * Math.PI * 2 / 10;
-      ellipsoid(`hero_fur_${i}`, 'Torso', offset(neck, Math.cos(angle) * .105, -.03, Math.sin(angle) * .068), .038, .028, .029, fur);
-    }
+    lathe('hero_fur_mantle', 'Torso', offset(neck, 0, -.048, 0), [[.123, 0], [.137, .015], [.123, .033], [.067, .040]], .66, fur);
   }
   if (model === 'Ranger' || model === 'Rogue' || model === 'Mage') {
     // Shoulder mantle stays above the thighs to avoid clipping walk and attacks.
@@ -128,47 +152,52 @@ export function buildHeroAppearance(root: THREE.Object3D, model: string, gender:
     const mantleMat = cloth.clone(); mantleMat.side = THREE.DoubleSide;
     part('hero_mantle', 'Torso', geo, mantleMat, offset(neck, 0, -.14, -.035), new THREE.Vector3(1, 1, .6));
   }
-  const center = offset(head, 0, .039, .003);
-  const faceGeometry = new THREE.SphereGeometry(1, 20, 16);
+  const center = offset(head, 0, .025, .003);
+  const faceGeometry = new THREE.SphereGeometry(1, 32, 24);
   const positions = faceGeometry.getAttribute('position');
+  const faceUv = faceGeometry.getAttribute('uv');
+  const texturedFace = heroFaceMaterial(female, palette.skin);
+  const colors: number[] = [];
   for (let i = 0; i < positions.count; i++) {
-    const y = positions.getY(i);
-    if (y < 0) positions.setX(i, positions.getX(i) * (1 + y * (female ? .27 : .12)));
+    const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
+    if (y < 0) positions.setX(i, x * (1 + y * (female ? .28 : .17)));
+    // A restrained jaw, brow plane and cheeks; vertex tint avoids painted-on
+    // facial details swimming as the head moves.
+    if (z > 0) {
+      let depth = z * (1 - .10 * Math.exp(-((y - .12) ** 2) / .025));
+      if (texturedFace) {
+        depth += .12 * Math.exp(-((x / .12) ** 2) - (((y + .12) / .28) ** 2));
+        depth += .13 * Math.exp(-((x / .15) ** 2) - (((y + .33) / .12) ** 2));
+        depth += .06 * Math.exp(-(((Math.abs(x) - .48) / .2) ** 2) - (((y + .2) / .17) ** 2));
+        depth += .035 * Math.exp(-((x / .3) ** 2) - (((y + .60) / .09) ** 2));
+      }
+      positions.setZ(i, depth);
+    }
+    if (texturedFace) faceUv.setXY(i, .5 + x * .42, .56 + y * .35);
+    const cheek = Math.exp(-((Math.abs(x) - .55) ** 2 + (y + .17) ** 2) / .10) * Math.max(z, 0);
+    const shade = .91 + Math.max(y, 0) * .09;
+    colors.push(shade, shade - cheek * .10, shade - cheek * .12);
   }
+  faceGeometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   faceGeometry.computeVertexNormals();
-  part('hero_head', 'Head', faceGeometry, skin, center, new THREE.Vector3(h * (female ? .068 : .074), h * .086, h * .064));
-  ellipsoid('hero_nose', 'Head', offset(center, 0, -.004, .061), female ? .008 : .011, .019, .01, skin);
-  ellipsoid('hero_mouth', 'Head', offset(center, 0, -.034, .058), female ? .019 : .022, .0025, .002, lip);
+  const faceMaterial = texturedFace ?? skin.clone(); faceMaterial.vertexColors = true;
+  part('hero_head', 'Head', faceGeometry, faceMaterial, center, new THREE.Vector3(h * (female ? .062 : .067), h * .083, h * .061));
+  if (!texturedFace) {
+    ellipsoid('hero_nose', 'Head', offset(center, 0, -.004, .057), female ? .0065 : .008, .017, .010, skin);
+    ellipsoid('hero_mouth', 'Head', offset(center, 0, -.030, .056), female ? .014 : .016, .002, .0018, lip);
+  }
   for (const sign of [-1, 1]) {
-    ellipsoid(`hero_ear_${sign}`, 'Head', offset(center, sign * .064, -.007, 0), .013, .021, .011, skin);
-    ellipsoid(`hero_eye_${sign}`, 'Head', offset(center, sign * .027, .007, .059), .013, .005, .003, white);
-    ellipsoid(`hero_iris_${sign}`, 'Head', offset(center, sign * .027, .007, .061), .0045, .0045, .002, iris);
-    ellipsoid(`hero_pupil_${sign}`, 'Head', offset(center, sign * .027, .007, .063), .002, .0035, .0015, dark);
-    ellipsoid(`hero_eye_glint_${sign}`, 'Head', offset(center, sign * .027 - .002, .009, .064), .0012, .0012, .001, white);
-    const brow = ellipsoid(`hero_brow_${sign}`, 'Head', offset(center, sign * .026, .023, .057), .018, female ? .0028 : .004, .003, hair);
+    if (!female) ellipsoid(`hero_ear_${sign}`, 'Head', offset(center, sign * .060, -.007, 0), .008, .018, .009, skin);
+    if (texturedFace) continue;
+    ellipsoid(`hero_eye_${sign}`, 'Head', offset(center, sign * .024, .006, .053), .010, .0032, .002, white);
+    ellipsoid(`hero_iris_${sign}`, 'Head', offset(center, sign * .024, .006, .0545), .0030, .0031, .0013, iris);
+    ellipsoid(`hero_pupil_${sign}`, 'Head', offset(center, sign * .024, .006, .0555), .0015, .0025, .001, dark);
+    const brow = ellipsoid(`hero_brow_${sign}`, 'Head', offset(center, sign * .024, .018, .052), .013, female ? .002 : .0028, .002, hair);
     brow.rotation.z += sign * .07;
   }
-  // Sculpted hair crown, swept locks and class-specific tied hair.
-  part('hero_hair_crown', 'Head', new THREE.SphereGeometry(1, 20, 12, 0, Math.PI * 2, 0, Math.PI * .54), hair, offset(center, 0, .01, -.006), new THREE.Vector3(h * .076, h * .081, h * .069));
-  for (let i = 0; i < 5; i++) {
-    const lock = ellipsoid(`hero_fringe_${i}`, 'Head', offset(center, (i - 2) * .022, .059 - i * .003, .039), .022, .03, .023, hair);
-    lock.rotation.z += -.3;
-  }
-  if (female) {
-    const long = model === 'Mage' || model === 'Barbarian';
-    for (const sign of [-1, 1]) {
-      ellipsoid(`hero_hair_side_${sign}`, 'Head', offset(center, sign * .062, -.024, -.012), .021, long ? .097 : .062, .045, hair);
-    }
-    ellipsoid('hero_hair_back', 'Head', offset(center, 0, -.018, -.04), .063, long ? .108 : .065, .034, hair);
-    if (model === 'Knight' || model === 'Ranger' || model === 'Barbarian') {
-      for (let i = 0; i < 7; i++) {
-        ellipsoid(`hero_braid_${i}`, 'Head', offset(center, .065 + Math.sin(i * 2.5) * .004, -.068 - i * .019, -.035), .018 - i * .0012, .014, .018 - i * .0012, i === 5 ? trim : hair);
-      }
-    }
-  } else {
-    for (const sign of [-1, 1]) ellipsoid(`hero_sideburn_${sign}`, 'Head', offset(center, sign * .061, -.018, -.004), .013, .035, .03, hair);
-    if (model === 'Mage' || model === 'Barbarian') ellipsoid('hero_beard', 'Head', offset(center, 0, -.061, .032), .047, .04, .037, hair);
-  }
+  const hairMaterial = hair.clone(); hairMaterial.side = THREE.DoubleSide;
+  part('hero_hair', 'Head', createHeroHair(female, model === 'Mage' || model === 'Barbarian'),
+    hairMaterial, center, new THREE.Vector3(h, h, h));
   if (model === 'Mage') {
     const band = new THREE.TorusGeometry(h * .067, h * .0045, 6, 32);
     const circlet = part('hero_circlet', 'Head', band, trim, offset(center, 0, .033, 0));
@@ -187,12 +216,14 @@ function mergeRigidDetails(root: THREE.Object3D): void {
   const anchors: THREE.Object3D[] = [];
   root.traverse(object => { if (object.children.some(child => child.name.startsWith('hero_'))) anchors.push(object); });
   for (const anchor of anchors) {
-    const groups = new Map<THREE.Material, THREE.Mesh[]>();
+    const groups = new Map<string, { material: THREE.Material; parts: THREE.Mesh[] }>();
     for (const child of anchor.children) {
-      if (!(child instanceof THREE.Mesh) || !child.name.startsWith('hero_') || Array.isArray(child.material)) continue;
-      const parts = groups.get(child.material) ?? []; parts.push(child); groups.set(child.material, parts);
+      if (!(child instanceof THREE.Mesh) || child instanceof THREE.SkinnedMesh || !child.name.startsWith('hero_') || Array.isArray(child.material)) continue;
+      const key = `${child.material.uuid}:${heroEquipmentSlot(child.name) ?? 'detail'}`;
+      const group = groups.get(key) ?? { material: child.material, parts: [] as THREE.Mesh[] };
+      group.parts.push(child); groups.set(key, group);
     }
-    for (const [material, parts] of groups) {
+    for (const [key, { material, parts }] of groups) {
       if (parts.length < 2) continue;
       const geometries = parts.map(mesh => {
         mesh.updateMatrix();
@@ -202,7 +233,7 @@ function mergeRigidDetails(root: THREE.Object3D): void {
       geometries.forEach(g => g.dispose());
       if (!geometry) continue;
       const merged = new THREE.Mesh(geometry, material);
-      merged.name = `hero_details_${anchor.name}_${groups.size}_${material.id}`;
+      merged.name = `hero_details_${anchor.name}_${key}`;
       merged.userData.parts = parts.map(p => p.name); merged.castShadow = true;
       parts.forEach(mesh => anchor.remove(mesh)); anchor.add(merged);
     }

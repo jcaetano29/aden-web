@@ -1,0 +1,28 @@
+.trade-toggle { position:fixed; left:126px; top:14px; padding:7px 14px; z-index:1000; pointer-events:auto; }
+.trade-panel.aden-panel { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); width:min(720px,calc(100vw - 24px)); max-height:85dvh; overflow:auto; box-sizing:border-box; padding:20px; z-index:1400; color:#ddceb0; font:16px 'EB Garamond','Georgia',serif; pointer-events:auto; }
+.trade-header,.trade-footer,.trade-candidate { display:flex; justify-content:space-between; align-items:center; gap:10px; }
+.trade-header { margin-bottom:14px; }
+.trade-title { font:21px 'Cinzel','Georgia',serif; color:#f2d896; }
+.trade-subtitle { font-size:18px; color:#f2d896; margin-bottom:8px; }
+.trade-columns { display:grid; grid-template-columns:1fr 1fr; gap:18px; margin:16px 0; }
+.trade-offer { min-width:0; padding:12px; border:1px solid #75694c; background:#171b16; }
+.trade-hint,.trade-empty { color:#b4a78b; line-height:1.4; margin:8px 0; }
+.trade-candidate { padding:9px 0; border-bottom:1px solid #75694c; }
+.trade-inventory { max-height:240px; overflow:auto; margin:10px 0; }
+.trade-item { display:flex; align-items:center; gap:8px; padding:6px 0; overflow-wrap:anywhere; }
+.trade-item img { width:34px!important; height:34px!important; flex:none!important; object-fit:contain; }
+.trade-item > div { flex:1; }
+.trade-item-description { min-width:0; }
+.trade-item details { font-size:13px; color:#c6b997; margin-top:4px; }
+.trade-item summary { cursor:pointer; }
+.trade-panel input { color:#e9dcc2; background:#0c0a07; border:1px solid #75694c; padding:6px; font:inherit; box-sizing:border-box; }
+.trade-item input { width:65px; flex:none; }
+.trade-gold-label { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.trade-gold-label input { width:100px; }
+.trade-gold { font-size:22px; color:#f2d896; margin:12px 0; }
+.trade-ready { color:#9dcd77; margin-top:14px; }
+.trade-status { padding:10px 0; line-height:1.4; color:#f2d896; }
+.trade-panel button { padding:7px 10px; white-space:normal; }
+.trade-panel button:disabled { opacity:.5; cursor:not-allowed; }
+.trade-panel :focus-visible { outline:2px solid #f2d896; outline-offset:2px; }
+@media (max-width:600px) { .trade-columns { grid-template-columns:1fr; gap:12px; } .trade-panel.aden-panel { padding:14px; } .trade-footer { align-items:stretch; flex-direction:column; } .trade-inventory { max-height:170px; } }

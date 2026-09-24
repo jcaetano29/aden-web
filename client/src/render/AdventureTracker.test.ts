@@ -4,6 +4,19 @@ import { AdventureTracker, adventureGuide } from "./AdventureTracker.js";
 import { getQuest } from "@aden/shared";
 
 describe("adventure guidance", () => {
+  it('guides the Monastery handoff, regional rewards and final epilogue', () => {
+    expect(adventureGuide({questId:'veil_prologue_complete',questProgress:0,mapId:'marismas'}).marker?.label).toBe('Nueva expedición');
+    const ready=adventureGuide({questId:'a2_prior',questProgress:1,mapId:'monasterio'});
+    expect(ready.hint).toContain('Iria'); expect(ready.marker).toMatchObject({x:1195,z:495});
+    const ending=adventureGuide({questId:'memory_campaign_complete',questProgress:0,mapId:'monasterio'});
+    expect(ending.title).toContain('completada'); expect(ending.marker).toBeUndefined();
+  });
+  it('routes the Veil rewards to Maera and recognizes the prologue ending', () => {
+    const guide = adventureGuide({ questId: 'a2_caravan', questProgress: 1, mapId: 'marismas' });
+    expect(guide.hint).toContain('Maera');
+    expect(guide.marker).toMatchObject({ x: 1195, z: 195 });
+    expect(adventureGuide({ questId: 'veil_prologue_complete', questProgress: 0, mapId: 'marismas' }).title).toBe('El camino recuperado');
+  });
   it("routes unassigned and completed quests to the elder without inventing an objective", () => {
     expect(adventureGuide({ questId: "", questProgress: 0, mapId: "pueblo" }).marker).toMatchObject({ label: "Anciano", x: -5, z: 6 });
     expect(adventureGuide({ questId: "q1", questProgress: getQuest("q1").amount, mapId: "pueblo" }).marker).toMatchObject({ label: "Entregar", x: -5, z: 6 });

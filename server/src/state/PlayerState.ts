@@ -19,6 +19,8 @@ export class PlayerState extends Schema {
   @type("string") targetId = "";
   @type("number") mp = 0;
   @type("number") maxMp = 0;
+  @type("number") hpPotionCooldownMs = 0;
+  @type("number") mpPotionCooldownMs = 0;
   @type("boolean") dead = false;
   @type("string") className = "knight";
   @type("string") gender: CharacterGender = 'male';
@@ -41,6 +43,8 @@ export class PlayerState extends Schema {
   // Etapa 20: contrato del Capitán (misión repetible en paralelo a la campaña).
   @type("string") bountyId = "";
   @type("number") bountyProgress = 0;
+  @type("string") veilContractId = '';
+  @type("number") veilContractProgress = 0;
 
   // Etapa 21: atributos primarios asignables + puntos sin gastar (sincronizados).
   @type("number") str = 0;

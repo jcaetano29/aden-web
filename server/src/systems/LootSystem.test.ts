@@ -2,7 +2,8 @@ import { describe,it,expect } from 'vitest';
 import { GameState } from '../state/GameState.js';
 import { PlayerState } from '../state/PlayerState.js';
 import { DroppedItemState } from '../state/DroppedItemState.js';
-import { tryPickup,dropPosition } from './LootSystem.js';
+import { tryPickup,dropPosition,tryDropInventory } from './LootSystem.js';
+import { grantItem } from './ItemSystem.js';
 import { createItemInstance,getItem,getZone,isWalkable,distance2D } from '@aden/shared';
 
 function fixture() {
@@ -13,6 +14,39 @@ function fixture() {
   return {state,p,other,drop};
 }
 describe('public atomic loot',()=>{
+  it('drops a partial stack publicly without automatically reclaiming it',()=>{
+    const {state,p,other}=fixture(); p.loaded=true;
+    grantItem(p,'bone',7);
+    expect(tryDropInventory(state,'p','bone',3)).toBe(true);
+    const [id,drop]=[...state.droppedItems].find(([,d])=>d.itemTemplateId==='bone')!;
+    expect(p.inventory.get('bone')?.qty).toBe(4);
+    expect(drop.qty).toBe(3); expect(isWalkable(p.mapId,drop)).toBe(true);
+    drop.pickDelayMs=0; p.x=other.x=drop.x; p.z=other.z=drop.z;
+    expect(tryPickup(state,'p',id,true)).toBe(false);
+    expect(tryPickup(state,'other',id,true)).toBe(true);
+    expect(other.inventory.get('bone')?.qty).toBe(3);
+  });
+  it('preserves instance options, removes an empty slot and permits explicit recovery',()=>{
+    const {state,p,drop}=fixture(); p.loaded=true; const itemId=drop.itemTemplateId;
+    state.droppedItems.clear(); grantItem(p,itemId,1);
+    expect(tryDropInventory(state,'p',itemId,1)).toBe(true);
+    expect(p.inventory.size).toBe(0);
+    const [id,d]=[...state.droppedItems][0]; expect(d.itemTemplateId).toBe(itemId);
+    d.pickDelayMs=0; p.x=d.x;p.z=d.z;
+    expect(tryPickup(state,'p',id)).toBe(true); expect(p.inventory.get(itemId)?.qty).toBe(1);
+  });
+  it.each([0,-1,1.5,NaN,Infinity,10001,8,'2',null])('rejects invalid drop quantity %s without mutations',qty=>{
+    const {state,p}=fixture(); p.loaded=true; grantItem(p,'bone',7);
+    expect(tryDropInventory(state,'p','bone',qty)).toBe(false);
+    expect(p.inventory.get('bone')?.qty).toBe(7);expect(state.droppedItems.size).toBe(1);
+  });
+  it.each(['dead','unloaded','equipped','currency','unknown'])('rejects %s inventory drops',kind=>{
+    const {state,p}=fixture();p.loaded=true;grantItem(p,'bone',1);
+    if(kind==='dead')p.dead=true;if(kind==='unloaded')p.loaded=false;
+    p.equipment.set('weapon','iron_sword');grantItem(p,'gold',5);
+    const id=kind==='equipped'?'iron_sword':kind==='currency'?'gold':kind==='unknown'?'invalid':'bone';
+    expect(tryDropInventory(state,'p',id,1)).toBe(false);expect(state.droppedItems.size).toBe(1);
+  });
   it('spreads repeated deaths on walkable ground',()=>{
     const state=new GameState(),spawn=getZone('cripta').spawn;
     for(let i=0;i<15;i++) {

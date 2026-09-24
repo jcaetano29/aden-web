@@ -17,14 +17,14 @@ export class Npc {
   private pulse = 0;
   private readonly appearance: NpcAppearance;
 
-  constructor(scene: THREE.Scene, _css2dLayer: unknown, factory: CharacterFactory) {
+  constructor(scene: THREE.Scene, _css2dLayer: unknown, factory: CharacterFactory, npcId = 'elder') {
     // Crear root del NPC (posición desde el registro de NPCs).
-    const def = getNpc("elder");
+    const def = getNpc(npcId);
     this.object = new THREE.Group();
     this.object.position.set(def.x, 0, def.z);
     scene.add(this.object);
 
-    this.appearance = new NpcAppearance(factory, "elder");
+    this.appearance = new NpcAppearance(factory, def.appearance ?? def.role, def.appearanceModel);
     this.object.add(this.appearance.root);
 
     // Indicador "!" flotante: esfera pequeña emissiva sobre la cabeza
@@ -42,7 +42,7 @@ export class Npc {
 
     // Nameplate CSS2D: Anciano Rowan
     const nameplateDiv = document.createElement("div");
-    nameplateDiv.textContent = ELDER_NAME;
+    nameplateDiv.textContent = def.name;
     nameplateDiv.style.cssText =
       `color:#ffe066;font-family:${FONT_DISPLAY};font-weight:700;font-size:13px;letter-spacing:0.5px;` +
       "text-shadow:0 0 4px #000,0 1px 2px #000;pointer-events:none;white-space:nowrap;";

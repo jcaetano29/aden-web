@@ -16,6 +16,11 @@ export const LEVEL_GROWTH = { hp: 20, mp: 5, pAtk: 3, pDef: 2 } as const;
 // Etapa 11: la EXP escala con la profundidad de la zona, de modo que el jugador
 // llega al Trono rondando el nivel recomendado (~9-10) cazando su camino al norte.
 export const MOB_EXP: Record<string, number> = {
+  memory_guard: 480,
+  memory_jailer: 1000,
+  memory_prior: 1800,
+  veil_raider: 360,
+  veil_guardian: 1000,
   umbra_alpha: 200,
   crypt_acolyte: 45,
   crypt_stalker: 45,

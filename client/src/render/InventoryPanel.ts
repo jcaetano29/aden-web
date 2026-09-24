@@ -9,6 +9,7 @@ import {
   offensiveOptions,
   canEquipItem,
   CLASSES,
+  TRANSFER_MAX_QTY,
   type EquipSlot,
 } from "@aden/shared";
 import { FONT_DISPLAY } from "./theme.js";
@@ -20,6 +21,7 @@ export interface InventoryPanelCallbacks {
   onUseItem?: (itemTemplateId: string, targetItemId?: string) => void;
   onEquip?: (itemTemplateId: string) => void;
   onUnequip?: (slot: string) => void;
+  onDrop?: (itemTemplateId: string, qty: number) => void;
 }
 
 export interface InventoryView {
@@ -348,6 +350,26 @@ export class InventoryPanel {
         actions.appendChild(this.makeBtn('Usar', () => this.cb.onUseItem?.(id)));
       }
       inspector.appendChild(actions);
+      if (!slot && item.type !== 'currency') {
+        const available = entries.find(entry => entry.itemTemplateId === id)?.qty ?? 0;
+        const dropActions = document.createElement('div'); dropActions.className = 'inventory-drop-actions';
+        const label = document.createElement('label'); label.textContent = 'Cantidad a tirar ';
+        const qty = document.createElement('input'); qty.type = 'number'; qty.min = '1'; qty.max = String(Math.min(available, TRANSFER_MAX_QTY)); qty.step = '1'; qty.value = '1';
+        qty.dataset.dropQty = ''; qty.setAttribute('aria-label', 'Cantidad a tirar'); label.append(qty);
+        const confirmation = document.createElement('div'); confirmation.className = 'inventory-drop-confirmation'; confirmation.setAttribute('role', 'status');
+        const drop = this.makeBtn('Tirar al suelo', () => {
+          const amount = qty.valueAsNumber;
+          if (!Number.isSafeInteger(amount) || amount < 1 || amount > Math.min(available, TRANSFER_MAX_QTY)) { qty.reportValidity(); return; }
+          confirmation.replaceChildren();
+          const warning = document.createElement('p'); warning.textContent = `${item.name} ×${amount}: cualquiera podrá recogerlo. Desaparece del suelo en 60 segundos.`;
+          const confirm = this.makeBtn(`Confirmar: tirar ×${amount}`, () => { this.cb.onDrop?.(id, amount); confirmation.replaceChildren(); }); confirm.dataset.dropConfirm = '';
+          const cancel = this.makeBtn('Cancelar', () => confirmation.replaceChildren());
+          confirmation.append(warning, confirm, cancel);
+        });
+        drop.dataset.dropItem = '';
+        qty.addEventListener('input', () => confirmation.replaceChildren());
+        dropActions.append(label, drop, confirmation); inspector.append(dropActions);
+      }
     } else inspector.textContent = 'Inventario vacío. Recogé objetos para verlos aquí.';
     this.body.appendChild(inspector);
     const hint = document.createElement('p'); hint.className = 'inventory-hint';

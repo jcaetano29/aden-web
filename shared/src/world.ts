@@ -120,6 +120,18 @@ export const ZONES: Zone[] = [
     biome: { ground: 0x2b2733, fog: 0x3a2f45, fogNear: 26, fogFar: 108, accent: 0xff3b3b },
   },
   {
+    id: 'marismas', name: 'Marismas del Velo', subtitle: 'Los caminos recuerdan a quienes faltan',
+    center: { x: 1200, z: 150 }, bounds: boundsAround(1200, 150), spawn: { x: 1200, z: 200 },
+    levelReq: 10, levelMin: 10, levelMax: 12, safe: false,
+    biome: { ground: 0x374f43, fog: 0x668786, fogNear: 38, fogFar: 130, accent: 0x8bcec0 },
+  },
+  {
+    id: 'monasterio', name: 'Monasterio de la Vigilia', subtitle: 'Los nombres que la piedra retuvo',
+    center: { x: 1200, z: 450 }, bounds: boundsAround(1200, 450), spawn: { x: 1200, z: 500 },
+    levelReq: 12, levelMin: 12, levelMax: 15, safe: false,
+    biome: { ground: 0x827b72, fog: 0x98a5a0, fogNear: 40, fogFar: 145, accent: 0xc4b68a },
+  },
+  {
     id: "cripta", name: "Cripta de las Dos Llamas", subtitle: "Dos sellos protegen al Custodio",
     center: { x: 900, z: -40 }, bounds: CRYPT_BOUNDS,
     spawn: CRYPT_SPAWN, levelReq: 5, levelMin: 5, levelMax: 7, safe: false,

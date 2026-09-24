@@ -350,7 +350,7 @@ describe("GameRoom", () => {
     await room.waitForNextPatch();
     room.state.mobs.clear();
     const p = room.state.players.get(c.sessionId)!;
-    p.mapId = 'cripta'; p.x = 909; p.z = CRYPT_BOSS.z; p.moving = false; room['dungeonRun'].dungeonStage = 4;
+    p.level = 6; p.mapId = 'cripta'; p.x = 909; p.z = CRYPT_BOSS.z; p.moving = false; room['dungeonRun'].dungeonStage = 4;
     const boss = room.spawnMob('ranged-guardian', 'crypt_warden', CRYPT_BOSS.x, CRYPT_BOSS.z, 'cripta');
     p.targetId = 'ranged-guardian'; p.attackCooldownMs = 0;
     room.tick(.05);
@@ -725,7 +725,7 @@ describe("GameRoom", () => {
     expect(p.hp).toBe(hpBefore); // no le pegó: lo esquivó
   });
 
-  it("el Rey Nihil spawnea con 1000 HP", async () => {
+  it("el Rey Nihil spawnea con su vida completa y nivel de jefe", async () => {
     const room = await colyseus.createRoom("game", {});
     await room.waitForNextPatch();
     let boss: any;
@@ -733,7 +733,10 @@ describe("GameRoom", () => {
       if (m.templateId === "skeleton_king") boss = m;
     });
     expect(boss).toBeDefined();
-    expect(boss.hp).toBe(1000);
+    expect(boss.hp).toBe(getMobCombat('skeleton_king').maxHp);
+    expect(boss.hp).toBe(boss.maxHp);
+    expect(boss.level).toBe(10);
+    expect(boss.rank).toBe('boss');
   });
 
   it("matar al Rey Nihil dropea la corona, da exp y completa la q6 (final)", async () => {
@@ -746,7 +749,7 @@ describe("GameRoom", () => {
       if (m.templateId === "skeleton_king") { bossId = id; boss = m; }
     });
     // Preparar: jugador con la q6 (final) activa, en el mapa del jefe, pegado, jefe casi muerto.
-    p.questId = "q6"; p.questProgress = 0;
+    p.questId = "q6"; p.questProgress = 0; p.level = 10; p.exp = 0;
     p.mapId = boss.mapId; p.x = boss.x; p.z = boss.z;
     boss.hp = 1;
     p.targetId = bossId;
@@ -760,8 +763,7 @@ describe("GameRoom", () => {
       if (d.itemTemplateId === "skull_crown") hasCrown = true;
     });
     expect(hasCrown).toBe(true);
-    // 900 exp mata seguro sube al menos un nivel desde nv1.
-    expect(p.level).toBeGreaterThan(1);
+    expect(p.exp).toBe(getMobExp('skeleton_king'));
     // q6 (amount 1) queda completa.
     expect(p.questProgress).toBe(1);
   });
@@ -941,7 +943,7 @@ describe("GameRoom", () => {
       const bossId = findBoss(room);
       const boss = room.state.mobs.get(bossId)!;
       boss.hp = 1;
-      pa.mapId = boss.mapId; pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
+      pa.level = 10; pa.mapId = boss.mapId; pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
       a.send("setTarget", { targetId: bossId });
       await room.waitForNextSimulationTick();
       await room.waitForNextSimulationTick();
@@ -956,7 +958,7 @@ describe("GameRoom", () => {
       const bossId = findBoss(room);
       const boss = room.state.mobs.get(bossId)!;
       boss.hp = 1;
-      pa.mapId = boss.mapId; pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
+      pa.level = 10; pa.mapId = boss.mapId; pa.x = boss.x; pa.z = boss.z + 1; pa.targetX = pa.x; pa.targetZ = pa.z; pa.hp = 500;
       a.send("setTarget", { targetId: bossId });
       await room.waitForNextSimulationTick();
       await room.waitForNextSimulationTick();
@@ -1149,7 +1151,7 @@ describe("GameRoom", () => {
         if (m.templateId === "skeleton_king") { bossId = id; boss = m; }
       });
       boss.hp = 1;
-      p.mapId = boss.mapId; p.x = p.targetX = boss.x; p.z = p.targetZ = boss.z + 1; p.moving = false; p.hp = 500;
+      p.level = 10; p.mapId = boss.mapId; p.x = p.targetX = boss.x; p.z = p.targetZ = boss.z + 1; p.moving = false; p.hp = 500;
       c.send(MessageType.SetTarget, { targetId: bossId });
       for (let i = 0; i < 10; i++) await room.waitForNextSimulationTick();
       expect(boss.dead).toBe(true);
@@ -1205,7 +1207,7 @@ describe("GameRoom", () => {
       const c = await colyseus.connectTo(room, { name: "Buscatesoros", className: "knight" });
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
-      const chest = findObject(room, "chest");
+      const chest = room.state.worldObjects.get('pueblo_chest_1')!;
       p.mapId = chest.mapId; p.x = chest.x; p.z = chest.z;
       const drops0 = room.state.droppedItems.size;
       c.send(MessageType.InteractObject, { objectId: chest.id });
@@ -1333,8 +1335,10 @@ describe("GameRoom", () => {
   describe("Cuentas y atributos (Etapa 21)", () => {
     it("registra una cuenta con contraseña y rechaza la contraseña incorrecta", async () => {
       const room = await colyseus.createRoom("game", {});
+      await colyseus.connectTo(room, { name: 'AuthObserver' });
       // Registro (cuenta nueva): entra bien.
-      await colyseus.connectTo(room, { name: "Cuenta", password: "secreta", className: "knight" });
+      const original = await colyseus.connectTo(room, { name: "Cuenta", password: "secreta", className: "knight" });
+      await original.leave();
       await room.waitForNextPatch();
       // Otro cliente con la MISMA cuenta y contraseña equivocada: rechazado.
       await expect(colyseus.connectTo(room, { name: "Cuenta", password: "mala" })).rejects.toBeDefined();
@@ -1346,7 +1350,9 @@ describe("GameRoom", () => {
 
     it("una cuenta protegida no se puede tomar sin contraseña", async () => {
       const room = await colyseus.createRoom("game", {});
-      await colyseus.connectTo(room, { name: "Protegido", password: "clave1" });
+      await colyseus.connectTo(room, { name: 'AuthObserver' });
+      const original = await colyseus.connectTo(room, { name: "Protegido", password: "clave1" });
+      await original.leave();
       await room.waitForNextPatch();
       await expect(colyseus.connectTo(room, { name: "Protegido" })).rejects.toBeDefined();
     });
@@ -1398,8 +1404,10 @@ describe("GameRoom", () => {
 
     it("modo login: entra a una cuenta existente con la contraseña correcta", async () => {
       const room = await colyseus.createRoom("game", {});
+      await colyseus.connectTo(room, { name: 'AuthObserver' });
       // Crear la cuenta primero.
-      await colyseus.connectTo(room, { name: "Vuelve", password: "clave1", className: "mage", mode: "create" });
+      const original = await colyseus.connectTo(room, { name: "Vuelve", password: "clave1", className: "mage", mode: "create" });
+      await original.leave();
       await room.waitForNextPatch();
       // Volver a entrar con login.
       const c = await colyseus.connectTo(room, { name: "Vuelve", password: "clave1", mode: "login" });
@@ -1409,7 +1417,9 @@ describe("GameRoom", () => {
 
     it("modo create: rechaza un nombre ya tomado", async () => {
       const room = await colyseus.createRoom("game", {});
-      await colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "knight", mode: "create" });
+      await colyseus.connectTo(room, { name: 'AuthObserver' });
+      const original = await colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "knight", mode: "create" });
+      await original.leave();
       await room.waitForNextPatch();
       await expect(colyseus.connectTo(room, { name: "Tomado", password: "clave1", className: "rogue", mode: "create" })).rejects.toBeDefined();
     });

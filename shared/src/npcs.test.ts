@@ -16,7 +16,7 @@ describe("npcs", () => {
   });
 
   it("todos los NPCs están dentro del radio de servicio del pueblo", () => {
-    for (const n of NPCS) {
+    for (const n of NPCS.filter(n => n.mapId === 'pueblo')) {
       expect(distance2D(n.x, n.z, TOWN.x, TOWN.z)).toBeLessThanOrEqual(TOWN_SERVICE_RADIUS);
     }
   });

@@ -10,6 +10,28 @@ export interface Soundtrack {
 }
 
 export const SOUNDTRACKS: Record<string, Soundtrack> = {
+  monasterio: {
+    id: 'monasterio', title: 'La última vigilia', description: 'Coro, cuerdas y campanas del archivo perdido',
+    bpm: 68, meter: 4, tonic: 45, scale: [0, 2, 3, 5, 7, 8, 11],
+    chords: [0, 3, 5, 0, 4, 5, 3, 0], lead: 'bell', pad: 'choir', pluck: 'harp',
+    motifs: [
+      [[0, 0, 2], [3, 4, 1.5], [5, 3, 1.5], [7, 1, .8]],
+      [[1, 2, 2], [4, 5, 1.5], [6, 4, 1.5]],
+      [[0, 7, 2], [3, 5, 1.5], [5, 3, 2]],
+      [[0, 4, 2], [3, 2, 1], [5, 1, 1], [7, 0, 1]],
+    ], reverb: 3.8, wind: .18, windHz: 420, percussion: .1,
+  },
+  marismas: {
+    id: 'marismas', title: 'Nombres sobre el agua', description: 'Flauta y campanas entre juncos y recuerdos',
+    bpm: 64, meter: 4, tonic: 46, scale: [0, 2, 3, 5, 7, 9, 10],
+    chords: [0, 5, 3, 0, 6, 3, 4, 0], lead: 'flute', pad: 'strings', pluck: 'bell',
+    motifs: [
+      [[0, 0, 2], [3, 2, 1.2], [5, 4, 2], [7, 3, .8]],
+      [[1, 2, 1.8], [4, 1, 1.5], [6, 0, 1.8]],
+      [[0, 5, 2.2], [3, 4, 1.8], [6, 2, 1.4]],
+      [[.5, 3, 1.8], [3, 1, 1], [5, -1, 1.5], [7, 0, .8]],
+    ], reverb: 3.3, wind: .3, windHz: 700, percussion: .08,
+  },
   pueblo: {
     id: 'pueblo', title: 'Lumbre del hogar', description: 'Arpa, flauta y cuerdas al abrigo de Aden',
     bpm: 78, meter: 3, tonic: 50, scale: [0, 2, 4, 5, 7, 9, 11],

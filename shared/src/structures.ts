@@ -1,4 +1,5 @@
 import { TOWN } from "./combat.js";
+import { VEIL_POOLS } from './veil.js';
 import { ZONES, type Zone } from "./world.js";
 import { WORLD_OBJECTS } from "./worldobjects.js";
 import { CRYPT_ROOMS } from './dungeon.js';
@@ -98,7 +99,7 @@ for (const [cx, z] of [[860, -7], [940, -91]])
         box('cripta', `crypt-passage-${x}-${z}`, x, 1.4, z, .65, 2.8, .65);
         box('cripta', `crypt-passage-capital-${x}-${z}`, x, 2.9, z, .8, .35, .8, 'gold', false);
     }
-for (const zone of ZONES.filter(z => !z.safe && z.id !== 'cripta'))
+for (const zone of ZONES.filter(z => !z.safe && z.id !== 'cripta' && z.id !== 'monasterio'))
     for (const side of [-1, 1])
         for (const row of [-1, 1]) {
             const x = zone.center.x + side * 25, z = zone.center.z + row * 26;
@@ -137,6 +138,19 @@ for (let i = 0; i < 26;) {
     add('ruinColumn', 'ruinas', x, z, 1.2, 1.2, 0, 1.5 + columnRandom() * 4);
     i++;
 }
+add('house', 'marismas', 1180, 199, 5, 4.5, 0, 1, 0x809c86, 1, 0x49594f, true);
+add('wagon', 'marismas', 1184, 116, 4, 2.5);
+add('house', 'marismas', 1220, 199, 5, 4.5, 0, 1, 0x778c80, 1, 0x49594f, true);
+add('tower', 'marismas', 1210, 95, 5, 5, 0, 11, 0x7a9390, 1, 0x536a65, false, true);
+// Low, roofless wings keep the camera and navigation readable.
+add('arch', 'monasterio', 1200, 505, S.archPierWidth, S.archPierWidth, 0, 1, 0x9a998a);
+add('monasteryWall', 'monasterio', 1155, 434, 1, 32, 0, 3.4, 0x868c86);
+for (const z of [449,439,429,419]) add('monasteryWall','monasterio',1161,z,12,1,0,2.6,0x868c86);
+add('monasteryWall','monasterio',1240,460,1,24,0,3.4,0x96998b);
+add('monasteryWall','monasterio',1229,472,23,1,0,2.6,0x96998b);
+add('monasteryWall','monasterio',1229,448,23,1,0,2.6,0x96998b);
+add('tower','monasterio',1180,391,5,5,0,12,0x858d88,1,0x666b64,true,true);
+add('tower','monasterio',1220,391,5,5,0,12,0x858d88,1,0x666b64,true,true);
 export const AUTHORED_STRUCTURES: readonly AuthoredStructure[] = Object.freeze(authored.map(p => Object.freeze(p)));
 export const STRUCTURE_BOXES: readonly StructureBox[] = Object.freeze(boxes.map(p => Object.freeze(p)));
 export interface Placement {
@@ -155,7 +169,7 @@ function random(seed: number): () => number {
 /** Clustered, reproducible decoration. The main route, central arena, spawn and
  * interactables reserve space before any props are emitted. No gameplay state. */
 export function dressingLayout(zone: Zone): Placement[] {
-    if (zone.id === "cripta")
+    if (zone.id === "cripta" || zone.id === 'monasterio')
         return []; // The dungeon uses authored chambers, not scattered scenery.
     const rng = random(Array.from(zone.id).reduce((n, c) => n * 31 + c.charCodeAt(0), 8421));
     const objects = WORLD_OBJECTS.filter(o => o.mapId === zone.id);
@@ -192,6 +206,7 @@ const obstacles: StructureObstacle[] = authored.flatMap(p => p.kind === 'arch' ?
 obstacles.push(...boxes.filter(p => p.solid));
 for (const zone of ZONES.filter(z => z.id === 'ruinas' || z.id === 'trono'))
     dressingLayout(zone).filter(p => p.kind === 'tree').forEach((p, i) => obstacles.push({ id: zone.id + '-grove-column-' + i, mapId: zone.id, x: p.x, z: p.z, width: S.dressingColumnRadius * 2 * p.scale, depth: S.dressingColumnRadius * 2 * p.scale, rotation: p.yaw }));
+for (const [i, pool] of VEIL_POOLS.entries()) obstacles.push({ ...pool, id: `veil-water-${i}`, mapId: 'marismas', rotation: 0 });
 export const STRUCTURE_OBSTACLES: readonly StructureObstacle[] = Object.freeze(obstacles.map(p => Object.freeze({ id: p.id, mapId: p.mapId, x: p.x, z: p.z, width: p.width, depth: p.depth, rotation: p.rotation })));
 const obstaclesByMap = new Map(ZONES.map(zone => [zone.id, Object.freeze(STRUCTURE_OBSTACLES.filter(p => p.mapId === zone.id))]));
 const noObstacles: readonly StructureObstacle[] = Object.freeze([]);

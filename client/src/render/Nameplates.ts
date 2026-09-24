@@ -1,3 +1,4 @@
+import { enemyThreat } from "@aden/shared";
 import * as THREE from "three";
 import { CSS2DObject } from "three/examples/jsm/renderers/CSS2DRenderer.js";
 import { COLORS, FONT_DISPLAY, FONT_BODY } from "./theme.js";
@@ -45,6 +46,16 @@ export class Nameplates {
     label.position.set(0, (parent.userData.visualHeight ?? 2) + 0.5, 0);
     parent.add(label);
     this.plates.set(id, { label, titleEl, nameEl });
+  }
+
+  setEnemy(id: string, name: string, level: number, rank: string, playerLevel: number) {
+    const p = this.plates.get(id); if (!p) return;
+    const threat = enemyThreat(playerLevel, level);
+    const category = rank === 'boss' ? 'Jefe' : rank === 'elite' ? 'Élite' : '';
+    p.nameEl.textContent = [threat.symbol, name, '· Nv. ' + level, category].filter(Boolean).join(' ');
+    p.nameEl.style.color = threat.color;
+    this.setTitle(id, level - playerLevel >= 3 ? threat.label : '');
+    p.titleEl.style.color = threat.color;
   }
 
   /** Actualiza el texto del NOMBRE (p.ej. cuando cambia el guildTag). */

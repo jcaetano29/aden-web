@@ -9,6 +9,8 @@ export class DialogPanel {
   private readonly speakerName: HTMLDivElement;
   private readonly textBody: HTMLDivElement;
   private readonly actionButton: HTMLButtonElement;
+  private readonly secondaryButton: HTMLButtonElement;
+  private secondaryAction: (() => void) | null = null;
   private currentAction: (() => void) | null = null;
   private visible = false;
 
@@ -50,6 +52,10 @@ export class DialogPanel {
     });
 
     panel.appendChild(this.actionButton);
+    this.secondaryButton=document.createElement('button');
+    applyButton(this.secondaryButton);this.secondaryButton.style.cssText+=';margin-left:8px;margin-top:8px;font-size:14px;display:none';
+    this.secondaryButton.addEventListener('click',()=>{const action=this.secondaryAction;this.close();action?.();});
+    panel.appendChild(this.secondaryButton);
     this.root.appendChild(panel);
     parent.appendChild(this.root);
   }
@@ -62,6 +68,7 @@ export class DialogPanel {
     text: string;
     actionLabel: string;
     onAction: () => void;
+    secondaryAction?: {label:string;onAction:()=>void};
   }): void {
     if (this.visible) return;
 
@@ -69,6 +76,9 @@ export class DialogPanel {
     this.textBody.textContent = opts.text;
     this.actionButton.textContent = opts.actionLabel;
     this.currentAction = opts.onAction;
+    this.secondaryAction=opts.secondaryAction?.onAction??null;
+    this.secondaryButton.textContent=opts.secondaryAction?.label??'';
+    this.secondaryButton.style.display=opts.secondaryAction?'':'none';
 
     this.visible = true;
     this.root.style.display = "";
@@ -84,6 +94,7 @@ export class DialogPanel {
     this.root.style.display = "none";
     this.root.style.pointerEvents = "none";
     this.currentAction = null;
+    this.secondaryAction = null;
   }
 
   /**

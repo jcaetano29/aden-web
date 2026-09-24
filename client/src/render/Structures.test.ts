@@ -55,7 +55,7 @@ it('keeps town gate, rotated arch and crypt central routes open',()=>{
   const dx=x-o.x,dz=z-o.z,c=Math.cos(o.rotation),s=Math.sin(o.rotation);
   return Math.abs(dx*c-dz*s)<o.width/2+.4&&Math.abs(dx*s+dz*c)<o.depth/2+.4;
  }
- for(const [map,x,z]of [['pueblo',0,42],['bosque',300,55],['ruinas',40,300]] as const)expect(obstaclesForMap(map).some(o=>inside(x,z,o))).toBe(false);
+ for(const [map,x,z]of [['pueblo',0,42],['bosque',300,55],['ruinas',40,300],['monasterio',1200,505]] as const)expect(obstaclesForMap(map).some(o=>inside(x,z,o))).toBe(false);
  for(let z=-47;z<=47;z++)expect(obstaclesForMap('cripta').some(o=>inside(900,z,o))).toBe(false);
  expect(STRUCTURE_OBSTACLES.every(o=>Object.isFrozen(o))).toBe(true);
  expect(new Set(STRUCTURE_OBSTACLES.map(o=>o.id)).size).toBe(STRUCTURE_OBSTACLES.length);

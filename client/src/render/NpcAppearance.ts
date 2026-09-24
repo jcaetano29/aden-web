@@ -14,8 +14,8 @@ export class NpcAppearance {
   private elapsed = 0;
   private gesturing = false;
 
-  constructor(factory: Pick<CharacterFactory, "create">, readonly role: NpcRole) {
-    this.character = factory.create(MODELS[role]);
+  constructor(factory: Pick<CharacterFactory, "create">, readonly role: NpcRole, model = MODELS[role]) {
+    this.character = factory.create(model);
     this.root = this.character.root;
     this.root.name = `npc_${role}`;
     this.height = Number(this.root.userData.visualHeight) || 2.5;

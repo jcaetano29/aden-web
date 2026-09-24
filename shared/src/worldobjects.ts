@@ -21,6 +21,8 @@ export interface WorldObjectDef {
   lootId?: string;
   /** stat que potencia el santuario. */
   buff?: "atk" | "def";
+  /** Story clues remain available to every visitor independently. */
+  reusable?: boolean;
 }
 
 export const OBJECT_INTERACT_RANGE = 3.5;
@@ -47,6 +49,16 @@ function breakables(mapId: string, pts: Array<[number, number]>): WorldObjectDef
 }
 
 export const WORLD_OBJECTS: WorldObjectDef[] = [
+  {id:'boren_supplies',mapId:'marismas',kind:'chest',x:1216,z:169,reusable:true},
+  {id:'boren_identity',mapId:'marismas',kind:'chest',x:1177,z:119,reusable:true},
+  {id:'boren_tool',mapId:'monasterio',kind:'chest',x:1236,z:454,reusable:true},
+  { id:'monastery_archive_1', mapId:'monasterio', kind:'chest', x:1228, z:464, reusable:true },
+  { id:'monastery_archive_2', mapId:'monasterio', kind:'chest', x:1232, z:456, reusable:true },
+  ...[444,434,424].map((z,i) => ({ id:`monastery_cell_${i+1}`, mapId:'monasterio', kind:'chest' as const, x:1162, z, reusable:true })),
+  { id:'monastery_anchor_1', mapId:'monasterio', kind:'shrine', x:1188, z:407, buff:'def', reusable:true },
+  { id:'monastery_anchor_2', mapId:'monasterio', kind:'shrine', x:1212, z:407, buff:'def', reusable:true },
+  { id: 'veil_caravan', mapId: 'marismas', kind: 'chest', x: 1184, z: 122, reusable: true },
+  { id: 'veil_manifest', mapId: 'marismas', kind: 'chest', x: 1191, z: 116, reusable: true },
   { ...CRYPT_SEALS[0], mapId: "cripta", kind: "shrine", buff: "def" },
   { ...CRYPT_SEALS[1], mapId: "cripta", kind: "shrine", buff: "atk" },
   ...breakables("cripta", [[885, 76], [842, 40], [878, 11], [924, -38], [956, -52], [880, -151]]),

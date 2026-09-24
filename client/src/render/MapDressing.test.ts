@@ -6,7 +6,7 @@ describe("map dressing placement", () => {
   for (const zone of ZONES) it(`${zone.id}: repeatable scenery leaves arrivals and interactables accessible`, () => {
     const layout = dressingLayout(zone);
     expect(layout).toEqual(dressingLayout(zone));
-    if (zone.id === "cripta") { expect(layout).toEqual([]); return; }
+    if (zone.id === "cripta" || zone.id === 'monasterio') { expect(layout).toEqual([]); return; }
     expect(layout.length).toBeGreaterThan(100);
     for (const p of layout) {
       expect(Math.hypot(p.x-zone.spawn.x,p.z-zone.spawn.z)).toBeGreaterThan(9);

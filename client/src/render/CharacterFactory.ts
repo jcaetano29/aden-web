@@ -4,6 +4,8 @@ import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.j
 import { modelUrl, MODEL_HEIGHTS, HERO_MODELS } from "../assets/manifest.js";
 import { CharacterMaterial } from "./CharacterMaterial.js";
 import { buildHeroAppearance } from "./HeroAppearance.js";
+import { preloadHeroMaterials } from "./HeroMaterials.js";
+import { preloadHeroFaces } from "./HeroFaces.js";
 import { addRevenantDetails } from "./RevenantDetails.js";
 
 interface LoadedModel {
@@ -30,6 +32,9 @@ export class CharacterFactory {
   private readonly loaded = new Map<string, LoadedModel>();
 
   async preload(names: readonly string[]): Promise<void> {
+    if (names.some(name => (HERO_MODELS as readonly string[]).includes(name.replace(/_Female$/, '')))) {
+      await Promise.all([preloadHeroMaterials(), preloadHeroFaces()]);
+    }
     const sources = new Map<string, ReturnType<GLTFLoader['loadAsync']>>();
     await Promise.all(
       names.map(async (name) => {

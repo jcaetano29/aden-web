@@ -1,4 +1,8 @@
-import { tryPickup, dropPosition } from '../systems/LootSystem.js';
+import { pvePower, getNpc, VEIL_COMPLETE, VEIL_QUEST_ORDER, MEMORY_COMPLETE, MONASTERY_QUEST_ORDER, MEMORY_ANCHORS, potionResource } from "@aden/shared";
+import { potionRecovery } from '../systems/PotionRecovery.js';
+import { VEIL_CONTRACTS, VEIL_CONTRACTS_COMPLETE, getVeilContract, nextVeilContract } from '@aden/shared';
+import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
+import { TradeSystem } from '../systems/TradeSystem.js';
 import { characterGender, isCharacterGender } from '@aden/shared';
 // NOTA: import por default + destructuring en lugar de `import { Room, Client }`.
 // El paquete "colyseus" (CJS, bundle de esbuild) sólo anota estáticamente
@@ -122,6 +126,7 @@ import { createSpawns } from "../systems/SpawnSystem.js";
 import { stepMobAI } from "../systems/MobAISystem.js";
 import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
 import { createPersistence } from "../persistence/createPersistence.js";
+import { CharacterSaveQueue } from '../persistence/CharacterSaveQueue.js';
 import type { PersistenceService, CharacterRank, GuildRank } from "../persistence/PersistenceService.js";
 import { toCharacterSave, inventoryRecordToEntries, type CharacterSave } from "../persistence/CharacterSave.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
@@ -131,6 +136,11 @@ const SAVE_INTERVAL_MS = 15000;
 const GLOBAL_CHAT_TOPIC = 'aden:chat:global';
 
 export class GameRoom extends Room<GameState> {
+  private static readonly activeAccounts=new Map<string,string>();
+  private readonly accountNames=new Map<string,string>();
+  private readonly departedAccounts=new Map<string,string>();
+  private saveQueue!:CharacterSaveQueue;
+  private holdingForSave=false;
   private readonly chat = new ChatSystem();
   private readonly deliverGlobalChat = (message: ChatMessage): void => {
     for (const client of this.clients) {
@@ -138,6 +148,7 @@ export class GameRoom extends Room<GameState> {
     }
   };
   private parties!: PartySystem;
+  private trades!: TradeSystem;
   /** Contador para generar ids únicos de ítems dropeados (R-E3b-3). */
   private dropSeq = 0;
   private dungeonActive = false;
@@ -368,6 +379,35 @@ export class GameRoom extends Room<GameState> {
       this.clients.find(c => c.sessionId === id)?.send(MessageType.PartyInvitation, invitation);
     });
     this.clock.setInterval(() => this.parties.expire(), 1000);
+    this.trades = new TradeSystem(this.state, (id, snapshot, text) => {
+      const client = this.clients.find(c => c.sessionId === id);
+      client?.send(MessageType.TradeState, snapshot);
+      if (text) client?.send(MessageType.ItemResult, { success: true, text });
+    }, Date.now, ids => {
+      for (const id of ids) this.checkAchievements(this.state.players.get(id)!, id);
+      void this.saveAll();
+    });
+    this.clock.setInterval(() => this.trades.sweep(), 1000);
+    this.onMessage(MessageType.TradeInvite, (client, data: unknown) => {
+      const msg = data as { targetId?: unknown } | null;
+      client.send(MessageType.ItemResult, this.trades.invite(client.sessionId, msg?.targetId));
+    });
+    this.onMessage(MessageType.TradeRespond, (client, data: unknown) => {
+      const msg = data as { tradeId?: unknown; accept?: unknown } | null;
+      client.send(MessageType.ItemResult, this.trades.respond(client.sessionId, msg?.tradeId, msg?.accept));
+    });
+    this.onMessage(MessageType.TradeOffer, (client, data: unknown) => {
+      const msg = data as { tradeId?: unknown; revision?: unknown; offer?: unknown } | null;
+      client.send(MessageType.ItemResult, this.trades.offer(client.sessionId, msg?.tradeId, msg?.revision, msg?.offer));
+    });
+    this.onMessage(MessageType.TradeConfirm, (client, data: unknown) => {
+      const msg = data as { tradeId?: unknown; revision?: unknown } | null;
+      client.send(MessageType.ItemResult, this.trades.confirm(client.sessionId, msg?.tradeId, msg?.revision));
+    });
+    this.onMessage(MessageType.TradeCancel, (client, data: unknown) => {
+      const msg = data as { tradeId?: unknown } | null;
+      client.send(MessageType.ItemResult, this.trades.cancel(client.sessionId, msg?.tradeId));
+    });
     this.onMessage(MessageType.PartyInvite, (client, msg: unknown) => {
       const targetId = (msg as { targetId?: unknown } | null)?.targetId;
       if (typeof targetId !== 'string' || targetId.length > 128) return;
@@ -389,6 +429,16 @@ export class GameRoom extends Room<GameState> {
       if (outcome.success) this.clients.find(c => c.sessionId === targetId)?.send(MessageType.ItemResult, { success: true, text: 'El líder te retiró de la party.' });
     });
     this.persistence = createPersistence();
+    this.saveQueue = new CharacterSaveQueue(entries => this.persistence.saveMany(entries), names => {
+      for(const name of names) {
+        const sessionId=this.departedAccounts.get(name);
+        if(sessionId && GameRoom.activeAccounts.get(name)===sessionId)GameRoom.activeAccounts.delete(name);
+        this.departedAccounts.delete(name);
+      }
+      if(this.holdingForSave && this.departedAccounts.size===0) {
+        this.holdingForSave=false;this.autoDispose=true;
+      }
+    });
     this.clock.setInterval(() => this.saveAll(), SAVE_INTERVAL_MS);
     this.clock.setInterval(() => { void this.refreshLeaderboard(); }, 15000);
     void this.refreshLeaderboard();
@@ -407,6 +457,12 @@ export class GameRoom extends Room<GameState> {
     this.onMessage(MessageType.PickupItem, (client, msg: {dropId?: unknown}) => {
       if (typeof msg?.dropId !== 'string' || msg.dropId.length > 512) return;
       if (tryPickup(this.state, client.sessionId, msg.dropId)) this.checkAchievements(this.state.players.get(client.sessionId)!, client.sessionId);
+    });
+    this.onMessage(MessageType.DropItem, (client, data: unknown) => {
+      const msg = data as { itemTemplateId?: unknown; qty?: unknown } | null;
+      const success = tryDropInventory(this.state, client.sessionId, msg?.itemTemplateId, msg?.qty);
+      if (success) { this.trades.sweep(); void this.saveAll(); }
+      client.send(MessageType.ItemResult, { success, text: success ? 'Objeto tirado al suelo. Cualquier jugador puede recogerlo.' : 'No se pudo tirar: verificá el objeto y la cantidad en tu inventario.' });
     });
     this.onMessage(MessageType.MoveTo, (client, msg: MoveToMessage) => {
       const player = this.state.players.get(client.sessionId);
@@ -469,6 +525,11 @@ export class GameRoom extends Room<GameState> {
         const t = p.targetId ? this.resolveTarget(p.targetId, p.mapId) : null;
         if (!t) return;
         if (t.kind === 'mob' && !canFightDungeonMob(p,t.entity.templateId)) return;
+        const power = t.kind === 'mob' ? pvePower(p.level, t.entity.level).outgoing : 1;
+        if (power === 0) {
+          client.send(MessageType.ItemResult, {success:false,text:'Fuera de tu alcance: necesitás acercarte a su nivel.'});
+          return;
+        }
         const gapCloser = skill.dash === "toTarget";
         // Enganche: requiere ataque listo pero NO rango (el dash acerca); si no, canAttack normal.
         const ready = gapCloser ? (p.attackCooldownMs <= 0 && t.entity.hp > 0 && distance2D(p.x,p.z,t.entity.x,t.entity.z)<=skillRange(skill)) : canAttack(p, t.entity, skillRange(skill));
@@ -484,7 +545,8 @@ export class GameRoom extends Room<GameState> {
         }
         spend();
         const variance = 0.9 + Math.random() * 0.2;
-        const dmg = resolveAttack(p, t.entity, skill.factor ?? 1, variance, atkCd,Math.random,skillElement(skill.id));
+        const dmg = resolveAttack(p, t.entity, (skill.factor ?? 1) * power, variance, atkCd,Math.random,skillElement(skill.id));
+        if (t.kind === 'mob' && dmg > 0) this.engageMob(t.entity, client.sessionId);
         // Modificadores de counterplay sobre el objetivo.
         if (dmg > 0 && skill.stunMs) t.entity.stunMs = Math.max(t.entity.stunMs, skill.stunMs);
         if (dmg > 0 && skill.rootMs) t.entity.rootMs = Math.max(t.entity.rootMs, Math.round(skill.rootMs*(1-(t.kind==='player'&&skillElement(skill.id)==='ice'?t.entity.itemEffects.iceResist:0))));
@@ -528,10 +590,10 @@ export class GameRoom extends Room<GameState> {
       } else if (skill.type === "dot") {
         const target=p.targetId?this.resolveTarget(p.targetId,p.mapId):null;
         if(!target || !canAttack(p,target.entity,skillRange(skill)))return;
-        if(target.kind==='mob' && !canFightDungeonMob(p,target.entity.templateId))return;
+        if(target.kind==='mob' && (!canFightDungeonMob(p,target.entity.templateId) || pvePower(p.level,target.entity.level).outgoing === 0)) { client.send(MessageType.ItemResult,{success:false,text:'Fuera de tu alcance o encuentro todavía bloqueado.'}); return; }
         if(target.kind==='player' && (!this.inPvpZone(p)||!this.inPvpZone(target.entity)||this.areAllies(p, target.entity)))return;
         spend();
-        if(target.kind==='mob') { const mob=target.entity; mob.dotMs=skill.dotMs??0;mob.dotDps=skill.dotDps??0;mob.dotAttackerId=client.sessionId;mob.dotAccumMs=0; }
+        if(target.kind==='mob') { const mob=target.entity; mob.dotMs=skill.dotMs??0;mob.dotDps=skill.dotDps??0;mob.dotAttackerId=client.sessionId;mob.dotAttackerLevel=p.level;mob.dotAccumMs=0; this.engageMob(mob,client.sessionId); }
         else { const victim=target.entity;victim.poisonMs=skill.dotMs??0;victim.poisonDps=skill.dotDps??0;victim.poisonAttackerId=client.sessionId;victim.poisonAccumMs=0; }
         this.markCombat(p);
         announceCast(p.targetId);
@@ -543,13 +605,19 @@ export class GameRoom extends Room<GameState> {
     this.onMessage(MessageType.InteractNpc, (client, msg: InteractNpcMessage) => {
       const p = this.state.players.get(client.sessionId);
       if (!p || p.dead) return;
-      if (distance2D(p.x, p.z, TOWN.x, TOWN.z) > TOWN_SERVICE_RADIUS) return;
-
       const npcId = msg?.npcId ?? "elder";
+      let npc;
+      try { npc = getNpc(npcId); } catch { return; }
+      const regional = npc.mapId !== 'pueblo';
+      const center = regional ? npc : TOWN;
+      if (p.mapId !== npc.mapId || distance2D(p.x, p.z, center.x, center.z) > (regional ? 5 : TOWN_SERVICE_RADIUS)) {
+        client.send(MessageType.ItemResult, {success:false, text:`Acercate a ${npc.name} para hablar.`});
+        return;
+      }
       if (npcId === "healer") { this.serveHealer(p); return; }
       if (npcId === "captain") { this.serveCaptain(p, client); return; }
-      // Por defecto: el Anciano (campaña principal).
-      this.serveElder(p, client);
+      if (npcId === 'boren') { this.serveBoren(p,client); return; }
+      if (npc.role === 'elder') this.serveElder(p, client, npcId);
     });
 
     // Etapa 4b-2: handler de compra en el mercader
@@ -558,7 +626,10 @@ export class GameRoom extends Room<GameState> {
       if (!p || p.dead) return;
 
       // Gate de proximidad al pueblo (igual que interactNpc)
-      if (distance2D(p.x, p.z, TOWN.x, TOWN.z) > TOWN_SERVICE_RADIUS) return;
+      const boren = getNpc('boren');
+      const townShop = p.mapId === 'pueblo' && distance2D(p.x, p.z, TOWN.x, TOWN.z) <= TOWN_SERVICE_RADIUS;
+      const fieldShop = p.mapId === boren.mapId && distance2D(p.x, p.z, boren.x, boren.z) <= 5;
+      if (!townShop && !fieldShop) return;
 
       // Validar cantidad
       const qty = msg?.qty ?? 1;
@@ -585,7 +656,16 @@ export class GameRoom extends Room<GameState> {
     this.onMessage(MessageType.UseItem, (client, msg: UseItemMessage) => {
       const p = this.state.players.get(client.sessionId);
       if (!p || p.dead) return;
+      const resource=potionResource(msg?.itemTemplateId);
+      const account=this.accountNames.get(client.sessionId)??p.name;
+      const remaining=resource?potionRecovery.remaining(account,resource):0;
+      if(remaining>0){client.send(MessageType.ItemResult,{success:false,text:`Poción de ${resource==='hp'?'vida':'maná'} disponible en ${Math.ceil(remaining/1000)} s.`});return;}
       const success=useInventoryItem(p,msg?.itemTemplateId,msg?.targetItemId);
+      if(success && resource){
+        potionRecovery.start(account,resource);
+        p.hpPotionCooldownMs=potionRecovery.remaining(account,'hp');
+        p.mpPotionCooldownMs=potionRecovery.remaining(account,'mp');
+      }
       if(p.mapId!=='cripta')resetDungeon(p);
       this.maintainDungeonRun();
       if(success)this.recomputeStats(p);
@@ -673,6 +753,10 @@ export class GameRoom extends Room<GameState> {
       try { zone = getZone(msg?.mapId ?? ""); } catch { return; }
       if (zone.id === p.mapId) return; // ya estás ahí
       if (!canEnterZone(zone, p.level)) return; // nivel insuficiente
+      if (zone.id === 'monasterio' && p.questId !== VEIL_COMPLETE && p.questId !== MEMORY_COMPLETE && !MONASTERY_QUEST_ORDER.includes(p.questId)) {
+        client.send(MessageType.ItemResult, {success:false,text:'Recuperá el paso de las Marismas y hablá con Maera antes de viajar al Monasterio.'});
+        return;
+      }
       this.maintainDungeonRun();
       if(zone.id==='cripta' && this.dungeonActive && this.dungeonRun.dungeonStage===5){
         client.send(MessageType.ItemResult,{success:false,text:'Esta expedición terminó. La cripta reabre cuando salga el último aventurero.'});
@@ -705,6 +789,20 @@ export class GameRoom extends Room<GameState> {
         return;
       }
       advanceQuest(p,'interact',o.id);
+      const contract=getVeilContract(p.veilContractId);
+      if(contract?.objectId===o.id && contract.mapId===p.mapId && p.veilContractProgress===0){
+        p.veilContractProgress=1;
+        client.send(MessageType.ItemResult,{success:true,text:`Encargo completado: ${contract.title}. Volvé con Boren en las Marismas.`});
+      }
+      if (MEMORY_ANCHORS.includes(o.id)) {
+        const boss = [...this.state.mobs.values()].find(m => m.templateId === 'memory_prior' && !m.dead && m.channeling && m.mapId === p.mapId && distance2D(p.x,p.z,m.x,m.z) <= 25);
+        if (boss && canFightDungeonMob(p,boss.templateId) && pvePower(p.level,boss.level).outgoing > 0) {
+          boss.channeling = false; boss.hazardMs = 0; boss.hazardCooldownMs = 9000;
+          boss.stunMs = Math.max(boss.stunMs,3000);
+          client.send(MessageType.ItemResult,{success:true,text:'Vínculo roto. ¡El Prior quedó expuesto!'});
+        } else client.send(MessageType.ItemResult,{success:!boss,text:boss?'El vínculo supera tu poder actual.':'Anclaje examinado. Activá uno durante la canalización del Prior.'});
+        return;
+      }
       if (o.kind === "shrine") {
         // Bendición temporal (reusa el sistema de buffs de skills).
         if (def.buff === "atk") { p.atkBuffMs = SHRINE_BUFF_MS; p.atkBuffMult = SHRINE_BUFF_MULT; }
@@ -712,6 +810,7 @@ export class GameRoom extends Room<GameState> {
       } else if (def.lootId) {
         this.dropLoot(def.lootId, o.x, o.z, o.mapId);
       }
+      if (def.reusable) return;
       o.active = false;
       o.respawnMs = objectRespawnMs(def.kind);
     });
@@ -735,6 +834,13 @@ export class GameRoom extends Room<GameState> {
   /** Etapa 22: marca a un jugador como "en combate" (corta la regen de HP 5 s). */
   private markCombat(p: PlayerState): void {
     p.msSinceCombat = 0;
+  }
+
+  /** Being hit provokes pursuit even when the attack began outside passive aggro. */
+  private engageMob(mob: MobState, attackerId: string): void {
+    if (mob.dead || mob.hp <= 0 || mob.aggroTargetId) return;
+    mob.aggroTargetId = attackerId;
+    mob.aiState = 'chase';
   }
 
   /** Etapa 22: enganche — acerca al caster a rango de ataque del objetivo (clamp a bounds). */
@@ -771,15 +877,34 @@ export class GameRoom extends Room<GameState> {
   }
 
   /** Anciano Rowan: campaña principal (asignar / entregar / avanzar). */
-  private serveElder(p: PlayerState, client: Client): void {
-    if(p.questId==='campaign_complete')return;
+  private serveElder(p: PlayerState, client: Client, npcId = 'elder'): void {
+    if (p.questId === MEMORY_COMPLETE) return;
+    if (p.questId === VEIL_COMPLETE) {
+      if (npcId !== 'maera') return;
+      if (p.level < 12) { client.send(MessageType.ItemResult,{success:false,text:'La expedición al Monasterio requiere nivel 12.'}); return; }
+      p.questId = MONASTERY_QUEST_ORDER[0]; p.questProgress = p.mapId === 'monasterio' ? 1 : 0;
+      client.send(MessageType.ItemResult,{success:true,text:'Nueva expedición: encontrá a Iria en el Monasterio de la Vigilia.'});
+      return;
+    }
+    if (p.questId === 'campaign_complete') {
+      if (npcId !== 'elder') return;
+      if (p.level < 10) { client.send(MessageType.ItemResult, {success:false,text:'La expedición a las Marismas requiere nivel 10.'}); return; }
+      p.questId = VEIL_QUEST_ORDER[0]; p.questProgress = 0;
+      client.send(MessageType.ItemResult, {success:true,text:'Nueva expedición: viajá a las Marismas y encontrá a Maera.'});
+      return;
+    }
     if (p.questId === "") {
+      if (npcId !== 'elder') return;
       p.questId = firstQuestId();
       p.questProgress = 0;
       return;
     }
     try {
       const q = getQuest(p.questId);
+      if ((q.returnNpcId ?? 'elder') !== npcId) {
+        client.send(MessageType.ItemResult, {success:false,text:`Esta misión se entrega con ${getNpc(q.returnNpcId ?? 'elder').name}.`});
+        return;
+      }
       if (p.questProgress >= q.amount) {
         this.grantExp(p, client, q.rewardExp);
         p.gold += q.rewardGold;
@@ -794,6 +919,20 @@ export class GameRoom extends Room<GameState> {
         client.send(MessageType.ItemResult,{success:true,text:`Misión completada: ${q.title}. +${q.rewardExp} EXP, +${q.rewardGold} oro${reward?`, ${getItem(reward).name}`:''}.`});
       }
     } catch { /* quest desconocida: ignorar */ }
+  }
+
+  private serveBoren(p:PlayerState,client:Client):void {
+    if(p.level<10 || p.veilContractId===VEIL_CONTRACTS_COMPLETE)return;
+    if(!p.veilContractId){
+      p.veilContractId=VEIL_CONTRACTS[0].id;p.veilContractProgress=0;
+      client.send(MessageType.ItemResult,{success:true,text:`Encargo aceptado: ${VEIL_CONTRACTS[0].intro}`});return;
+    }
+    const contract=getVeilContract(p.veilContractId);
+    if(!contract || p.veilContractProgress<1)return;
+    p.gold+=contract.rewardGold;this.addToInventory(p,contract.rewardItemId,contract.rewardQty);
+    p.veilContractId=nextVeilContract(contract.id);p.veilContractProgress=0;
+    const next=getVeilContract(p.veilContractId);
+    client.send(MessageType.ItemResult,{success:true,text:`${contract.done} +${contract.rewardGold} oro, ${contract.rewardQty} ${getItem(contract.rewardItemId).name}.${next?` Nuevo encargo: ${next.title}.`:''}`});
   }
 
   /** Sanadora: restaura HP y MP a full por oro (no-op si ya está full o falta oro). */
@@ -848,6 +987,8 @@ export class GameRoom extends Room<GameState> {
     x = position.x; z = position.z;
     const mob = this.state.mobs.get(id) ?? new MobState();
     mob.templateId = templateId;
+    mob.level = getTemplate(templateId).level;
+    mob.rank = getTemplate(templateId).rank;
     mob.mapId = mapId;
     mob.x = x;
     mob.z = z;
@@ -867,6 +1008,7 @@ export class GameRoom extends Room<GameState> {
     mob.dotDps=0;mob.dotAttackerId='';mob.dotAccumMs=0;
     mob.hazardMs = 0;
     mob.hazardCooldownMs = 0;
+    mob.channeling = false; mob.hazardCount = 0;
 
     const c = getMobCombat(templateId);
     mob.hp = c.maxHp;
@@ -889,6 +1031,7 @@ export class GameRoom extends Room<GameState> {
     if(mob.dead)return;
     mob.dead = true;
     mob.hazardMs = 0;
+    mob.channeling = false;
     mob.moving = false;
     mob.respawnMs = respawnForTemplate(mob.templateId) ?? MOB_RESPAWN_MS;
     this.broadcast(MessageType.Death, { entityId: mobId });
@@ -1042,23 +1185,33 @@ export class GameRoom extends Room<GameState> {
     const dtMs = dt * 1000;
     this.state.mobs.forEach((mob) => {
       if (mob.dead) return; // R-E2b1-3: un mob muerto no deambula ni persigue
-      if (mob.windupMs > 0) {
+      if (mob.windupMs > 0 || mob.hazardMs > 0) {
         mob.moving = false;
         return; // Plantado mientras carga el ataque
       }
       if (mob.stunMs > 0) { mob.moving = false; return; } // Etapa 22: aturdido no actúa
-      const aiConfig = ['crypt_warden','crypt_behemoth'].includes(mob.templateId) ? { ...AI_CONFIG, aggroRadius: 14 } : AI_CONFIG;
+      const aiConfig = ['crypt_warden','crypt_behemoth','skeleton_king','veil_guardian','memory_jailer','memory_prior'].includes(mob.templateId) ? { ...AI_CONFIG, aggroRadius: 14 } : AI_CONFIG;
       const candidates=(playersByMap.get(mob.mapId) ?? []).filter(pos=>{
         const p=this.state.players.get(pos.id);
         return p && canFightDungeonMob(p,mob.templateId);
       });
+      const wasEngaged = mob.aiState === 'chase';
       stepMobAI(mob, candidates, aiConfig, Math.random, dtMs);
+      if (wasEngaged && !mob.aggroTargetId) {
+        mob.hp = mob.maxHp;
+        mob.dotMs = 0; mob.dotDps = 0; mob.dotAccumMs = 0; mob.dotAttackerId = '';
+        mob.hazardMs = 0; mob.hazardCooldownMs = 0;
+        mob.channeling = false; mob.hazardCount = 0;
+        mob.rootMs = 0; mob.stunMs = 0;
+      }
       if (mob.rootMs > 0) mob.moving = false; else advanceMovable(mob, dt, MOB_MOVE_SPEED); // enraizado no se mueve
     });
 
     // cooldowns de jugadores (ataque + skill) y buffs
     this.state.players.forEach((p) => {
       tickCooldown(p, dtMs);
+      p.hpPotionCooldownMs=potionRecovery.remaining(p.name,'hp');
+      p.mpPotionCooldownMs=potionRecovery.remaining(p.name,'mp');
 
       // Decrement per-skill cooldowns
       for (const [skillId, cooldownMs] of p.skillCooldowns.entries()) {
@@ -1141,10 +1294,13 @@ export class GameRoom extends Room<GameState> {
       if (t.kind === "mob") {
         const mob = t.entity;
         if(!canFightDungeonMob(p,mob.templateId))return;
+        const power = pvePower(p.level, mob.level).outgoing;
+        if (power === 0) { p.targetId = ''; return; }
         if (canAttack(p, mob, weaponRange(playerLoadout(p)))) {
           if(!consumeAmmo(p))return;
           const variance = 0.9 + Math.random() * 0.2;
-          const dmg = resolveAttack(p, mob, 1, variance, getClass(p.className).base.attackCooldownMs/(1+p.itemEffects.attackSpeed));
+          const dmg = resolveAttack(p, mob, power, variance, getClass(p.className).base.attackCooldownMs/(1+p.itemEffects.attackSpeed));
+          if (dmg > 0) this.engageMob(mob, sessionId);
           if(getItem(p.equipment.get('weapon')??'worn_sword').ammo)this.broadcast(MessageType.SkillCast,{casterId:sessionId,skillId:'aimed_shot',targetId:p.targetId});
           this.markCombat(p);
           this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
@@ -1175,7 +1331,8 @@ export class GameRoom extends Room<GameState> {
       for(const id of impacted) {
         const p=this.state.players.get(id)!;
         const def=p.pDef*(p.defBuffMs>0?p.defBuffMult:1);
-        const dmg=Math.max(1,Math.round(computeDamage(mob.pAtk,def,1.8,1)*(1-p.itemEffects.reduction)));
+        const power = mob.templateId === 'memory_prior' ? mob.hazardPower : mob.templateId === 'skeleton_king' ? 2.8 : 2.2;
+        const dmg=Math.max(1,Math.round(computeDamage(mob.pAtk,def,power * pvePower(p.level,mob.level).incoming,1)*(1-p.itemEffects.reduction)));
         p.hp=Math.max(0,p.hp-dmg);
         this.markCombat(p);
         this.broadcast(MessageType.Damage,{attackerId:mobId,targetId:id,amount:dmg,hp:p.hp});
@@ -1203,8 +1360,8 @@ export class GameRoom extends Room<GameState> {
         // daño con def efectiva del jugador (buff): reusar computeDamage
         const defMult = (target.defBuffMs > 0) ? target.defBuffMult : 1;
         const fireMob=['infernal_demon','ancient_drake'].includes(mob.templateId);
-        const dmg = Math.random()<target.itemEffects.dodge?0:Math.max(1,Math.round(computeDamage(mob.pAtk, target.pDef * defMult, 1, variance)*(1-target.itemEffects.reduction)*(1-(fireMob?target.itemEffects.fireResist:0))));
-        const reflected=Math.floor(Math.min(target.hp,dmg)*target.itemEffects.reflect);
+        const dmg = Math.random()<target.itemEffects.dodge?0:Math.max(1,Math.round(computeDamage(mob.pAtk, target.pDef * defMult, pvePower(target.level,mob.level).incoming, variance)*(1-target.itemEffects.reduction)*(1-(fireMob?target.itemEffects.fireResist:0))));
+        const reflected=Math.floor(Math.min(target.hp,dmg)*target.itemEffects.reflect*pvePower(target.level,mob.level).outgoing);
         target.hp = Math.max(0, target.hp - dmg);
         this.markCombat(target);
         this.broadcast(MessageType.Damage, { attackerId: mobId, targetId, amount: dmg, hp: target.hp });
@@ -1228,11 +1385,14 @@ export class GameRoom extends Room<GameState> {
       if (mob.dead || mob.dotMs <= 0) return;
       if(mob.mapId==='cripta' && !canFightDungeonMob(this.dungeonRun,mob.templateId)) {mob.dotMs=0;return;}
 
+      const source = this.state.players.get(mob.dotAttackerId);
+      const power = pvePower(source?.level ?? mob.dotAttackerLevel, mob.level).outgoing;
+      if (power === 0) { mob.dotMs=0;mob.dotAccumMs=0;return; }
       mob.dotAccumMs += Math.min(dtMs, mob.dotMs);
 
       // Tick de daño cada 500ms
       while (mob.dotAccumMs >= 500) {
-        const dmg = Math.max(1, Math.round(mob.dotDps * 0.5));
+        const dmg = Math.max(1, Math.round(mob.dotDps * 0.5 * power));
         mob.hp = Math.max(0, mob.hp - dmg);
 
         this.broadcast(MessageType.Damage, {
@@ -1281,7 +1441,7 @@ export class GameRoom extends Room<GameState> {
       });
       let pickedItem = false;
       for (const id of pickupIds) {
-        if (tryPickup(this.state, sessionId, id)) pickedItem = true;
+        if (tryPickup(this.state, sessionId, id, true)) pickedItem = true;
       }
       // Etapa 13: recoger un ítem (p.ej. un legendario) puede desbloquear un logro.
       if (pickedItem) this.checkAchievements(p, sessionId);
@@ -1347,6 +1507,7 @@ export class GameRoom extends Room<GameState> {
     const password = options?.password ?? "";
     const mode = options?.mode ?? "";
     if (name.length < 1 || name.length > 16) throw new Error("Nombre inválido (1-16 caracteres).");
+    if (GameRoom.activeAccounts.has(name)) throw new Error('Esa cuenta ya está conectada o terminando de guardar.');
     if (mode !== 'login' && options.gender !== undefined && !isCharacterGender(options.gender)) {
       throw new Error('Elegí una apariencia masculina o femenina.');
     }
@@ -1375,19 +1536,23 @@ export class GameRoom extends Room<GameState> {
         await this.persistence.saveAccount({ name, passwordHash: hash, passwordSalt: salt });
       }
     }
-    // Precargar el personaje guardado (si existe) para que onJoin lo aplique de forma
-    // SÍNCRONA antes de insertar al jugador → el primer snapshot ya trae la clase/stats
-    // correctas (sin el parpadeo "knight" del load async) y sin la race save-before-load.
-    const save = await this.persistence.load(name);
-    return { name, save };
+    // onJoin claims the canonical account before loading its latest saved state.
+    return { name };
   }
 
   async onJoin(client: Client, options: { name?: string; className?: string; gender?: unknown }) {
-    // Save precargado por onAuth (síncrono acá). En login trae la clase real del
-    // personaje; en create es null y se usa la clase elegida.
-    const preSave = (client.auth as { save?: CharacterSave | null } | undefined)?.save ?? null;
+    // No other room may load a second writable copy of this account.
+    const name=(client.auth as {name?:string}|undefined)?.name ?? options.name?.trim() ?? 'Adventurer';
+    if(GameRoom.activeAccounts.has(name))throw new Error('Esa cuenta ya está conectada o terminando de guardar.');
+    GameRoom.activeAccounts.set(name,client.sessionId);this.accountNames.set(client.sessionId,name);
+    let preSave:CharacterSave|null;
+    try {preSave=await this.persistence.load(name);}
+    catch(error){GameRoom.activeAccounts.delete(name);this.accountNames.delete(client.sessionId);throw error;}
+    if(this.accountNames.get(client.sessionId)!==name)return;
     const player = new PlayerState();
-    player.name = options?.name ?? "Adventurer";
+    player.name = name;
+    player.hpPotionCooldownMs=potionRecovery.remaining(name,'hp');
+    player.mpPotionCooldownMs=potionRecovery.remaining(name,'mp');
     const className = preSave?.className && isValidClass(preSave.className)
       ? preSave.className
       : (isValidClass(options?.className) ? options.className! : "knight");
@@ -1425,8 +1590,7 @@ export class GameRoom extends Room<GameState> {
     player.z = player.targetZ = townSpawn.z;
     this.state.players.set(client.sessionId, player);
 
-    // Etapa 3c/21: el save ya viene precargado por onAuth (client.auth) → se aplica de
-    // forma síncrona, sin segunda lectura ni race save-before-load.
+    // Apply the loaded save synchronously before yielding a player snapshot.
     const save = preSave;
     if (save) {
       player.className = save.className ?? "knight";
@@ -1480,6 +1644,8 @@ export class GameRoom extends Room<GameState> {
         // Etapa 20: contrato activo del Capitán.
         player.bountyId = pr.bountyId ?? "";
         player.bountyProgress = pr.bountyProgress ?? 0;
+        player.veilContractId = pr.veilContractId ?? '';
+        player.veilContractProgress = pr.veilContractProgress ?? 0;
         // Etapa 21: atributos asignados. statPoints se DERIVA del nivel (invariante:
         // total por nivel − gastados), así los personajes viejos reciben sus puntos
         // retroactivamente y nunca queda desincronizado.
@@ -1528,20 +1694,25 @@ export class GameRoom extends Room<GameState> {
     this.checkAchievements(player, client.sessionId);
   }
 
-  /** Guarda el estado de todos los jugadores conectados (fire-and-forget, periódico). */
+  /** Atomic room snapshot; failed transfer rows remain queued for retry. */
   private async saveAll() {
-    this.state.players.forEach((p) => {
-      // Etapa 3c: si el load de onJoin todavía no aplicó, p tiene los defaults de nivel 1;
-      // guardarlo pisaría el registro real. Se salta hasta que loaded === true.
-      if (!p.loaded) return;
-      this.persistence.save(p.name, toCharacterSave(p)).catch((e) => console.error("[aden] save fail", p.name, e));
-    });
+    const entries=[...this.state.players.values()].filter(p=>p.loaded).map(p=>({name:p.name,data:toCharacterSave(p)}));
+    try{await this.saveQueue.save(entries);}catch(e){console.error('[aden] save batch failed; retained for retry',e);}
   }
 
   async onLeave(client: Client) {
     this.chat.remove(client.sessionId);
+    this.trades.remove(client.sessionId);
     this.parties.leave(client.sessionId);
     const player = this.state.players.get(client.sessionId);
+    const name=this.accountNames.get(client.sessionId);
+    this.accountNames.delete(client.sessionId);
+    if(name)this.departedAccounts.set(name,client.sessionId);
+    // Keep the retry interval alive when the last player's save fails.
+    if(player?.loaded && this.autoDispose){this.holdingForSave=true;this.autoDispose=false;}
+    if(!player?.loaded && name && GameRoom.activeAccounts.get(name)===client.sessionId) {
+      GameRoom.activeAccounts.delete(name);this.departedAccounts.delete(name);
+    }
     // Remove from live systems before the asynchronous save: disconnected players
     // must not accept invitations or earn group rewards while persistence waits.
     const gid = player?.guildId ?? '';
@@ -1553,7 +1724,9 @@ export class GameRoom extends Room<GameState> {
       // valga la pena persistir y guardar pisaría el registro real con defaults.
       if (player.loaded) {
         try {
-          await this.persistence.save(player.name, toCharacterSave(player));
+          const entries=[...this.state.players.values()].filter(p=>p.loaded).map(p=>({name:p.name,data:toCharacterSave(p)}));
+          entries.push({name:player.name,data:toCharacterSave(player)});
+          await this.saveQueue.save(entries);
         } catch (e) {
           console.error("[aden] save fail on leave", player.name, e);
         }
@@ -1562,6 +1735,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   async onDispose() {
+    await this.saveAll();
     await this.presence.unsubscribe(GLOBAL_CHAT_TOPIC, this.deliverGlobalChat);
   }
 }

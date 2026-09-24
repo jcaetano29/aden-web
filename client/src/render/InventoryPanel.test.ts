@@ -15,6 +15,22 @@ function view(over: Partial<Parameters<InventoryPanel["update"]>[0]> = {}) {
 }
 
 describe("InventoryPanel (Equipo)", () => {
+  it('pide cantidad y confirmación para tirar, sin modificar el inventario local', () => {
+    const onDrop = vi.fn(); const panel = new InventoryPanel(document.body, { onDrop });panel.toggle();
+    const entries = [{itemTemplateId:'bone',qty:7,name:'Hueso'}];panel.update(view({entries}));
+    const qty=document.querySelector<HTMLInputElement>('[data-drop-qty]')!;expect(qty).not.toBeNull();qty.value='3';
+    document.querySelector<HTMLButtonElement>('[data-drop-item]')!.click();expect(onDrop).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-drop-confirm]')?.textContent).toContain('3');
+    document.querySelector<HTMLButtonElement>('[data-drop-confirm]')!.click();expect(onDrop).toHaveBeenCalledWith('bone',3);
+    expect(entries[0].qty).toBe(7);
+  });
+  it('no permite tirar equipo puesto ni cantidades inválidas', () => {
+    const onDrop=vi.fn();const panel=new InventoryPanel(document.body,{onDrop});panel.toggle();
+    panel.update(view({entries:[{itemTemplateId:'bone',qty:2,name:'Hueso'}],equipment:{weapon:'iron_sword'}}));
+    const qty=document.querySelector<HTMLInputElement>('[data-drop-qty]')!;qty.value='3';
+    document.querySelector<HTMLButtonElement>('[data-drop-item]')!.click();expect(document.querySelector('[data-drop-confirm]')).toBeNull();expect(onDrop).not.toHaveBeenCalled();
+    document.querySelector<HTMLButtonElement>('[data-equip-slot="weapon"]')!.click();expect(document.querySelector('[data-drop-item]')).toBeNull();
+  });
   it('compara el objeto seleccionado y actualiza el resultado al cambiar el equipo', () => {
     const panel = new InventoryPanel(document.body);
     panel.toggle();

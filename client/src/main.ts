@@ -1,4 +1,5 @@
 import { AdventureTracker } from "./render/AdventureTracker.js";
+import { NPCS, VEIL_COMPLETE, VEIL_QUEST_ORDER, MEMORY_COMPLETE, MONASTERY_QUEST_ORDER, chooseHealthPotion, VEIL_CONTRACTS, VEIL_CONTRACTS_COMPLETE, getVeilContract } from '@aden/shared';
 import { HazardViews } from "./render/HazardViews.js";
 import * as THREE from "three";
 import { preloadMaterialAtlas } from "./render/materialAtlas.js";
@@ -16,6 +17,7 @@ import { SkillBar } from "./render/SkillBar.js";
 import { InventoryPanel } from "./render/InventoryPanel.js";
 import { GuildPanel } from "./render/GuildPanel.js";
 import { PartyPanel } from './render/PartyPanel.js';
+import { TradePanel } from './render/TradePanel.js';
 import { ChatPanel } from './render/ChatPanel.js';
 import { LeaderboardPanel } from "./render/LeaderboardPanel.js";
 import { ProgressPanel } from "./render/ProgressPanel.js";
@@ -82,6 +84,9 @@ async function main() {
   const healer = new ServiceNpc(renderer.scene, renderer.css2d, "healer", factory);
   const smith = new ServiceNpc(renderer.scene, renderer.css2d, "smith", factory);
   const captain = new ServiceNpc(renderer.scene, renderer.css2d, "captain", factory);
+  const regionalNpcs = NPCS.filter(def => def.mapId !== 'pueblo').map(def => ({ def, view: new Npc(renderer.scene, renderer.css2d, factory, def.id) }));
+  const fieldShop = new ShopPanel(itemId => net.sendBuyItem(itemId), { title: 'Provisiones de Boren' });
+  fieldShop.setGreeting('Llegaron sin nombres, pero todavía necesitan comer. Maera busca respuestas; yo mantengo este puesto en pie. Llevá pociones y munición antes de seguir al norte.');
   const shopPanel = new ShopPanel((itemId) => {
     net.sendBuyItem(itemId);
   });
@@ -93,6 +98,7 @@ async function main() {
     onUseItem: (itemId, targetItemId) => net.sendUseItem(itemId, targetItemId),
     onEquip: (itemId) => net.sendEquipItem(itemId),
     onUnequip: (slot) => net.sendUnequipItem(slot),
+    onDrop: (itemId, qty) => net.sendDropItem(itemId, qty),
   });
   const guildPanel = new GuildPanel({
     onCreate: (name_, tag) => net.sendCreateGuild(name_, tag),
@@ -107,6 +113,14 @@ async function main() {
     onLeave: () => net.sendPartyLeave(),
   });
   partyPanel.mount(document.body);
+  const tradePanel = new TradePanel({
+    onInvite: id => net.sendTradeInvite(id),
+    onRespond: (id, accept) => net.sendTradeRespond(id, accept),
+    onOffer: (id, revision, offer) => net.sendTradeOffer(id, revision, offer),
+    onConfirm: (id, revision) => net.sendTradeConfirm(id, revision),
+    onCancel: id => net.sendTradeCancel(id),
+  });
+  tradePanel.mount(document.body);
   const leaderboardPanel = new LeaderboardPanel();
   leaderboardPanel.mount(document.body);
   const progressPanel = new ProgressPanel((title) => net.sendSetTitle(title));
@@ -326,15 +340,50 @@ async function main() {
 
   // Interacción con el NPC de misiones: diálogo narrativo contextual.
   // El server es autoritativo; el diálogo es presentación.
-  function interactNpc() {
+  function interactNpc(npcId = 'elder') {
     const self = net.getSelf();
     const pos = views.selfPosition();
     if (!self || !pos) return;
+    const npcDef = getNpc(npcId);
+    const regional = npcDef.mapId !== 'pueblo';
+    const center = regional ? npcDef : TOWN;
+    const speaker = npcDef.name;
 
     // Gate de cercanía (espeja el del server)
-    if (distance2D(pos.x, pos.z, TOWN.x, TOWN.z) > TOWN_SERVICE_RADIUS) {
-      hud.toast(`Acercate al ${ELDER_NAME} para hablarle`, "#ffe066");
+    if (self.mapId !== npcDef.mapId || distance2D(pos.x, pos.z, center.x, center.z) > (regional ? 5 : TOWN_SERVICE_RADIUS)) {
+      hud.toast(`Acercate a ${speaker} para hablarle`, "#ffe066");
       return;
+    }
+    if (npcId === 'boren') {
+      shopPanel.close();smithPanel.close();fieldShop.close();
+      const id=self.veilContractId??'',contract=getVeilContract(id)||VEIL_CONTRACTS[0];
+      const finished=id===VEIL_CONTRACTS_COMPLETE,ready=(self.veilContractProgress??0)>=1;
+      const reward=`Recompensa: ${contract.rewardGold} oro y ${contract.rewardQty} ${getItem(contract.rewardItemId).name}.`;
+      dialog.open({speaker,text:finished?'Los viajeros tienen provisiones, su familia tiene noticias y los carros están reparados. Gracias por ayudarlos a regresar.':`${contract.title}\n\n${ready?contract.done:contract.intro}\n\n${reward}`,
+        actionLabel:finished?'Gracias':ready?'Entregar encargo':id?'Seguir buscando':'Aceptar encargo',
+        onAction:()=>{if(!finished && (!id||ready))net.sendInteractNpc('boren');},
+        secondaryAction:{label:'Comprar provisiones',onAction:()=>{fieldShop.updateGold(self.gold);fieldShop.toggle();}}});
+      return;
+    }
+    if (self.questId === VEIL_COMPLETE) {
+      const ready = npcId === 'maera' && self.level >= 12;
+      dialog.open({ speaker, text: npcId === 'maera' ? getQuest(MONASTERY_QUEST_ORDER[0]).intro + '\n\nIria conoce los registros de la caravana. Encontrala y traé a los desaparecidos de vuelta. Requiere nivel 12.' : 'Hablá con Maera en las Marismas para iniciar la expedición al Monasterio (nivel 12).', actionLabel: ready ? 'Viajaré al Monasterio' : 'Entendido', onAction: () => { if (ready) net.sendInteractNpc(npcId); } });
+      return;
+    }
+    if (self.questId === MEMORY_COMPLETE) {
+      dialog.open({ speaker, text: 'El Prior cayó. Los cautivos recuperaron sus nombres y Maera se reunió con su hermano. Iria conserva los testimonios para que Aden no vuelva a olvidar. La Memoria del Velo está a salvo.', actionLabel: 'Seguir explorando', onAction: () => {} });
+      return;
+    }
+    if ((npcId === 'maera' || npcId === 'iria') && !self.questId.startsWith('a2_')) {
+      dialog.open({ speaker, text: 'Rowan está reuniendo una expedición. Hablá con él en Aden después de vencer a Nihil; a partir del nivel 10 podremos investigar juntos.', actionLabel: 'Entendido', onAction: () => {} });
+      return;
+    }
+    if (self.questId.startsWith('a2_')) {
+      const receiver = getNpc(getQuest(self.questId).returnNpcId ?? 'elder');
+      if (npcId !== receiver.id) {
+        dialog.open({ speaker, text: `${receiver.name} espera noticias. Seguí el diario de misión y entregá allí tus descubrimientos.`, actionLabel: 'Entendido', onAction: () => {} });
+        return;
+      }
     }
 
     // Si no hay misión asignada: ofrecer la primera
@@ -343,10 +392,10 @@ async function main() {
         const firstQuestId_ = firstQuestId();
         const q = getQuest(firstQuestId_);
         dialog.open({
-          speaker: ELDER_NAME,
+          speaker,
           text: q.intro,
           actionLabel: "Aceptar",
-          onAction: () => net.sendInteractNpc(),
+          onAction: () => net.sendInteractNpc(npcId),
         });
       } catch {
         // No hay quests disponibles (no debería pasar)
@@ -356,7 +405,7 @@ async function main() {
     }
 
     if (self.questId === "campaign_complete") {
-      dialog.open({ speaker: ELDER_NAME, text: "Bram vuelve a preparar viajes; Elenya puede hablar de recuperación, y no sólo de sobrevivir. Eso es lo que cambiaste al vencer a Nihil. Los ecos de la maldición aún nos obligan a vigilar la Cripta. Hoy, antes de volver al camino, escuchá a quienes ayudaste.", actionLabel: "Volver a la plaza", onAction: () => {} });
+      dialog.open({ speaker, text: getQuest(VEIL_QUEST_ORDER[0]).intro + '\n\nRequiere nivel 10.', actionLabel: self.level >= 10 ? 'Iniciar expedición' : 'Volver al camino', onAction: () => { if (self.level >= 10) net.sendInteractNpc(npcId); } });
       return;
     }
 
@@ -367,17 +416,17 @@ async function main() {
       // Si la misión está completada: mostrar diálogo de entrega
       if (self.questProgress >= q.amount) {
         dialog.open({
-          speaker: ELDER_NAME,
+          speaker,
           text: questTurnInText(q.id),
           actionLabel: "Recibir recompensa",
-          onAction: () => net.sendInteractNpc(),
+          onAction: () => net.sendInteractNpc(npcId),
         });
       } else {
         // Misión en progreso: recordatorio + progreso
         const advice = q.id === "q_alpha" ? classAdvice(self.className, self.level) : "";
         const progressText = `${q.intro}${advice ? `\n\n${advice}` : ""}\n\n(Progreso: ${self.questProgress}/${q.amount})`;
         dialog.open({
-          speaker: ELDER_NAME,
+          speaker,
           text: progressText,
           actionLabel: "Entendido",
           onAction: () => {},
@@ -519,6 +568,7 @@ async function main() {
       { object: healer.object, onInteract: interactHealer },
       { object: smith.object, onInteract: interactSmith },
       { object: captain.object, onInteract: interactCaptain },
+      ...regionalNpcs.map(({def,view}) => ({object:view.object, onInteract:()=>interactNpc(def.id)})).filter(entry => entry.object.visible),
     ],
     {targets:()=>groundItems.raycastTargets(),hover:ray=>groundItems.hover(ray),pick:id=>{
       groundItems.select(id);
@@ -588,6 +638,8 @@ async function main() {
       inventoryPanel.toggle();
     }
     if (e.code === 'KeyP' && !e.repeat) { partyPanel.update(net.getPartyPanelData()); partyPanel.toggle(); }
+    if (e.code === 'KeyR' && !e.repeat) { tradePanel.update(net.getTradePanelData()); tradePanel.toggle(); }
+    if (e.key === 'Escape') tradePanel.setVisible(false);
     if (e.key === 'Escape') partyPanel.setVisible(false);
     if (e.key === "g" || e.key === "G" || e.code === "KeyG") {
       guildPanelVisible = !guildPanelVisible;
@@ -632,12 +684,16 @@ async function main() {
         hud.toast("Ya tenés la vida llena", "#ffe066");
         return;
       }
-      const potion = inv.find((it) => it.itemTemplateId === "health_potion");
-      if (!potion || potion.qty < 1) {
+      if ((self.hpPotionCooldownMs ?? 0) > 0) {
+        hud.toast(`Poción de vida disponible en ${Math.ceil(self.hpPotionCooldownMs! / 1000)} s.`, '#ffe066');
+        return;
+      }
+      const potion = chooseHealthPotion(inv,self.maxHp-self.hp,self.level,self.className);
+      if (!potion) {
         hud.toast("No tenés pociones de vida", "#ff6b6b");
         return;
       }
-      net.sendUseItem("health_potion");
+      net.sendUseItem(potion);
     }
   });
 
@@ -673,6 +729,7 @@ async function main() {
     const myMapId = selfCombat?.mapId ?? "pueblo";
     groundItems.setMap(myMapId);
     views.setCurrentMap(myMapId);
+    views.setSelfLevel(selfCombat?.level ?? 1);
     nameplates.updateChat(myMapId);
     worldObjects.setCurrentMap(myMapId);
     hazards.setCurrentMap(myMapId);
@@ -688,11 +745,22 @@ async function main() {
     healer.update(dt);
     smith.update(dt);
     captain.update(dt);
+    for (const {def,view} of regionalNpcs) {
+      view.object.visible = def.mapId === myMapId;
+      if (view.object.visible) view.update(dt);
+      let ready = false;
+      try { const q = getQuest(selfCombat?.questId ?? ''); ready = q.returnNpcId === def.id && (selfCombat?.questProgress ?? 0) >= q.amount; } catch { /* No active regional quest. */ }
+      if(def.id==='boren')ready=(selfCombat?.veilContractProgress??0)>=1;
+      view.setReady(ready);
+    }
+    if (myMapId !== 'marismas') fieldShop.close();
+    else if (selfCombat && fieldShop.isOpen()) fieldShop.updateGold(selfCombat.gold);
     const objective = selfCombat ? adventure.update(selfCombat) : undefined;
     minimap.update(net.getMinimapEntities(), net.getAdventureTarget() ?? objective);
     // Barra del jefe en pantalla + contador de reaparición (Etapa 14).
     bossBar.update(net.getBossState(), bossRespawnMs);
     if (selfCombat) {
+      hud.updatePotionRecovery(selfCombat.hpPotionCooldownMs ?? 0,selfCombat.mpPotionCooldownMs ?? 0);
       hud.update(
         selfCombat.hp,
         selfCombat.maxHp,
@@ -735,6 +803,7 @@ async function main() {
       attributes: selfCombat ? { str: selfCombat.str, agi: selfCombat.agi, vit: selfCombat.vit, ene: selfCombat.ene } : undefined,
     });
     partyPanel.update(net.getPartyPanelData());
+    tradePanel.update(net.getTradePanelData());
     if (guildPanelVisible) {
       guildPanel.update(net.getGuildPanelData());
     }

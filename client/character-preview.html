@@ -12,6 +12,7 @@ import {CharacterFactory} from '/src/render/CharacterFactory.ts';
 import {MODEL_NAMES} from '/src/assets/manifest.ts';
 import {selectClip} from '/src/render/animation.ts';
 import {preloadMaterialAtlas} from '/src/render/materialAtlas.ts';
+import {EquipmentViews} from '/src/render/EquipmentViews.ts';
 await preloadMaterialAtlas();
 const factory=new CharacterFactory();await factory.preload(MODEL_NAMES);
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x121b27);
@@ -22,16 +23,24 @@ const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(
 const camera=new THREE.OrthographicCamera(-6,6,7,-.3,.1,100);camera.position.set(0,3.2,18);camera.lookAt(0,3.2,0);
 const labels=['Caballero','Mago','Bárbaro','Pícaro','Explorador','Caballera','Maga','Bárbara','Pícara','Exploradora'];
 const chars=MODEL_NAMES.map((name,i)=>{const c=factory.create(name);c.root.position.set((i%5-2)*2.35,i<5?3.25:0,0);c.root.rotation.y=-.18;scene.add(c.root);c.play(selectClip(c.clipNames,'idle'),true);document.querySelector('#labels').append(Object.assign(document.createElement('span'),{textContent:labels[i]}));return c;});
-let mode='idle';
+const equipment=chars.map(c=>new EquipmentViews(c.root));
+let mode='idle', focused=-1;
 for(const [kind,label] of [['idle','Reposo'],['walk','Caminar'],['attack','Atacar'],['hit','Recibir golpe'],['death','Caer']]){const b=document.createElement('button');b.textContent=label;b.onclick=()=>{mode=kind;for(const c of chars){const clip=selectClip(c.clipNames,kind);if(clip)c.play(clip,true);}};document.querySelector('#controls').append(b);}
 const turn=document.createElement('button');turn.textContent='Girar 45°';turn.onclick=()=>chars.forEach(c=>c.root.rotation.y+=Math.PI/4);document.querySelector('#controls').append(turn);
+const views=document.createElement('select');views.setAttribute('aria-label','Personaje en detalle');
+views.style.cssText='background:#273646;color:#dfd2b5;padding:6px;margin:2px;border:1px solid #917c53';
+['Todas las clases',...labels].forEach((label,i)=>views.append(Object.assign(document.createElement('option'),{textContent:label,value:String(i-1)})));
+views.onchange=()=>{focused=Number(views.value);chars.forEach((c,i)=>{c.root.visible=focused<0||focused===i;c.root.position.set(focused<0?(i%5-2)*2.35:0,focused<0&&i<5?3.25:0,0);});resize();};document.querySelector('#controls').append(views);
+let equipped=false;const equip=document.createElement('button');equip.textContent='Probar equipo';equip.onclick=()=>{equipped=!equipped;equipment.forEach(e=>e.update(equipped?{armor:'iron_mail',pants:'aden_grebas_de_la_senda_del_alba',boots:'aden_botas_de_la_senda_del_alba',gloves:'aden_guantes_de_la_senda_del_alba'}:{}));equip.textContent=equipped?'Quitar equipo':'Probar equipo';};document.querySelector('#controls').append(equip);
 const report=chars.map((c,i)=>{
  const errors=[];const anchors=['Head','Torso','Hips','WeaponR','FistL','FootL','FootR'];for(const name of anchors)if(!c.root.getObjectByName(name))errors.push('Falta '+name);
- for(const kind of ['idle','walk','attack','hit','death']) {const clip=selectClip(c.clipNames,kind);if(!clip){errors.push('Falta animación '+kind);continue;}c.play(clip,true);for(let j=0;j<12;j++){c.mixer.update(.08);c.root.updateMatrixWorld(true);c.root.traverse(o=>{if(o.visible&&o instanceof THREE.Mesh&&!o.matrixWorld.elements.every(Number.isFinite))errors.push('Transformación no finita '+o.name);});}}
+ const body=c.root.getObjectByName('hero_cuirass');if(!body?.isSkinnedMesh)errors.push('Falta cuerpo continuo animado');
+ if(!body?.material.map||!body?.material.bumpMap||!body?.material.roughnessMap)errors.push('Faltan texturas del cuerpo');
+ for(const kind of ['idle','walk','attack','hit','death']) {const clip=selectClip(c.clipNames,kind);if(!clip){errors.push('Falta animación '+kind);continue;}c.play(clip,true);for(let j=0;j<12;j++){c.mixer.update(.08);c.root.updateMatrixWorld(true);c.root.traverse(o=>{if(o.visible&&o instanceof THREE.Mesh&&!o.matrixWorld.elements.every(Number.isFinite))errors.push('Transformación no finita '+o.name);});if(body?.isSkinnedMesh){body.skeleton.update();for(let v=0;v<body.geometry.attributes.position.count;v+=37){const p=body.getVertexPosition(v,new THREE.Vector3());if(!p.toArray().every(Number.isFinite)||p.length()>8)errors.push('Deformación inválida '+kind);}}}}
  c.play(selectClip(c.clipNames,'idle'),true);
- return {model:MODEL_NAMES[i],gender:c.root.userData.gender,clips:c.clipNames.length,errors};
+ return {model:MODEL_NAMES[i],gender:c.root.userData.gender,clips:c.clipNames.length,textured:!!body?.material.map,errors};
 });
 document.querySelector('#report').textContent=JSON.stringify(report,null,2);document.body.dataset.ready='true';document.body.dataset.passed=String(report.every(r=>!r.errors.length));
-function resize(){renderer.setSize(innerWidth,innerHeight);const aspect=innerWidth/innerHeight;const viewHeight=8.2,w=Math.max(12,viewHeight*aspect);camera.left=-w/2;camera.right=w/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();document.querySelectorAll('#labels span').forEach((label,i)=>{label.style.left=((i%5-2)*2.35/w+.5)*innerWidth+'px';label.style.top=((3.2+viewHeight/2-(i<5?6.02:2.77))/viewHeight)*innerHeight+'px';});}addEventListener('resize',resize);resize();
+function resize(){renderer.setSize(innerWidth,innerHeight);const aspect=innerWidth/innerHeight;const viewHeight=focused<0?8.2:3.7,w=Math.max(focused<0?12:3.5,viewHeight*aspect);const center=focused<0?3.2:1.45;camera.position.set(0,center,18);camera.lookAt(0,center,0);camera.left=-w/2;camera.right=w/2;camera.top=viewHeight/2;camera.bottom=-viewHeight/2;camera.updateProjectionMatrix();document.querySelectorAll('#labels span').forEach((label,i)=>{label.hidden=focused>=0;label.style.left=((i%5-2)*2.35/w+.5)*innerWidth+'px';label.style.top=((3.2+viewHeight/2-(i<5?6.02:2.77))/viewHeight)*innerHeight+'px';});}addEventListener('resize',resize);resize();
 let last=performance.now();function frame(now){const dt=Math.min((now-last)/1000,.05);last=now;chars.forEach(c=>c.mixer.update(dt));renderer.render(scene,camera);document.querySelector('#status').textContent=`10 modelos · ${mode} · ${renderer.info.render.triangles.toLocaleString()} triángulos · ${renderer.info.render.calls} llamadas de dibujo · ${report.every(r=>!r.errors.length)?'Animaciones verificadas':'Revisar errores'}`;requestAnimationFrame(frame);}requestAnimationFrame(frame);
 </script></html>
