@@ -123,7 +123,7 @@ import { LeaderPlayerEntry, LeaderGuildEntry } from "../state/LeaderboardState.j
 import { advanceMovable } from "@aden/shared";
 import { createSpawns } from "../systems/SpawnSystem.js";
 import { stepMobAI } from "../systems/MobAISystem.js";
-import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
+import { canAttack, inSkillRange, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
 import { createPersistence } from "../persistence/createPersistence.js";
 import { CharacterSaveQueue } from '../persistence/CharacterSaveQueue.js';
 import type { PersistenceService, CharacterRank, GuildRank } from "../persistence/PersistenceService.js";
@@ -533,9 +533,8 @@ export class GameRoom extends Room<GameState> {
           return;
         }
         const gapCloser = skill.dash === "toTarget";
-        // Enganche: requiere ataque listo pero NO rango (el dash acerca); si no, canAttack normal.
-        const ready = gapCloser ? (p.attackCooldownMs <= 0 && t.entity.hp > 0 && distance2D(p.x,p.z,t.entity.x,t.entity.z)<=skillRange(skill)) : canAttack(p, t.entity, skillRange(skill));
-        if (!ready) return;
+        // Las skills no esperan al golpe automático: las limitan su cooldown, su maná y su alcance.
+        if (!inSkillRange(p, t.entity, skillRange(skill))) return;
         if (t.kind === "player") {
           const victim = t.entity;
           if (this.areAllies(p, victim)) return;
@@ -591,7 +590,7 @@ export class GameRoom extends Room<GameState> {
         announceCast("");
       } else if (skill.type === "dot") {
         const target=p.targetId?this.resolveTarget(p.targetId,p.mapId):null;
-        if(!target || !canAttack(p,target.entity,skillRange(skill)))return;
+        if(!target || !inSkillRange(p,target.entity,skillRange(skill)))return;
         if(target.kind==='mob' && (!canFightDungeonMob(p,target.entity.templateId) || pvePower(p.level,target.entity.level).outgoing === 0)) { client.send(MessageType.ItemResult,{success:false,text:'Fuera de tu alcance o encuentro todavía bloqueado.'}); return; }
         if(target.kind==='player' && (!this.inPvpZone(p)||!this.inPvpZone(target.entity)||this.areAllies(p, target.entity)))return;
         spend();

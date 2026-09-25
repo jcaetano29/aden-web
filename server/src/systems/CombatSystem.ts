@@ -20,6 +20,19 @@ export function canAttack(
   return distance2D(attacker.x, attacker.z, target.x, target.z) <= range;
 }
 
+/**
+ * Alcance de una skill: objetivo vivo y a distancia. No mira el golpe automático:
+ * las skills tienen su propio cooldown y maná (resolveAttack igual reinicia el golpe).
+ */
+export function inSkillRange(
+  attacker: { x: number; z: number },
+  target: { x: number; z: number; hp: number; dead?: boolean },
+  range: number,
+): boolean {
+  if (target.hp <= 0 || target.dead) return false;
+  return distance2D(attacker.x, attacker.z, target.x, target.z) <= range;
+}
+
 export function resolveAttack(
   attacker: Combatant,
   target: { hp: number; pDef: number; itemEffects?: EquipmentEffects },
