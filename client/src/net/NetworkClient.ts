@@ -410,11 +410,11 @@ export class NetworkClient {
     const achievements: string[] = [];
     p.achievements?.forEach((id: string) => achievements.push(id));
     return {
-      loginStreak: p.loginStreak ?? 0,
-      dailyQuestId: p.dailyQuestId ?? "",
-      dailyProgress: p.dailyProgress ?? 0,
-      dailyDone: p.dailyDone ?? false,
-      totalKills: p.totalKills ?? 0,
+      loginStreak: p.retention?.loginStreak ?? 0,
+      dailyQuestId: p.retention?.dailyQuestId ?? "",
+      dailyProgress: p.retention?.dailyProgress ?? 0,
+      dailyDone: p.retention?.dailyDone ?? false,
+      totalKills: p.retention?.totalKills ?? 0,
       title: p.title ?? "",
       achievements,
     };
@@ -503,11 +503,11 @@ export class NetworkClient {
       bountyProgress: p.bountyProgress ?? 0,
       veilContractId: p.veilContractId ?? '',
       veilContractProgress: p.veilContractProgress ?? 0,
-      str: p.str ?? 0,
-      agi: p.agi ?? 0,
-      vit: p.vit ?? 0,
-      ene: p.ene ?? 0,
-      statPoints: p.statPoints ?? 0,
+      str: p.attributes?.str ?? 0,
+      agi: p.attributes?.agi ?? 0,
+      vit: p.attributes?.vit ?? 0,
+      ene: p.attributes?.ene ?? 0,
+      statPoints: p.attributes?.statPoints ?? 0,
       stunMs: p.stunMs ?? 0,
       rootMs: p.rootMs ?? 0,
       className: p.className ?? "knight",

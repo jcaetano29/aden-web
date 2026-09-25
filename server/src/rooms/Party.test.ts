@@ -39,7 +39,7 @@ describe('party integration', () => {
 
   it('splits EXP and shares kill objectives only with living nearby party members', async () => {
     const { room, a, pa, pb, pc } = await setup();
-    for (const p of [pa, pb, pc]) { p.mapId = 'bosque'; p.x = 300; p.z = 0; p.exp = 0; p.questId = 'q1'; p.questProgress = 0; p.dailyQuestId = ''; }
+    for (const p of [pa, pb, pc]) { p.mapId = 'bosque'; p.x = 300; p.z = 0; p.exp = 0; p.questId = 'q1'; p.questProgress = 0; p.retention.dailyQuestId = ''; }
     const mob = room.spawnMob('party-mob', 'skeleton_minion', 300, 0, 'bosque');
     room['killMob'](mob, 'party-mob', a.sessionId);
     const exp = getMobExp('skeleton_minion');
@@ -68,14 +68,14 @@ describe('party integration', () => {
   it('preserves full public crypt EXP without granting it twice to a party member', async () => {
     const { room, a, pa, pb, pc } = await setup();
     const [id, mob] = [...room.state.mobs].find(([, m]) => m.templateId === 'crypt_acolyte')!;
-    for (const p of [pa, pb, pc]) { p.mapId = mob.mapId; p.x = mob.x; p.z = mob.z; p.exp = 0; p.dailyQuestId = ''; }
+    for (const p of [pa, pb, pc]) { p.mapId = mob.mapId; p.x = mob.x; p.z = mob.z; p.exp = 0; p.retention.dailyQuestId = ''; }
     room['killMob'](mob, id, a.sessionId);
     for (const p of [pa, pb, pc]) expect(p.exp).toBe(getMobExp('crypt_acolyte'));
   });
 
   it.each(['dead', 'far', 'other-map'])('awards eligible companions when the killer is %s at the final poison tick', async mode => {
     const { room, a, pa, pb } = await setup();
-    for (const p of [pa, pb]) { p.mapId = 'bosque'; p.x = 300; p.z = 0; p.exp = 0; p.questId = 'q1'; p.questProgress = 0; p.dailyQuestId = ''; }
+    for (const p of [pa, pb]) { p.mapId = 'bosque'; p.x = 300; p.z = 0; p.exp = 0; p.questId = 'q1'; p.questProgress = 0; p.retention.dailyQuestId = ''; }
     pa.dead = mode === 'dead'; pa.x = mode === 'far' ? 340 : 300; pa.mapId = mode === 'other-map' ? 'pueblo' : 'bosque';
     const mob = room.spawnMob('poison-final', 'skeleton_minion', 300, 0, 'bosque');
     room['killMob'](mob, 'poison-final', a.sessionId);

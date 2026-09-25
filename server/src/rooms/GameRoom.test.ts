@@ -327,7 +327,7 @@ describe("GameRoom", () => {
     const ally = room.state.players.get(allyClient.sessionId)!;
     for (const p of [author, ally]) {
       p.mapId = 'cripta'; p.x = 900; p.z = 30; p.moving = false;
-      p.level = 6; p.exp = 0; p.dailyQuestId = ''; p.targetId = '';
+      p.level = 6; p.exp = 0; p.retention.dailyQuestId = ''; p.targetId = '';
     }
     if (ownerState === 'dead') { author.dead = true; author.respawnMs = 100000; }
     if (ownerState === 'missing') room.state.players.delete(authorClient.sessionId);
@@ -1104,8 +1104,8 @@ describe("GameRoom", () => {
       const c = await colyseus.connectTo(room, { name: "Nuevo", className: "knight" });
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
-      expect(p.loginStreak).toBe(1);
-      expect(p.dailyQuestId).not.toBe("");
+      expect(p.retention.loginStreak).toBe(1);
+      expect(p.retention.dailyQuestId).not.toBe("");
     });
 
     it("matar un enemigo desbloquea 'Primera Sangre' y otorga el título Novato", async () => {
@@ -1114,7 +1114,7 @@ describe("GameRoom", () => {
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
       await killOneMob(room, c, p, "skeleton_minion");
-      expect(p.totalKills).toBeGreaterThanOrEqual(1);
+      expect(p.retention.totalKills).toBeGreaterThanOrEqual(1);
       expect([...p.achievements]).toContain("first_blood");
       expect(p.title).toBe("Novato");
     });
@@ -1126,10 +1126,10 @@ describe("GameRoom", () => {
       const p = room.state.players.get(c.sessionId)!;
       // Forzar la diaria "caza cualquiera" (amount 12) a falta de 1.
       const dq = getDailyQuest("d_hunt");
-      p.dailyQuestId = "d_hunt"; p.dailyDone = false; p.dailyProgress = dq.amount - 1;
+      p.retention.dailyQuestId = "d_hunt"; p.retention.dailyDone = false; p.retention.dailyProgress = dq.amount - 1;
       const gold0 = p.gold;
       await killOneMob(room, c, p, "skeleton_minion");
-      expect(p.dailyDone).toBe(true);
+      expect(p.retention.dailyDone).toBe(true);
       expect(p.gold).toBe(gold0 + dq.rewardGold);
     });
 
@@ -1380,12 +1380,12 @@ describe("GameRoom", () => {
       const c = await colyseus.connectTo(room, { name: "AttrGuy", className: "knight" });
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
-      p.statPoints = 5; p.str = 0;
+      p.attributes.statPoints = 5; p.attributes.str = 0;
       const atk0 = p.pAtk;
       c.send(MessageType.AllocateStat, { attr: "str" });
       await room.waitForNextPatch();
-      expect(p.str).toBe(1);
-      expect(p.statPoints).toBe(4);
+      expect(p.attributes.str).toBe(1);
+      expect(p.attributes.statPoints).toBe(4);
       expect(p.pAtk).toBe(atk0 + 2); // +2 ataque por punto de Fuerza
     });
 
@@ -1394,10 +1394,10 @@ describe("GameRoom", () => {
       const c = await colyseus.connectTo(room, { name: "SinPuntos", className: "knight" });
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
-      p.statPoints = 0; p.vit = 0;
+      p.attributes.statPoints = 0; p.attributes.vit = 0;
       c.send(MessageType.AllocateStat, { attr: "vit" });
       await room.waitForNextPatch();
-      expect(p.vit).toBe(0);
+      expect(p.attributes.vit).toBe(0);
     });
 
     it("subir de nivel otorga puntos de atributo", async () => {
@@ -1406,13 +1406,13 @@ describe("GameRoom", () => {
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
       p.x = TOWN.x; p.z = TOWN.z;
-      const pts0 = p.statPoints;
+      const pts0 = p.attributes.statPoints;
       // Entregar q5 (900 exp) parado en el pueblo → sube varios niveles.
       p.questId = "q5"; p.questProgress = getQuest("q5").amount;
       c.send(MessageType.InteractNpc, {});
       await room.waitForNextPatch();
       expect(p.level).toBeGreaterThan(1);
-      expect(p.statPoints).toBeGreaterThan(pts0);
+      expect(p.attributes.statPoints).toBeGreaterThan(pts0);
     });
 
     it("modo login: rechaza una cuenta inexistente", async () => {

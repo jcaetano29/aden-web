@@ -9,10 +9,10 @@ describe("toCharacterSave", () => {
     const save = toCharacterSave({
       level: 3, exp: 40, x: 12, z: -7, mapId: "bosque", inventory: inv, gold: 100, questId: "q1", questProgress: 2,
       className: "mage", pvpKills: 0, guildId: "", guildName: "", guildTag: "", equipment: equip,
-      loginStreak: 4, lastLoginDay: "2026-08-24", dailyQuestId: "d_hunt", dailyProgress: 3,
-      dailyDone: false, totalKills: 42, bossKills: 1, title: "Aventurero", achievements,
+      retention: { loginStreak: 4, dailyQuestId: "d_hunt", dailyProgress: 3, dailyDone: false, totalKills: 42 },
+      lastLoginDay: "2026-08-24", bossKills: 1, title: "Aventurero", achievements,
       bountyId: "b_forest", bountyProgress: 3,
-      str: 5, agi: 2, vit: 3, ene: 1, statPoints: 4,
+      attributes: { str: 5, agi: 2, vit: 3, ene: 1, statPoints: 4 },
     });
     expect(save.mapId).toBe("bosque");
     expect(save.equipment).toEqual({ weapon: "iron_sword" });

@@ -198,7 +198,7 @@ export class GameRoom extends Room<GameState> {
     p.moveSpeed = MOVE_SPEED * (1 + effects.moveSpeed);
     p.appearanceModel=equipped.ring && getItem(equipped.ring).ref_origen==='transformation_ring'?'DeathWraith':'';
     // Etapa 21: bonus de atributos primarios asignados (str/agi/vit/ene).
-    const attr = attributeBonuses({ str: p.str, agi: p.agi, vit: p.vit, ene: p.ene });
+    const attr = attributeBonuses({ str: p.attributes.str, agi: p.attributes.agi, vit: p.attributes.vit, ene: p.attributes.ene });
     p.maxHp = Math.round((base.maxHp + bonus.maxHp + attr.maxHp) * (1+effects.hpPct));
     p.maxMp = Math.round((base.maxMp + bonus.maxMp + attr.maxMp) * (1+effects.mpPct));
     p.pAtk = Math.round((base.pAtk + bonus.pAtk + attr.pAtk + p.level*effects.levelAttack)*(1+effects.attackPct));
@@ -224,7 +224,7 @@ export class GameRoom extends Room<GameState> {
     const unlocked = [...p.achievements];
     const news = newlyUnlocked(unlocked, {
       level: p.level,
-      totalKills: p.totalKills,
+      totalKills: p.retention.totalKills,
       bossKills: p.bossKills,
       pvpKills: p.pvpKills,
       hasLegendary: this.hasLegendary(p),
@@ -250,15 +250,15 @@ export class GameRoom extends Room<GameState> {
   private handleDailyRollover(p: PlayerState, client: Client): void {
     const today = dayKey(new Date());
     if (p.lastLoginDay === today) return;
-    p.loginStreak = (p.lastLoginDay === previousDay(today)) ? p.loginStreak + 1 : 1;
+    p.retention.loginStreak = (p.lastLoginDay === previousDay(today)) ? p.retention.loginStreak + 1 : 1;
     p.lastLoginDay = today;
     const daily = dailyQuestForDay(today);
-    p.dailyQuestId = daily.id;
-    p.dailyProgress = 0;
-    p.dailyDone = false;
-    const reward = streakReward(p.loginStreak);
+    p.retention.dailyQuestId = daily.id;
+    p.retention.dailyProgress = 0;
+    p.retention.dailyDone = false;
+    const reward = streakReward(p.retention.loginStreak);
     p.gold += reward;
-    client.send(MessageType.DailyReset, { streak: p.loginStreak, reward, dailyDesc: daily.desc });
+    client.send(MessageType.DailyReset, { streak: p.retention.loginStreak, reward, dailyDesc: daily.desc });
   }
 
   /**
@@ -820,11 +820,11 @@ export class GameRoom extends Room<GameState> {
     this.onMessage(MessageType.AllocateStat, (client, msg: AllocateStatMessage) => {
       const p = this.state.players.get(client.sessionId);
       if (!p) return;
-      if (p.statPoints <= 0) return;
+      if (p.attributes.statPoints <= 0) return;
       const attr = msg?.attr ?? "";
       if (!isValidAttribute(attr)) return;
-      p[attr as Attribute] += 1;
-      p.statPoints -= 1;
+      p.attributes[attr as Attribute] += 1;
+      p.attributes.statPoints -= 1;
       this.recomputeStats(p);
     });
 
@@ -969,7 +969,7 @@ export class GameRoom extends Room<GameState> {
     const lvls = gainExp(player, amount, player.className);
     if (lvls > 0) {
       // Etapa 21: cada nivel otorga puntos de atributo para repartir.
-      player.statPoints += lvls * POINTS_PER_LEVEL;
+      player.attributes.statPoints += lvls * POINTS_PER_LEVEL;
       // gainExp resetea los stats a la base de clase/nivel; re-aplicar equipo + atributos
       // y rellenar HP/MP al nuevo máximo (que incluye equipo y atributos).
       this.recomputeStats(player);
@@ -1121,15 +1121,15 @@ export class GameRoom extends Room<GameState> {
         if ((!bounty.mobTemplateId || bounty.mobTemplateId === mob.templateId) && player.bountyProgress < bounty.amount) player.bountyProgress++;
       } catch { /* Unknown legacy bounty. */ }
     }
-    player.totalKills++;
+    player.retention.totalKills++;
     if (isBoss(mob.templateId)) player.bossKills++;
-    if (player.dailyQuestId && !player.dailyDone) {
+    if (player.retention.dailyQuestId && !player.retention.dailyDone) {
       try {
-        const daily = getDailyQuest(player.dailyQuestId);
+        const daily = getDailyQuest(player.retention.dailyQuestId);
         if (!daily.mobTemplateId || daily.mobTemplateId === mob.templateId) {
-          player.dailyProgress++;
-          if (player.dailyProgress >= daily.amount) {
-            player.dailyDone = true;
+          player.retention.dailyProgress++;
+          if (player.retention.dailyProgress >= daily.amount) {
+            player.retention.dailyDone = true;
             player.gold += daily.rewardGold;
             const client = this.clients.find(c => c.sessionId === id);
             if (client) {
@@ -1633,12 +1633,12 @@ export class GameRoom extends Room<GameState> {
       const pr = save.progress;
       if (pr) {
         for(const id of availableSkills(player.className,1,pr.learnedTomes??[]).filter(id=>id.startsWith('tome_')))player.learnedTomes.push(id);
-        player.loginStreak = pr.loginStreak ?? 0;
+        player.retention.loginStreak = pr.loginStreak ?? 0;
         player.lastLoginDay = pr.lastLoginDay ?? "";
-        player.dailyQuestId = pr.dailyQuestId ?? "";
-        player.dailyProgress = pr.dailyProgress ?? 0;
-        player.dailyDone = pr.dailyDone ?? false;
-        player.totalKills = pr.totalKills ?? 0;
+        player.retention.dailyQuestId = pr.dailyQuestId ?? "";
+        player.retention.dailyProgress = pr.dailyProgress ?? 0;
+        player.retention.dailyDone = pr.dailyDone ?? false;
+        player.retention.totalKills = pr.totalKills ?? 0;
         player.bossKills = pr.bossKills ?? 0;
         player.title = pr.title ?? "";
         for (const id of pr.achievements ?? []) player.achievements.push(id);
@@ -1650,12 +1650,12 @@ export class GameRoom extends Room<GameState> {
         // Etapa 21: atributos asignados. statPoints se DERIVA del nivel (invariante:
         // total por nivel − gastados), así los personajes viejos reciben sus puntos
         // retroactivamente y nunca queda desincronizado.
-        player.str = pr.str ?? 0;
-        player.agi = pr.agi ?? 0;
-        player.vit = pr.vit ?? 0;
-        player.ene = pr.ene ?? 0;
+        player.attributes.str = pr.str ?? 0;
+        player.attributes.agi = pr.agi ?? 0;
+        player.attributes.vit = pr.vit ?? 0;
+        player.attributes.ene = pr.ene ?? 0;
       }
-      player.statPoints = Math.max(0, pointsForLevel(player.level) - (player.str + player.agi + player.vit + player.ene));
+      player.attributes.statPoints = Math.max(0, pointsForLevel(player.level) - (player.attributes.str + player.attributes.agi + player.attributes.vit + player.attributes.ene));
       // Recalcular stats con clase/nivel + equipo + atributos, y rellenar HP/MP.
       this.recomputeStats(player);
       player.hp = player.maxHp;

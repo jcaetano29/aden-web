@@ -1,5 +1,7 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { InventoryItemState } from "./InventoryItemState.js";
+import { AttributesState } from "./AttributesState.js";
+import { RetentionState } from "./RetentionState.js";
 import { emptyEffects, MOVE_SPEED } from '@aden/shared';
 import type { CharacterGender } from '@aden/shared';
 
@@ -49,11 +51,7 @@ export class PlayerState extends Schema {
   @type("number") veilContractProgress = 0;
 
   // Etapa 21: atributos primarios asignables + puntos sin gastar (sincronizados).
-  @type("number") str = 0;
-  @type("number") agi = 0;
-  @type("number") vit = 0;
-  @type("number") ene = 0;
-  @type("number") statPoints = 0;
+  @type(AttributesState) attributes = new AttributesState();
 
   // Combat cooldown — server-only (NO @type)
   attackCooldownMs = 0;
@@ -100,11 +98,7 @@ export class PlayerState extends Schema {
   @type({ map: "string" }) equipment = new MapSchema<string>();
 
   // ── Etapa 13: retención (sincronizado al cliente para el panel de progreso) ──
-  @type("number") loginStreak = 0;
-  @type("string") dailyQuestId = "";
-  @type("number") dailyProgress = 0;
-  @type("boolean") dailyDone = false;
-  @type("number") totalKills = 0;
+  @type(RetentionState) retention = new RetentionState();
   /** Título lucido en el nameplate ("" = ninguno). */
   @type("string") title = "";
   /** Ids de logros desbloqueados (para el panel de logros). */

@@ -69,12 +69,8 @@ export interface Persistable {
   guildTag: string;
   equipment: { forEach(cb: (v: string, k: string) => void): void };
   // Etapa 13: retención.
-  loginStreak: number;
+  retention: { loginStreak: number; dailyQuestId: string; dailyProgress: number; dailyDone: boolean; totalKills: number };
   lastLoginDay: string;
-  dailyQuestId: string;
-  dailyProgress: number;
-  dailyDone: boolean;
-  totalKills: number;
   bossKills: number;
   title: string;
   achievements: { forEach(cb: (v: string) => void): void };
@@ -82,11 +78,7 @@ export interface Persistable {
   bountyId: string;
   bountyProgress: number;
   // Etapa 21: atributos asignados + puntos sin gastar.
-  str: number;
-  agi: number;
-  vit: number;
-  ene: number;
-  statPoints: number;
+  attributes: { str: number; agi: number; vit: number; ene: number; statPoints: number };
 }
 
 export function toCharacterSave(p: Persistable): CharacterSave {
@@ -124,23 +116,23 @@ export function toCharacterSave(p: Persistable): CharacterSave {
     progress: {
       gender: characterGender(p.gender),
       ...(learnedTomes.length ? {learnedTomes} : {}),
-      loginStreak: p.loginStreak,
+      loginStreak: p.retention.loginStreak,
       lastLoginDay: p.lastLoginDay,
-      dailyQuestId: p.dailyQuestId,
-      dailyProgress: p.dailyProgress,
-      dailyDone: p.dailyDone,
-      totalKills: p.totalKills,
+      dailyQuestId: p.retention.dailyQuestId,
+      dailyProgress: p.retention.dailyProgress,
+      dailyDone: p.retention.dailyDone,
+      totalKills: p.retention.totalKills,
       bossKills: p.bossKills,
       title: p.title,
       achievements,
       bountyId: p.bountyId,
       bountyProgress: p.bountyProgress,
       ...(p.veilContractId ? {veilContractId:p.veilContractId,veilContractProgress:p.veilContractProgress??0} : {}),
-      str: p.str,
-      agi: p.agi,
-      vit: p.vit,
-      ene: p.ene,
-      statPoints: p.statPoints,
+      str: p.attributes.str,
+      agi: p.attributes.agi,
+      vit: p.attributes.vit,
+      ene: p.attributes.ene,
+      statPoints: p.attributes.statPoints,
     },
   };
 }
