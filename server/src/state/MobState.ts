@@ -54,4 +54,10 @@ export class MobState extends Schema {
   /** Snapshot retained when the caster disconnects before the poison expires. */
   dotAttackerLevel = 1;
   dotAccumMs = 0;
+
+  // Invocaciones de encuentros (server-only).
+  summonedBy = "";
+  summonSource = "";
+  summonTimers = new Map<string, number>();
+  summonFlags = new Set<number>();
 }

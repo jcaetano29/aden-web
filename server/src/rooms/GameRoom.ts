@@ -150,6 +150,8 @@ export class GameRoom extends Room<GameState> {
   private trades!: TradeSystem;
   /** Contador para generar ids únicos de ítems dropeados (R-E3b-3). */
   private dropSeq = 0;
+  /** Contador para ids únicos de invocaciones de encuentros. */
+  private summonSeq = 0;
   private dungeonActive = false;
   private readonly dungeonRun = { mapId: 'cripta', dead: false, dungeonStage: 0, dungeonKills: 0 };
 
@@ -1017,6 +1019,7 @@ export class GameRoom extends Room<GameState> {
     mob.hazardCooldownMs = 0;
     mob.channeling = false; mob.hazardCount = 0;
     mob.hazardArc = Math.PI * 2; mob.hazardAngle = 0; mob.hazardPower = 2.2;
+    mob.summonedBy = ''; mob.summonSource = ''; mob.summonTimers.clear(); mob.summonFlags.clear();
 
     const c = getMobCombat(templateId);
     mob.hp = c.maxHp;
@@ -1037,6 +1040,11 @@ export class GameRoom extends Room<GameState> {
    */
   private killMob(mob: MobState, mobId: string, killerId?: string) {
     if(mob.dead)return;
+    if (mob.summonedBy) {
+      mob.dead = true; mob.hazardMs = 0; mob.channeling = false; mob.moving = false; mob.respawnMs = 0;
+      this.broadcast(MessageType.Death, { entityId: mobId });
+      return;
+    }
     mob.dead = true;
     mob.hazardMs = 0;
     mob.channeling = false;
@@ -1114,6 +1122,59 @@ export class GameRoom extends Room<GameState> {
 
     // Loot (R-E3b-2): rodar drop table del mob y crear ítems en el piso con scatter.
     this.dropLoot(mob.templateId, mob.x, mob.z, mob.mapId, killer?.itemEffects.goldPct ?? 0);
+    this.clearSummons(mobId);
+  }
+
+  /** Refuerzos de un encuentro: una vez al bajar de cierta vida, o periódicos desde objetos activos. */
+  private stepSummons(mob: MobState, mobId: string, dtMs: number): void {
+    const def = getEncounter(mob.templateId);
+    if (!def?.summons || mob.dead || mob.summonedBy || !mob.aggroTargetId) return;
+    def.summons.forEach((s, index) => {
+      if (s.atHpPct !== undefined) {
+        if (mob.summonFlags.has(index) || mob.hp > mob.maxHp * s.atHpPct) return;
+        mob.summonFlags.add(index);
+        const count = Math.min(s.count ?? 1, s.maxAlive - this.summonsOf(mobId, s.templateId).length);
+        for (let i = 0; i < count; i++) {
+          const a = (i / Math.max(1, count)) * Math.PI * 2;
+          this.spawnSummon(mobId, s.templateId, mob.x + Math.cos(a) * 3, mob.z + Math.sin(a) * 3, mob.mapId, `hp${index}`);
+        }
+        return;
+      }
+      if (!s.everyMs || !s.fromObjects) return;
+      for (const objectId of s.fromObjects) {
+        const o = this.state.worldObjects.get(objectId);
+        if (!o || !o.active || o.mapId !== mob.mapId) continue;
+        const key = `${index}:${objectId}`;
+        const left = (mob.summonTimers.get(key) ?? s.everyMs) - dtMs;
+        if (left > 0) { mob.summonTimers.set(key, left); continue; }
+        mob.summonTimers.set(key, s.everyMs);
+        if (this.summonsOf(mobId, s.templateId, objectId).length >= s.maxAlive) continue;
+        this.spawnSummon(mobId, s.templateId, o.x, o.z, mob.mapId, objectId);
+      }
+    });
+  }
+
+  private summonsOf(ownerId: string, templateId: string, source?: string): MobState[] {
+    return [...this.state.mobs.values()].filter(m => m.summonedBy === ownerId && !m.dead && m.templateId === templateId && (source === undefined || m.summonSource === source));
+  }
+
+  private spawnSummon(ownerId: string, templateId: string, x: number, z: number, mapId: string, source: string): void {
+    const add = this.spawnMob(`${ownerId}_add_${this.summonSeq++}`, templateId, x, z, mapId);
+    add.summonedBy = ownerId;
+    add.summonSource = source;
+    const owner = this.state.mobs.get(ownerId);
+    if (owner?.aggroTargetId) { add.aggroTargetId = owner.aggroTargetId; add.aiState = 'chase'; }
+  }
+
+  /** Marca muertas las invocaciones de un dueño; el loop de respawn las borra. */
+  private clearSummons(ownerId: string): void {
+    this.state.mobs.forEach((m, id) => {
+      if (m.summonedBy !== ownerId || m.dead) return;
+      m.dead = true; m.hp = 0; m.hazardMs = 0; m.channeling = false; m.moving = false; m.respawnMs = 0;
+      this.broadcast(MessageType.Death, { entityId: id });
+    });
+    const owner = this.state.mobs.get(ownerId);
+    if (owner) { owner.summonTimers.clear(); owner.summonFlags.clear(); }
   }
 
   private areAllies(a: PlayerState, b: PlayerState): boolean {
@@ -1186,7 +1247,7 @@ export class GameRoom extends Room<GameState> {
       playersByMap.set(p.mapId, arr);
     });
     const dtMs = dt * 1000;
-    this.state.mobs.forEach((mob) => {
+    this.state.mobs.forEach((mob, mobId) => {
       if (mob.dead) return; // R-E2b1-3: un mob muerto no deambula ni persigue
       if (mob.windupMs > 0 || mob.hazardMs > 0) {
         mob.moving = false;
@@ -1207,6 +1268,7 @@ export class GameRoom extends Room<GameState> {
         mob.hazardMs = 0; mob.hazardCooldownMs = 0;
         mob.channeling = false; mob.hazardCount = 0;
         mob.rootMs = 0; mob.stunMs = 0;
+        this.clearSummons(mobId);
       }
       if (mob.rootMs > 0) mob.moving = false; else advanceMovable(mob, dt, MOB_MOVE_SPEED); // enraizado no se mueve
     });
@@ -1342,6 +1404,7 @@ export class GameRoom extends Room<GameState> {
         this.broadcast(MessageType.Damage,{attackerId:mobId,targetId:id,amount:dmg,hp:p.hp});
         if(p.hp<=0)this.killPlayer(p,id);
       }
+      this.stepSummons(mob, mobId, dtMs);
       if(mob.hazardMs>0){mob.windupMs=0;mob.windupTargetId='';return;}
       // Etapa 22: un mob aturdido no ataca y se le cancela el wind-up en curso.
       if (mob.stunMs > 0) { mob.windupMs = 0; mob.windupTargetId = ""; return; }
@@ -1452,12 +1515,14 @@ export class GameRoom extends Room<GameState> {
     });
 
     // cooldowns/respawn de mobs
+    const expiredSummons: string[] = [];
     this.state.mobs.forEach((mob, id) => {
       tickCooldown(mob, dtMs);
       // Etapa 22: decremento de control del mob.
       if (mob.stunMs > 0) mob.stunMs = Math.max(0, mob.stunMs - dtMs);
       if (mob.rootMs > 0) mob.rootMs = Math.max(0, mob.rootMs - dtMs);
       if (mob.dead) {
+        if (mob.summonedBy) { expiredSummons.push(id); return; }
         if(mob.mapId==='cripta')return;
         mob.respawnMs -= dtMs;
         if (mob.respawnMs <= 0) {
@@ -1468,6 +1533,7 @@ export class GameRoom extends Room<GameState> {
         }
       }
     });
+    for (const id of expiredSummons) this.state.mobs.delete(id);
 
     // Etapa 16: reactivar objetos de mundo usados (cofre reaparece, barril se regenera,
     // santuario sale de cooldown).
