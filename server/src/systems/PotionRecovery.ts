@@ -3,7 +3,8 @@ import { POTION_COOLDOWN_MS,type PotionResource } from '@aden/shared';
 /** Account expiries survive room/session changes for this server process. */
 export class PotionRecovery {
   private readonly expiries=new Map<string,{hp:number;mp:number}>();
-  constructor(private readonly now:()=>number=Date.now) {}
+  // Enlace tardío: el simulador de balance controla el reloj reemplazando Date.now.
+  constructor(private readonly now:()=>number=()=>Date.now()) {}
   remaining(account:string,resource:PotionResource):number {
     const entry=this.expiries.get(account);if(!entry)return 0;
     const now=this.now();
