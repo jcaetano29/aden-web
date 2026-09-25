@@ -27,6 +27,10 @@ export class MobState extends Schema {
   @type("number") hazardX = 0;
   @type("number") hazardZ = 0;
   @type("number") hazardRadius = 6;
+  /** Apertura del área anunciada en radianes (2π = círculo). */
+  @type("number") hazardArc = Math.PI * 2;
+  /** Orientación del cono en radianes (0 = +X), fijada al iniciar el aviso. */
+  @type("number") hazardAngle = 0;
   hazardCooldownMs = 0;
   // Etapa 22: control (sincronizado para el VFX de aturdido/enraizado en el cliente).
   @type("number") stunMs = 0;

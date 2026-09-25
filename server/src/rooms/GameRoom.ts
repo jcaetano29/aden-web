@@ -1,4 +1,4 @@
-import { pvePower, getNpc, MEMORY_ANCHORS, potionResource, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
+import { pvePower, getNpc, potionResource, getEncounter, encounterInterruptFor, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
@@ -16,7 +16,8 @@ import colyseusPkg from "colyseus";
 import type { Client } from "colyseus";
 import { randomUUID } from 'node:crypto';
 import { catalogDropPool, dungeonReward, questReward, createItemInstance } from '@aden/shared';
-import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, resetDungeon, stepGuardianHazard } from '../systems/AdventureSystem.js';
+import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, resetDungeon } from '../systems/AdventureSystem.js';
+import { stepEncounter } from '../systems/EncounterSystem.js';
 const { Room } = colyseusPkg;
 import {
   MessageType,
@@ -790,13 +791,15 @@ export class GameRoom extends Room<GameState> {
       }
       advanceQuest(p,'interact',o.id);
       this.creditSideChains(p, 'interact', o.id, client);
-      if (MEMORY_ANCHORS.includes(o.id)) {
-        const boss = [...this.state.mobs.values()].find(m => m.templateId === 'memory_prior' && !m.dead && m.channeling && m.mapId === p.mapId && distance2D(p.x,p.z,m.x,m.z) <= 25);
-        if (boss && canFightDungeonMob(p,boss.templateId) && pvePower(p.level,boss.level).outgoing > 0) {
-          boss.channeling = false; boss.hazardMs = 0; boss.hazardCooldownMs = 9000;
-          boss.stunMs = Math.max(boss.stunMs,3000);
-          client.send(MessageType.ItemResult,{success:true,text:'Vínculo roto. ¡El Prior quedó expuesto!'});
-        } else client.send(MessageType.ItemResult,{success:!boss,text:boss?'El vínculo supera tu poder actual.':'Anclaje examinado. Activá uno durante la canalización del Prior.'});
+      const interrupt = encounterInterruptFor(o.id);
+      if (interrupt) {
+        const texts = interrupt.pattern.interruptTexts;
+        const boss = [...this.state.mobs.values()].find(m => m.templateId === interrupt.templateId && !m.dead && m.channeling && m.mapId === p.mapId && distance2D(p.x, p.z, m.x, m.z) <= 25);
+        if (boss && canFightDungeonMob(p, boss.templateId) && pvePower(p.level, boss.level).outgoing > 0) {
+          boss.channeling = false; boss.hazardMs = 0; boss.hazardCooldownMs = interrupt.pattern.interruptCooldownMs ?? 0;
+          boss.stunMs = Math.max(boss.stunMs, interrupt.pattern.interruptStunMs ?? 0);
+          client.send(MessageType.ItemResult, { success: true, text: texts?.success ?? '' });
+        } else client.send(MessageType.ItemResult, { success: !boss, text: (boss ? texts?.tooWeak : texts?.idle) ?? '' });
         return;
       }
       if (o.kind === "shrine") {
@@ -1013,6 +1016,7 @@ export class GameRoom extends Room<GameState> {
     mob.hazardMs = 0;
     mob.hazardCooldownMs = 0;
     mob.channeling = false; mob.hazardCount = 0;
+    mob.hazardArc = Math.PI * 2; mob.hazardAngle = 0; mob.hazardPower = 2.2;
 
     const c = getMobCombat(templateId);
     mob.hp = c.maxHp;
@@ -1189,7 +1193,8 @@ export class GameRoom extends Room<GameState> {
         return; // Plantado mientras carga el ataque
       }
       if (mob.stunMs > 0) { mob.moving = false; return; } // Etapa 22: aturdido no actúa
-      const aiConfig = ['crypt_warden','crypt_behemoth','skeleton_king','veil_guardian','memory_jailer','memory_prior'].includes(mob.templateId) ? { ...AI_CONFIG, aggroRadius: 14 } : AI_CONFIG;
+      const encounter = getEncounter(mob.templateId);
+      const aiConfig = encounter ? { ...AI_CONFIG, aggroRadius: encounter.aggroRadius } : AI_CONFIG;
       const candidates=(playersByMap.get(mob.mapId) ?? []).filter(pos=>{
         const p=this.state.players.get(pos.id);
         return p && canFightDungeonMob(p,mob.templateId);
@@ -1326,11 +1331,11 @@ export class GameRoom extends Room<GameState> {
     // ataque de mobs sobre el jugador que persiguen — dos fases: wind-up + impacto
     this.state.mobs.forEach((mob, mobId) => {
       if (mob.dead) return;
-      const impacted=stepGuardianHazard(mob,this.state.players.entries(),dtMs);
+      const impacted=stepEncounter(mob,this.state.players.entries(),dtMs);
       for(const id of impacted) {
         const p=this.state.players.get(id)!;
         const def=p.pDef*(p.defBuffMs>0?p.defBuffMult:1);
-        const power = mob.templateId === 'memory_prior' ? mob.hazardPower : mob.templateId === 'skeleton_king' ? 2.8 : 2.2;
+        const power = mob.hazardPower;
         const dmg=Math.max(1,Math.round(computeDamage(mob.pAtk,def,power * pvePower(p.level,mob.level).incoming,1)*(1-p.itemEffects.reduction)));
         p.hp=Math.max(0,p.hp-dmg);
         this.markCombat(p);
