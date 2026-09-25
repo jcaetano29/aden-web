@@ -37,4 +37,5 @@ export * from './veil.js';
 export * from './monastery.js';
 export * from './potions.js';
 export * from './veilContracts.js';
+export * from './sideChains.js';
 export * from './movement.js';

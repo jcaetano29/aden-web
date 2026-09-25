@@ -1,7 +1,11 @@
 import { characterGender, type CharacterGender } from '@aden/shared';
 
+export interface SideChainSave { id: string; progress: number }
+
 /** Appearance shares the existing JSON column, including in Supabase: no migration required. */
 export interface ProgressSave {
+  /** Encargos opcionales por cadena; los campos de Varek y Boren se conservan para poder volver atrás. */
+  sideChains?: Record<string, SideChainSave>;
   veilContractId?: string;
   veilContractProgress?: number;
   gender?: CharacterGender;
@@ -49,8 +53,6 @@ export interface CharacterSave {
 }
 
 export interface Persistable {
-  veilContractId?: string;
-  veilContractProgress?: number;
   gender?: CharacterGender;
   learnedTomes?: { forEach(cb: (v: string) => void): void };
   level: number;
@@ -74,9 +76,7 @@ export interface Persistable {
   bossKills: number;
   title: string;
   achievements: { forEach(cb: (v: string) => void): void };
-  // Etapa 20: contrato activo del Capitán.
-  bountyId: string;
-  bountyProgress: number;
+  sideChains: { forEach(cb: (v: { id: string; progress: number }, k: string) => void): void };
   // Etapa 21: atributos asignados + puntos sin gastar.
   attributes: { str: number; agi: number; vit: number; ene: number; statPoints: number };
 }
@@ -96,6 +96,8 @@ export function toCharacterSave(p: Persistable): CharacterSave {
   const learnedTomes: string[] = [];
   p.learnedTomes?.forEach(id=>learnedTomes.push(id));
   p.achievements.forEach((id) => achievements.push(id));
+  const sideChains: Record<string, SideChainSave> = {};
+  p.sideChains.forEach((v, k) => { if (v.id) sideChains[k] = { id: v.id, progress: v.progress }; });
 
   return {
     level: p.level,
@@ -125,9 +127,11 @@ export function toCharacterSave(p: Persistable): CharacterSave {
       bossKills: p.bossKills,
       title: p.title,
       achievements,
-      bountyId: p.bountyId,
-      bountyProgress: p.bountyProgress,
-      ...(p.veilContractId ? {veilContractId:p.veilContractId,veilContractProgress:p.veilContractProgress??0} : {}),
+      // Campos viejos: se siguen escribiendo para poder volver a una versión anterior.
+      bountyId: sideChains.varek?.id ?? "",
+      bountyProgress: sideChains.varek?.progress ?? 0,
+      ...(sideChains.boren ? { veilContractId: sideChains.boren.id, veilContractProgress: sideChains.boren.progress } : {}),
+      ...(Object.keys(sideChains).length ? { sideChains } : {}),
       str: p.attributes.str,
       agi: p.attributes.agi,
       vit: p.attributes.vit,
@@ -135,6 +139,15 @@ export function toCharacterSave(p: Persistable): CharacterSave {
       statPoints: p.attributes.statPoints,
     },
   };
+}
+
+/** Encargos guardados: formato nuevo si existe; si no, migra los campos de Varek y Boren. */
+export function sideChainsFromSave(pr: Partial<ProgressSave>): Record<string, SideChainSave> {
+  if (pr.sideChains) return { ...pr.sideChains };
+  const out: Record<string, SideChainSave> = {};
+  if (pr.bountyId) out.varek = { id: pr.bountyId, progress: pr.bountyProgress ?? 0 };
+  if (pr.veilContractId) out.boren = { id: pr.veilContractId, progress: pr.veilContractProgress ?? 0 };
+  return out;
 }
 
 export function inventoryRecordToEntries(record: Record<string, number>): [string, number][] {

@@ -1,6 +1,6 @@
 import { pvePower, getNpc, MEMORY_ANCHORS, potionResource, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
-import { VEIL_CONTRACTS, VEIL_CONTRACTS_COMPLETE, getVeilContract, nextVeilContract } from '@aden/shared';
+import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
 import { TradeSystem } from '../systems/TradeSystem.js';
 import { characterGender, isCharacterGender } from '@aden/shared';
@@ -86,9 +86,6 @@ import {
   type AllocateStatMessage,
   TOWN_SERVICE_RADIUS,
   HEAL_COST_GOLD,
-  getBounty,
-  firstBountyId,
-  nextBountyId,
   attributeBonuses,
   isValidAttribute,
   POINTS_PER_LEVEL,
@@ -111,6 +108,7 @@ import {
 import { grantItem, equipItem, useInventoryItem, consumeAmmo, playerLoadout, instantiateItem } from '../systems/ItemSystem.js';
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
+import { SideChainState } from "../state/SideChainState.js";
 import { MobState } from "../state/MobState.js";
 import { DroppedItemState } from "../state/DroppedItemState.js";
 import { GuildState } from "../state/GuildState.js";
@@ -128,7 +126,7 @@ import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.
 import { createPersistence } from "../persistence/createPersistence.js";
 import { CharacterSaveQueue } from '../persistence/CharacterSaveQueue.js';
 import type { PersistenceService, CharacterRank, GuildRank } from "../persistence/PersistenceService.js";
-import { toCharacterSave, inventoryRecordToEntries, type CharacterSave } from "../persistence/CharacterSave.js";
+import { toCharacterSave, inventoryRecordToEntries, sideChainsFromSave, type CharacterSave } from "../persistence/CharacterSave.js";
 import { hashPassword, verifyPassword } from "../auth/password.js";
 
 /** Intervalo de guardado periódico de personajes (Etapa 3c). */
@@ -616,8 +614,8 @@ export class GameRoom extends Room<GameState> {
         return;
       }
       if (npcId === "healer") { this.serveHealer(p); return; }
-      if (npcId === "captain") { this.serveCaptain(p, client); return; }
-      if (npcId === 'boren') { this.serveBoren(p,client); return; }
+      const chain = sideChainForNpc(npcId);
+      if (chain) { this.serveSideChain(p, client, chain); return; }
       if (npc.role === 'elder') this.serveElder(p, client, npcId);
     });
 
@@ -791,11 +789,7 @@ export class GameRoom extends Room<GameState> {
         return;
       }
       advanceQuest(p,'interact',o.id);
-      const contract=getVeilContract(p.veilContractId);
-      if(contract?.objectId===o.id && contract.mapId===p.mapId && p.veilContractProgress===0){
-        p.veilContractProgress=1;
-        client.send(MessageType.ItemResult,{success:true,text:`Encargo completado: ${contract.title}. Volvé con Boren en las Marismas.`});
-      }
+      this.creditSideChains(p, 'interact', o.id, client);
       if (MEMORY_ANCHORS.includes(o.id)) {
         const boss = [...this.state.mobs.values()].find(m => m.templateId === 'memory_prior' && !m.dead && m.channeling && m.mapId === p.mapId && distance2D(p.x,p.z,m.x,m.z) <= 25);
         if (boss && canFightDungeonMob(p,boss.templateId) && pvePower(p.level,boss.level).outgoing > 0) {
@@ -919,18 +913,48 @@ export class GameRoom extends Room<GameState> {
     } catch { /* quest desconocida: ignorar */ }
   }
 
-  private serveBoren(p:PlayerState,client:Client):void {
-    if(p.level<10 || p.veilContractId===VEIL_CONTRACTS_COMPLETE)return;
-    if(!p.veilContractId){
-      p.veilContractId=VEIL_CONTRACTS[0].id;p.veilContractProgress=0;
-      client.send(MessageType.ItemResult,{success:true,text:`Encargo aceptado: ${VEIL_CONTRACTS[0].intro}`});return;
+  /** Encargos opcionales: aceptar, entregar y avanzar según el registro compartido. */
+  private serveSideChain(p: PlayerState, client: Client, chain: SideChainDef): void {
+    if (p.level < chain.minLevel) return;
+    const entry = p.sideChains.get(chain.id);
+    if (entry && entry.id === chain.completeId) return;
+    if (!entry || entry.id === '') {
+      const first = chain.steps[0];
+      const created = new SideChainState();
+      created.id = first.id; created.progress = 0;
+      p.sideChains.set(chain.id, created);
+      if (chain.announce) client.send(MessageType.ItemResult, { success: true, text: `Encargo aceptado: ${first.intro}` });
+      return;
     }
-    const contract=getVeilContract(p.veilContractId);
-    if(!contract || p.veilContractProgress<1)return;
-    p.gold+=contract.rewardGold;this.addToInventory(p,contract.rewardItemId,contract.rewardQty);
-    p.veilContractId=nextVeilContract(contract.id);p.veilContractProgress=0;
-    const next=getVeilContract(p.veilContractId);
-    client.send(MessageType.ItemResult,{success:true,text:`${contract.done} +${contract.rewardGold} oro, ${contract.rewardQty} ${getItem(contract.rewardItemId).name}.${next?` Nuevo encargo: ${next.title}.`:''}`});
+    const step = sideChainStep(chain, entry.id);
+    if (!step || entry.progress < step.amount) return;
+    if (step.rewardExp > 0) this.grantExp(p, client, step.rewardExp);
+    p.gold += step.rewardGold;
+    if (step.rewardItemId) this.addToInventory(p, step.rewardItemId, step.rewardQty ?? 1);
+    entry.id = nextSideChainStep(chain, step.id);
+    entry.progress = 0;
+    if (chain.announce) {
+      const next = sideChainStep(chain, entry.id);
+      const item = step.rewardItemId ? `, ${step.rewardQty ?? 1} ${getItem(step.rewardItemId).name}` : '';
+      client.send(MessageType.ItemResult, { success: true, text: `${step.done} +${step.rewardGold} oro${item}.${next ? ` Nuevo encargo: ${next.title}.` : ''}` });
+    }
+  }
+
+  /** Suma progreso a los encargos activos que piden esta baja u objeto. */
+  private creditSideChains(p: PlayerState, objective: 'kill' | 'interact', targetId: string, client?: Client): void {
+    p.sideChains.forEach((entry, chainId) => {
+      const chain = getSideChain(chainId);
+      const step = chain ? sideChainStep(chain, entry.id) : undefined;
+      if (!chain || !step || step.objective !== objective || entry.progress >= step.amount) return;
+      const matches = objective === 'kill'
+        ? step.targetId === '' || step.targetId === targetId
+        : step.targetId === targetId && (step.mapId === undefined || step.mapId === p.mapId);
+      if (!matches) return;
+      entry.progress++;
+      if (entry.progress >= step.amount && chain.announce && objective === 'interact') {
+        client?.send(MessageType.ItemResult, { success: true, text: `Encargo completado: ${step.title}. ${chain.returnHint ?? ''}`.trim() });
+      }
+    });
   }
 
   /** Sanadora: restaura HP y MP a full por oro (no-op si ya está full o falta oro). */
@@ -940,24 +964,6 @@ export class GameRoom extends Room<GameState> {
     p.gold -= HEAL_COST_GOLD;
     p.hp = p.maxHp;
     p.mp = p.maxMp;
-  }
-
-  /** Capitán de la Guardia: contratos repetibles (asignar / entregar / rotar). */
-  private serveCaptain(p: PlayerState, client: Client): void {
-    if (p.bountyId === "") {
-      p.bountyId = firstBountyId();
-      p.bountyProgress = 0;
-      return;
-    }
-    try {
-      const b = getBounty(p.bountyId);
-      if (p.bountyProgress >= b.amount) {
-        this.grantExp(p, client, b.rewardExp);
-        p.gold += b.rewardGold;
-        p.bountyId = nextBountyId(p.bountyId);
-        p.bountyProgress = 0;
-      }
-    } catch { /* contrato desconocido: ignorar */ }
   }
 
   /** Otorga EXP a un jugador y envía LevelUp si sube de nivel (Etapa 4b-1: reutilizable en quests). */
@@ -1112,12 +1118,7 @@ export class GameRoom extends Room<GameState> {
 
   private creditMobKill(player: PlayerState, id: string, mob: MobState): void {
     advanceQuest(player, 'kill', mob.templateId);
-    if (player.bountyId) {
-      try {
-        const bounty = getBounty(player.bountyId);
-        if ((!bounty.mobTemplateId || bounty.mobTemplateId === mob.templateId) && player.bountyProgress < bounty.amount) player.bountyProgress++;
-      } catch { /* Unknown legacy bounty. */ }
-    }
+    this.creditSideChains(player, 'kill', mob.templateId);
     player.retention.totalKills++;
     if (isBoss(mob.templateId)) player.bossKills++;
     if (player.retention.dailyQuestId && !player.retention.dailyDone) {
@@ -1640,10 +1641,11 @@ export class GameRoom extends Room<GameState> {
         player.title = pr.title ?? "";
         for (const id of pr.achievements ?? []) player.achievements.push(id);
         // Etapa 20: contrato activo del Capitán.
-        player.bountyId = pr.bountyId ?? "";
-        player.bountyProgress = pr.bountyProgress ?? 0;
-        player.veilContractId = pr.veilContractId ?? '';
-        player.veilContractProgress = pr.veilContractProgress ?? 0;
+        for (const [chainId, saved] of Object.entries(sideChainsFromSave(pr))) {
+          const entry = new SideChainState();
+          entry.id = saved.id; entry.progress = saved.progress;
+          player.sideChains.set(chainId, entry);
+        }
         // Etapa 21: atributos asignados. statPoints se DERIVA del nivel (invariante:
         // total por nivel − gastados), así los personajes viejos reciben sus puntos
         // retroactivamente y nunca queda desincronizado.

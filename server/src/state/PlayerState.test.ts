@@ -5,7 +5,7 @@ const fieldCount = (cls: unknown) => Object.keys((cls as { _definition: { schema
 
 describe('PlayerState schema budget', () => {
   it('leaves headroom under the 64-field Colyseus limit', () => {
-    expect(fieldCount(PlayerState)).toBeLessThanOrEqual(48);
+    expect(fieldCount(PlayerState)).toBeLessThanOrEqual(45);
   });
   it('groups attributes and retention into sub-states', () => {
     const p = new PlayerState();
@@ -15,5 +15,7 @@ describe('PlayerState schema budget', () => {
     expect(p.retention.dailyDone).toBe(false);
     expect('str' in p).toBe(false);
     expect('loginStreak' in p).toBe(false);
+    expect(p.sideChains.size).toBe(0);
+    expect('bountyId' in p).toBe(false);
   });
 });

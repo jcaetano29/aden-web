@@ -11,6 +11,12 @@ import { toCharacterSave } from '../persistence/CharacterSave.js';
 import { CRYPT_BOSS, CRYPT_SEALS, getMobExp } from '@aden/shared';
 import { isWalkable } from '@aden/shared';
 import { DroppedItemState } from '../state/DroppedItemState.js';
+import { SideChainState } from '../state/SideChainState.js';
+import type { PlayerState } from '../state/PlayerState.js';
+const chainOf = (p: PlayerState, id: string) => p.sideChains.get(id);
+const setChain = (p: PlayerState, id: string, stepId: string, progress = 0) => {
+  const e = new SideChainState(); e.id = stepId; e.progress = progress; p.sideChains.set(id, e);
+};
 
 describe("GameRoom", () => {
   let colyseus: ColyseusTestServer;
@@ -1303,11 +1309,11 @@ describe("GameRoom", () => {
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
       p.x = TOWN.x; p.z = TOWN.z;
-      expect(p.bountyId).toBe("");
+      expect((chainOf(p,'varek')?.id ?? '')).toBe("");
       c.send(MessageType.InteractNpc, { npcId: "captain" });
       await room.waitForNextPatch();
-      expect(p.bountyId).toBe(firstBountyId());
-      expect(p.bountyProgress).toBe(0);
+      expect((chainOf(p,'varek')?.id ?? '')).toBe(firstBountyId());
+      expect((chainOf(p,'varek')?.progress ?? 0)).toBe(0);
     });
 
     it("el contrato progresa al matar el enemigo correcto", async () => {
@@ -1315,9 +1321,9 @@ describe("GameRoom", () => {
       const c = await colyseus.connectTo(room, { name: "Cazador", className: "barbarian" });
       await room.waitForNextPatch();
       const p = room.state.players.get(c.sessionId)!;
-      p.bountyId = "b_forest"; p.bountyProgress = 0; // caza de skeleton_minion
+      setChain(p, 'varek', 'b_forest', 0); // caza de skeleton_minion
       await killOneMob(room, c, p, "skeleton_minion");
-      expect(p.bountyProgress).toBeGreaterThanOrEqual(1);
+      expect((chainOf(p,'varek')?.progress ?? 0)).toBeGreaterThanOrEqual(1);
     });
 
     it("el Capitán entrega el contrato completo: da exp+oro y rota al siguiente", async () => {
@@ -1327,14 +1333,14 @@ describe("GameRoom", () => {
       const p = room.state.players.get(c.sessionId)!;
       p.x = TOWN.x; p.z = TOWN.z;
       const b = getBounty("b_forest");
-      p.bountyId = "b_forest"; p.bountyProgress = b.amount; // completo
+      setChain(p, 'varek', 'b_forest', b.amount); // completo
       const gold0 = p.gold; const exp0 = p.exp;
       c.send(MessageType.InteractNpc, { npcId: "captain" });
       await room.waitForNextPatch();
       expect(p.gold).toBe(gold0 + b.rewardGold);
       expect(p.exp).toBe(exp0 + b.rewardExp);
-      expect(p.bountyId).toBe(nextBountyId("b_forest"));
-      expect(p.bountyProgress).toBe(0);
+      expect((chainOf(p,'varek')?.id ?? '')).toBe(nextBountyId("b_forest"));
+      expect((chainOf(p,'varek')?.progress ?? 0)).toBe(0);
     });
 
     it("hablar con la Sanadora no toca la misión de la campaña", async () => {

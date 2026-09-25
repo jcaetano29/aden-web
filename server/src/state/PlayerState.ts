@@ -2,6 +2,7 @@ import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { InventoryItemState } from "./InventoryItemState.js";
 import { AttributesState } from "./AttributesState.js";
 import { RetentionState } from "./RetentionState.js";
+import { SideChainState } from "./SideChainState.js";
 import { emptyEffects, MOVE_SPEED } from '@aden/shared';
 import type { CharacterGender } from '@aden/shared';
 
@@ -44,11 +45,8 @@ export class PlayerState extends Schema {
   @type("number") dungeonStage = 0;
   @type("number") dungeonKills = 0;
   @type("number") gold = 0;
-  // Etapa 20: contrato del Capitán (misión repetible en paralelo a la campaña).
-  @type("string") bountyId = "";
-  @type("number") bountyProgress = 0;
-  @type("string") veilContractId = '';
-  @type("number") veilContractProgress = 0;
+  // Encargos opcionales (Varek, Boren, …): cadena → paso y progreso.
+  @type({ map: SideChainState }) sideChains = new MapSchema<SideChainState>();
 
   // Etapa 21: atributos primarios asignables + puntos sin gastar (sincronizados).
   @type(AttributesState) attributes = new AttributesState();
