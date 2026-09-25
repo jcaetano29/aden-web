@@ -66,3 +66,13 @@ Hay un `vercel.json` en la raíz (build del workspace del cliente, output `dist`
 - **CORS/origen**: Colyseus + WS no necesita config de CORS especial para el WS; si agregás endpoints HTTP, permití el origen de Vercel.
 - **Costo**: Vercel Hobby (gratis) + Railway/Render (free tier con límites; el server duerme en algunos free tiers → primer request lo despierta).
 - **Supabase**: ya está el proyecto `aden-web` (ref `lvxcgzfrxrrlkbvasidl`) con las tablas/migraciones aplicadas (characters, guilds, columnas equipment/progress). Solo falta la service key en el env del server.
+
+## Cambios de schema: deploy coordinado
+
+Cuando un commit cambia campos `@type` de `server/src/state/*`, el server (Railway) y el cliente (Vercel) deben deployarse con el mismo commit: un cliente nuevo contra un server viejo (o al revés) rompe la sincronización. La etapa A (Fragua, cimientos) cambia `PlayerState` (sub-estados `attributes`, `retention`, `sideChains`) y `MobState` (`hazardArc`, `hazardAngle`).
+
+El watch pattern del servicio de Railway es `/server/**`: un commit que solo toca `shared/` NO redeploya el server aunque el bundle lo incluya. Conviene agregar `/shared/**` al patrón.
+
+## Simulador de balance
+
+`npm run balance --workspace @aden/server` corre el combate real del server con bots por clase contra los jefes actuales y escribe `artifacts/balance/baseline.json`; con `-- --mana` mide cuánto dura la rotación del mago (`artifacts/balance/mana.json`). Es determinista (semilla fija) y no reemplaza partidas reales.
