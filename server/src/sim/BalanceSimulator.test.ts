@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BalanceSimulator, balancedAttributes, seededRandom } from './BalanceSimulator.js';
-import { baselineScenarios } from './scenarios.js';
+import { baselineScenarios, manaProfile } from './scenarios.js';
 
 describe('BalanceSimulator', () => {
   let sim: BalanceSimulator;
@@ -22,6 +22,13 @@ describe('BalanceSimulator', () => {
     expect(r.outcome).toBe('kill');
     expect(r.seconds).toBeGreaterThan(0);
     expect(r.enemyLevel).toBe(10);
+  });
+  it('drains the full mage rotation in 40–70 s of combat but sustains the primary skill', () => {
+    const max = sim.manaRun(manaProfile(), 'max');
+    expect(max).not.toBeNull();
+    expect(max!).toBeGreaterThanOrEqual(40);
+    expect(max!).toBeLessThanOrEqual(70);
+    expect(sim.manaRun(manaProfile(), 'primary')).toBeNull();
   });
   it('keeps a far lower level character from beating a boss', () => {
     const prior = baselineScenarios('knight').find(s => s.templateId === 'memory_prior')!;

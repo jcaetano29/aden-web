@@ -6,9 +6,9 @@
     "level": 6,
     "enemyLevel": 6,
     "outcome": "kill",
-    "seconds": 32.3,
-    "hpLostPct": 61,
-    "potions": 2
+    "seconds": 20.1,
+    "hpLostPct": 56,
+    "potions": 1
   },
   {
     "scenario": "Centinela",
@@ -28,9 +28,9 @@
     "level": 7,
     "enemyLevel": 7,
     "outcome": "kill",
-    "seconds": 60.3,
-    "hpLostPct": 62,
-    "potions": 2
+    "seconds": 37.9,
+    "hpLostPct": 63,
+    "potions": 1
   },
   {
     "scenario": "Custodio",
@@ -50,9 +50,9 @@
     "level": 10,
     "enemyLevel": 10,
     "outcome": "kill",
-    "seconds": 100.1,
-    "hpLostPct": 44,
-    "potions": 0
+    "seconds": 63.7,
+    "hpLostPct": 58,
+    "potions": 3
   },
   {
     "scenario": "Nihil",
@@ -72,8 +72,8 @@
     "level": 10,
     "enemyLevel": 10,
     "outcome": "kill",
-    "seconds": 13.1,
-    "hpLostPct": 16,
+    "seconds": 5.1,
+    "hpLostPct": 4,
     "potions": 0
   },
   {
@@ -94,8 +94,8 @@
     "level": 12,
     "enemyLevel": 12,
     "outcome": "kill",
-    "seconds": 57.6,
-    "hpLostPct": 45,
+    "seconds": 24.1,
+    "hpLostPct": 23,
     "potions": 0
   },
   {
@@ -116,8 +116,8 @@
     "level": 13,
     "enemyLevel": 13,
     "outcome": "kill",
-    "seconds": 16.3,
-    "hpLostPct": 26,
+    "seconds": 6.9,
+    "hpLostPct": 9,
     "potions": 0
   },
   {
@@ -138,8 +138,8 @@
     "level": 14,
     "enemyLevel": 14,
     "outcome": "kill",
-    "seconds": 73.4,
-    "hpLostPct": 45,
+    "seconds": 31.3,
+    "hpLostPct": 26,
     "potions": 0
   },
   {
@@ -160,8 +160,8 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 136.3,
-    "hpLostPct": 47,
+    "seconds": 88.1,
+    "hpLostPct": 54,
     "potions": 0
   },
   {
@@ -182,9 +182,9 @@
     "level": 6,
     "enemyLevel": 6,
     "outcome": "kill",
-    "seconds": 19.9,
-    "hpLostPct": 68,
-    "potions": 2
+    "seconds": 7.1,
+    "hpLostPct": 51,
+    "potions": 0
   },
   {
     "scenario": "Centinela",
@@ -204,9 +204,9 @@
     "level": 7,
     "enemyLevel": 7,
     "outcome": "kill",
-    "seconds": 33.2,
-    "hpLostPct": 64,
-    "potions": 2
+    "seconds": 13.5,
+    "hpLostPct": 42,
+    "potions": 0
   },
   {
     "scenario": "Custodio",
@@ -226,9 +226,9 @@
     "level": 10,
     "enemyLevel": 10,
     "outcome": "kill",
-    "seconds": 51.2,
-    "hpLostPct": 58,
-    "potions": 2
+    "seconds": 22.7,
+    "hpLostPct": 50,
+    "potions": 0
   },
   {
     "scenario": "Nihil",
@@ -248,8 +248,8 @@
     "level": 10,
     "enemyLevel": 10,
     "outcome": "kill",
-    "seconds": 6.1,
-    "hpLostPct": 13,
+    "seconds": 3.1,
+    "hpLostPct": 6,
     "potions": 0
   },
   {
@@ -270,8 +270,8 @@
     "level": 12,
     "enemyLevel": 12,
     "outcome": "kill",
-    "seconds": 29.3,
-    "hpLostPct": 43,
+    "seconds": 12.2,
+    "hpLostPct": 33,
     "potions": 0
   },
   {
@@ -292,8 +292,8 @@
     "level": 13,
     "enemyLevel": 13,
     "outcome": "kill",
-    "seconds": 9.2,
-    "hpLostPct": 25,
+    "seconds": 3.1,
+    "hpLostPct": 8,
     "potions": 0
   },
   {
@@ -314,7 +314,7 @@
     "level": 14,
     "enemyLevel": 14,
     "outcome": "kill",
-    "seconds": 37.2,
+    "seconds": 15.3,
     "hpLostPct": 42,
     "potions": 0
   },
@@ -336,8 +336,8 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 72.2,
-    "hpLostPct": 55,
+    "seconds": 34.9,
+    "hpLostPct": 48,
     "potions": 0
   },
   {
@@ -358,9 +358,9 @@
     "level": 6,
     "enemyLevel": 6,
     "outcome": "kill",
-    "seconds": 17.2,
-    "hpLostPct": 60,
-    "potions": 1
+    "seconds": 8.5,
+    "hpLostPct": 37,
+    "potions": 0
   },
   {
     "scenario": "Centinela",
@@ -380,9 +380,9 @@
     "level": 7,
     "enemyLevel": 7,
     "outcome": "kill",
-    "seconds": 38.3,
-    "hpLostPct": 61,
-    "potions": 1
+    "seconds": 16.5,
+    "hpLostPct": 41,
+    "potions": 0
   },
   {
     "scenario": "Custodio",
@@ -402,9 +402,9 @@
     "level": 10,
     "enemyLevel": 10,
     "outcome": "kill",
-    "seconds": 60.7,
-    "hpLostPct": 58,
-    "potions": 6
+    "seconds": 19.1,
+    "hpLostPct": 57,
+    "potions": 1
   },
   {
     "scenario": "Nihil",
@@ -424,8 +424,8 @@
     "level": 10,
     "enemyLevel": 10,
     "outcome": "kill",
-    "seconds": 6.5,
-    "hpLostPct": 10,
+    "seconds": 1.9,
+    "hpLostPct": 6,
     "potions": 0
   },
   {
@@ -446,9 +446,9 @@
     "level": 12,
     "enemyLevel": 12,
     "outcome": "kill",
-    "seconds": 35.6,
-    "hpLostPct": 55,
-    "potions": 1
+    "seconds": 7.3,
+    "hpLostPct": 17,
+    "potions": 0
   },
   {
     "scenario": "Guardián del Velo",
@@ -468,8 +468,8 @@
     "level": 13,
     "enemyLevel": 13,
     "outcome": "kill",
-    "seconds": 9.5,
-    "hpLostPct": 19,
+    "seconds": 1.9,
+    "hpLostPct": 6,
     "potions": 0
   },
   {
@@ -490,9 +490,9 @@
     "level": 14,
     "enemyLevel": 14,
     "outcome": "kill",
-    "seconds": 46.6,
-    "hpLostPct": 63,
-    "potions": 2
+    "seconds": 10.4,
+    "hpLostPct": 23,
+    "potions": 0
   },
   {
     "scenario": "Carcelero",
@@ -512,9 +512,9 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 87.7,
-    "hpLostPct": 62,
-    "potions": 5
+    "seconds": 28.8,
+    "hpLostPct": 40,
+    "potions": 0
   },
   {
     "scenario": "Prior",
@@ -534,9 +534,9 @@
     "level": 6,
     "enemyLevel": 6,
     "outcome": "kill",
-    "seconds": 19.6,
-    "hpLostPct": 56,
-    "potions": 1
+    "seconds": 8.5,
+    "hpLostPct": 43,
+    "potions": 0
   },
   {
     "scenario": "Centinela",
@@ -556,9 +556,9 @@
     "level": 7,
     "enemyLevel": 7,
     "outcome": "kill",
-    "seconds": 37.9,
-    "hpLostPct": 65,
-    "potions": 2
+    "seconds": 16.1,
+    "hpLostPct": 47,
+    "potions": 0
   },
   {
     "scenario": "Custodio",
@@ -578,9 +578,9 @@
     "level": 10,
     "enemyLevel": 10,
     "outcome": "kill",
-    "seconds": 63.3,
-    "hpLostPct": 63,
-    "potions": 6
+    "seconds": 22.9,
+    "hpLostPct": 61,
+    "potions": 2
   },
   {
     "scenario": "Nihil",
@@ -600,8 +600,8 @@
     "level": 10,
     "enemyLevel": 10,
     "outcome": "kill",
-    "seconds": 8.3,
-    "hpLostPct": 16,
+    "seconds": 2.7,
+    "hpLostPct": 5,
     "potions": 0
   },
   {
@@ -622,9 +622,9 @@
     "level": 12,
     "enemyLevel": 12,
     "outcome": "kill",
-    "seconds": 36.7,
-    "hpLostPct": 56,
-    "potions": 1
+    "seconds": 13.6,
+    "hpLostPct": 24,
+    "potions": 0
   },
   {
     "scenario": "Guardián del Velo",
@@ -644,8 +644,8 @@
     "level": 13,
     "enemyLevel": 13,
     "outcome": "kill",
-    "seconds": 10.5,
-    "hpLostPct": 24,
+    "seconds": 3.7,
+    "hpLostPct": 5,
     "potions": 0
   },
   {
@@ -666,9 +666,9 @@
     "level": 14,
     "enemyLevel": 14,
     "outcome": "kill",
-    "seconds": 46.6,
-    "hpLostPct": 61,
-    "potions": 2
+    "seconds": 15.9,
+    "hpLostPct": 32,
+    "potions": 0
   },
   {
     "scenario": "Carcelero",
@@ -688,9 +688,9 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 75.6,
+    "seconds": 33.5,
     "hpLostPct": 77,
-    "potions": 6
+    "potions": 2
   },
   {
     "scenario": "Prior",
@@ -710,9 +710,9 @@
     "level": 6,
     "enemyLevel": 6,
     "outcome": "kill",
-    "seconds": 23.5,
-    "hpLostPct": 63,
-    "potions": 1
+    "seconds": 14.2,
+    "hpLostPct": 50,
+    "potions": 0
   },
   {
     "scenario": "Centinela",
@@ -732,9 +732,9 @@
     "level": 7,
     "enemyLevel": 7,
     "outcome": "kill",
-    "seconds": 44.1,
-    "hpLostPct": 61,
-    "potions": 1
+    "seconds": 25.4,
+    "hpLostPct": 50,
+    "potions": 0
   },
   {
     "scenario": "Custodio",
@@ -754,8 +754,8 @@
     "level": 10,
     "enemyLevel": 10,
     "outcome": "kill",
-    "seconds": 67.5,
-    "hpLostPct": 51,
+    "seconds": 30.6,
+    "hpLostPct": 44,
     "potions": 0
   },
   {
@@ -776,8 +776,8 @@
     "level": 10,
     "enemyLevel": 10,
     "outcome": "kill",
-    "seconds": 7.3,
-    "hpLostPct": 13,
+    "seconds": 3,
+    "hpLostPct": 6,
     "potions": 0
   },
   {
@@ -798,8 +798,8 @@
     "level": 12,
     "enemyLevel": 12,
     "outcome": "kill",
-    "seconds": 36.7,
-    "hpLostPct": 50,
+    "seconds": 15.9,
+    "hpLostPct": 38,
     "potions": 0
   },
   {
@@ -820,8 +820,8 @@
     "level": 13,
     "enemyLevel": 13,
     "outcome": "kill",
-    "seconds": 11.7,
-    "hpLostPct": 29,
+    "seconds": 4.5,
+    "hpLostPct": 15,
     "potions": 0
   },
   {
@@ -842,8 +842,8 @@
     "level": 14,
     "enemyLevel": 14,
     "outcome": "kill",
-    "seconds": 48.4,
-    "hpLostPct": 48,
+    "seconds": 20.3,
+    "hpLostPct": 45,
     "potions": 0
   },
   {
@@ -864,8 +864,8 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 95.9,
-    "hpLostPct": 53,
+    "seconds": 42.5,
+    "hpLostPct": 41,
     "potions": 0
   },
   {

@@ -40,4 +40,5 @@ export * from './veilContracts.js';
 export * from './sideChains.js';
 export * from './encounters.js';
 export * from './travel.js';
+export * from './regen.js';
 export * from './movement.js';

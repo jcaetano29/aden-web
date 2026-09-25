@@ -1,4 +1,4 @@
-import { pvePower, getNpc, potionResource, getEncounter, encounterInterruptFor, travelLockRemainingMs, travelLockText, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
+import { pvePower, getNpc, potionResource, getEncounter, encounterInterruptFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
@@ -1344,7 +1344,7 @@ export class GameRoom extends Room<GameState> {
         }
         if(p.dead)return;
         if (p.mp < p.maxMp) {
-          p.mpRegenAcc += (Math.max(2, p.maxMp * 0.04)+p.maxMp*p.itemEffects.manaRegen) * dt;
+          p.mpRegenAcc += mpRegenPerSecond(p.maxMp, p.msSinceCombat, p.itemEffects.manaRegen) * dt;
           const add = Math.floor(p.mpRegenAcc);
           if (add > 0) { p.mp = Math.min(p.maxMp, p.mp + add); p.mpRegenAcc -= add; }
         } else {
