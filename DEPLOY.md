@@ -71,7 +71,7 @@ Hay un `vercel.json` en la raíz (build del workspace del cliente, output `dist`
 
 Cuando un commit cambia campos `@type` de `server/src/state/*`, el server (Railway) y el cliente (Vercel) deben deployarse con el mismo commit: un cliente nuevo contra un server viejo (o al revés) rompe la sincronización. La etapa A (Fragua, cimientos) cambia `PlayerState` (sub-estados `attributes`, `retention`, `sideChains`) y `MobState` (`hazardArc`, `hazardAngle`).
 
-El watch pattern del servicio de Railway es `/server/**`: un commit que solo toca `shared/` NO redeploya el server aunque el bundle lo incluya. Conviene agregar `/shared/**` al patrón.
+El watch pattern del servicio `@aden/server` en Railway es `/server/**` + `/shared/**` (desde 2026-09-25): un commit que toca `shared/` también redeploya el server, porque su bundle lo incluye. Un cambio solo en `package-lock.json` de la raíz no lo dispara.
 
 ## Simulador de balance
 
