@@ -88,6 +88,10 @@ export interface MobSnapshot extends PlayerSnapshot {
   hazardX?: number;
   hazardZ?: number;
   hazardRadius?: number;
+  /** Apertura del área en radianes (2π = círculo). */
+  hazardArc?: number;
+  /** Orientación del cono en radianes (0 = +X). */
+  hazardAngle?: number;
 }
 
 /** Campos de combate del jugador local, leídos directamente del estado sincronizado (HUD). */
@@ -235,6 +239,8 @@ export class NetworkClient {
       hazardX: m.hazardX ?? m.x,
       hazardZ: m.hazardZ ?? m.z,
       hazardRadius: m.hazardRadius ?? 0,
+      hazardArc: m.hazardArc ?? Math.PI * 2,
+      hazardAngle: m.hazardAngle ?? 0,
       mapId: m.mapId ?? "",
     });
 

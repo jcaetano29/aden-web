@@ -18,6 +18,17 @@ describe("boss ground warnings", () => {
     expect(warning.position.x).toBe(892); expect(warning.position.z).toBe(-30);
     views.update("boss", snap({ hazardMs: 0 })); expect(warning.visible).toBe(false);
   });
+  it("draws a frontal cone with the server aperture and facing", () => {
+    const scene = new THREE.Scene(); const views = new HazardViews(scene); views.setCurrentMap("cripta");
+    views.update("boss", snap({ hazardArc: Math.PI / 2, hazardAngle: Math.PI / 2, hazardRadius: 9 }));
+    const warning = scene.getObjectByName("hazard-boss")!;
+    const fill = warning.children[0] as THREE.Mesh<THREE.CircleGeometry>;
+    expect(fill.geometry.parameters.thetaLength).toBeCloseTo(Math.PI / 2);
+    expect(warning.rotation.y).toBeCloseTo(-Math.PI / 2);
+    expect(warning.scale.x).toBe(9);
+    views.update("boss", snap({ hazardArc: Math.PI * 2 }));
+    expect((warning.children[0] as THREE.Mesh<THREE.CircleGeometry>).geometry.parameters.thetaLength).toBeCloseTo(Math.PI * 2);
+  });
   it("hides immediately for death, cancelled casts and another map and disposes on removal", () => {
     const scene = new THREE.Scene(); const views = new HazardViews(scene); views.setCurrentMap("cripta");
     views.update("boss", snap()); const warning = scene.getObjectByName("hazard-boss")!;
