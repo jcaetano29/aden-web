@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { CharacterFactory } from "./CharacterFactory.js";
-import { CharacterView } from "./CharacterView.js";
+import { CharacterView, type ServerState } from "./CharacterView.js";
 import { Nameplates } from "./Nameplates.js";
 import { HealthBar } from "./HealthBar.js";
 import { isBoss, isMiniBoss, scaleForTemplate, getTemplate, tintForTemplate, ATTACK_RANGE } from "@aden/shared";
@@ -445,6 +445,11 @@ export class EntityViews {
       const tm = this.mobMap.get(this.currentTargetId) ?? this.playerMap.get(this.currentTargetId);
       if (tm !== undefined && tm !== mapId) this.setTargetHighlight(null);
     }
+  }
+
+  /** Movimiento predicho del jugador propio (ver MovementPredictor): reemplaza la posición del server en la vista. */
+  setSelfMotion(motion: ServerState) {
+    if (this.selfId) this.views.get(this.selfId)?.setServerState(motion);
   }
 
   updateAll(dt: number) {

@@ -16,6 +16,13 @@ Aden tiene **dos piezas** con hosting distinto:
 
 Hay un `server/Dockerfile` + `.dockerignore` listos (el server ya lee `process.env.PORT`).
 
+El Dockerfile es multi-stage: compila server + `@aden/shared` a un único bundle con esbuild
+(`server/build.mjs` → `server/dist/index.js`) y la imagen final corre `node server/dist/index.js`
+solo con dependencias de producción (sin `tsx`, TypeScript ni las dependencias del cliente).
+Medido en local: ~98 MB de RAM contra ~170–185 MB con `tsx`. **No configures un Start Command
+custom** en el host: el `CMD` del Dockerfile ya es el correcto. Para probar el build en local:
+`npm run build --workspace @aden/server && npm run start --workspace @aden/server`.
+
 **Railway** (recomendado, simple):
 1. New Project → Deploy from GitHub repo (o `railway up` con la CLI) apuntando a este repo.
 2. **Root Directory = RAÍZ del repo (dejalo vacío)** + **Dockerfile Path = `server/Dockerfile`**.

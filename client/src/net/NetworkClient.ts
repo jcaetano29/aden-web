@@ -1,6 +1,7 @@
 import { Client, Room } from "colyseus.js";
 import {
   MessageType,
+  MOVE_SPEED,
   type ChatSendMessage,
   type ChatMessage,
   type ChatErrorEvent,
@@ -54,6 +55,8 @@ export interface PlayerSnapshot {
   targetX: number;
   targetZ: number;
   moving: boolean;
+  /** Velocidad efectiva replicada (base × equipo); la usa la predicción del movimiento propio. */
+  moveSpeed?: number;
   /** Muerto/respawneando (server-autoritativo); permite animar death/respawn de OTROS jugadores. */
   dead: boolean;
   /** Clase del jugador (knight/mage/barbarian/rogue); se sincroniza desde el server. Solo para jugadores. */
@@ -189,6 +192,7 @@ export class NetworkClient {
       targetX: p.targetX,
       targetZ: p.targetZ,
       moving: p.moving,
+      moveSpeed: p.moveSpeed ?? MOVE_SPEED,
       dead: p.dead,
       stunMs: p.stunMs ?? 0, rootMs: p.rootMs ?? 0, poisonMs: p.poisonMs ?? 0,
       atkBuffMs: p.atkBuffMs ?? 0, defBuffMs: p.defBuffMs ?? 0,

@@ -1,6 +1,6 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { InventoryItemState } from "./InventoryItemState.js";
-import { emptyEffects } from '@aden/shared';
+import { emptyEffects, MOVE_SPEED } from '@aden/shared';
 import type { CharacterGender } from '@aden/shared';
 
 export class PlayerState extends Schema {
@@ -9,6 +9,8 @@ export class PlayerState extends Schema {
   @type("number") targetX = 0;
   @type("number") targetZ = 0;
   @type("boolean") moving = false;
+  /** Velocidad efectiva (base × equipo). Replicada para que el cliente prediga el propio movimiento. */
+  @type("number") moveSpeed = MOVE_SPEED;
   @type("string") name = "";
 
   // Combat — synced to clients

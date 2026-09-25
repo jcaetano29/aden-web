@@ -7,6 +7,7 @@ import { Renderer } from "./render/Renderer.js";
 import { Environment } from "./render/Environment.js";
 import { AmbientLife } from "./render/AmbientLife.js";
 import { EntityViews } from "./render/EntityViews.js";
+import { MovementPredictor, predictorStateFromSnapshot } from "./net/MovementPredictor.js";
 import { GroundItems } from "./render/GroundItems.js";
 import { disposeItemModels } from './render/ItemModels.js';
 import { CharacterFactory } from "./render/CharacterFactory.js";
@@ -153,6 +154,10 @@ async function main() {
 
   // Callbacks de red (se reutilizan si hay que reintentar el login).
   let className = "";
+  // Predicción del movimiento propio: el personaje camina en el frame del click y el server corrige.
+  let selfId: string | null = null;
+  let predictor = new MovementPredictor();
+  const moveSelf = (x: number, z: number) => net.sendMove(predictor.request(x, z) ?? { x, z });
   const netCallbacks: RoomCallbacks = {
     onChatMessage: message => {
       chatPanel.receive(message);
@@ -164,11 +169,21 @@ async function main() {
       if (!connected) nameplates.clearChat();
     },
     onAdd: (id, isSelf, snap) => {
+      if (isSelf) {
+        selfId = id;
+        predictor = new MovementPredictor();
+        predictor.reconcile(predictorStateFromSnapshot(snap));
+      }
       views.add(id, isSelf, modelForClass(snap.className ?? "knight", snap.gender), snap);
       statusEffects.sync(`p:${id}`, snap, () => views.playerWorldPosition(id));
     },
     onChange: (id, snap) => {
-      views.update(id, snap);
+      if (id === selfId) {
+        predictor.reconcile(predictorStateFromSnapshot(snap));
+        views.update(id, { ...snap, ...predictor.state });
+      } else {
+        views.update(id, snap);
+      }
       statusEffects.sync(`p:${id}`, snap, () => views.playerWorldPosition(id));
     },
     onRemove: (id) => { views.remove(id); statusEffects.remove(`p:${id}`); },
@@ -557,7 +572,7 @@ async function main() {
   const input = new InputController(
     renderer,
     views,
-    (msg) => net.sendMove(msg),
+    (msg) => moveSelf(msg.x, msg.z),
     pickTarget,
     pickTarget,
     interactObject,
@@ -574,7 +589,7 @@ async function main() {
       groundItems.select(id);
       currentTargetId=null;net.sendSetTarget('');views.setTargetHighlight(null);
       const pos=groundItems.position(id);
-      if(pos)net.sendMove({x:pos.x,z:pos.z});
+      if(pos)moveSelf(pos.x,pos.z);
       net.sendPickup(id);
     }},
   );
@@ -702,6 +717,8 @@ async function main() {
   const clock = new THREE.Clock();
   function loop() {
     const dt = clock.getDelta();
+    predictor.update(dt);
+    views.setSelfMotion(predictor.state);
     views.updateAll(dt);
     damageNumbers.update(dt);
     groundItems.update(dt, renderer.camera);

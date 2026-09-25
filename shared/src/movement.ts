@@ -1,4 +1,6 @@
-import { stepTowards, MOVE_SPEED, findPath, clipMovement, nearestWalkable, type Point2 } from "@aden/shared";
+import { stepTowards } from "./math.js";
+import { MOVE_SPEED } from "./constants.js";
+import { findPath, clipMovement, nearestWalkable, type Point2 } from "./navigation.js";
 
 export interface Movable {
   x: number;

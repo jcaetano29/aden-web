@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { advanceMovable, type Movable } from "./MovementSystem.js";
-import { MOVE_SPEED } from "@aden/shared";
+import { advanceMovable, type Movable } from "./movement.js";
+import { MOVE_SPEED } from "./constants.js";
 
 function makeMovable(over: Partial<Movable> = {}): Movable {
   return { x: 0, z: 0, targetX: 0, targetZ: 0, moving: false, ...over };

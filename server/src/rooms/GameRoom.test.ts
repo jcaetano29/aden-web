@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from "vitest";
 import { ColyseusTestServer, boot } from "@colyseus/testing";
-import { MessageType, getZone, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN, getDailyQuest, HEAL_COST_GOLD, firstBountyId, nextBountyId, getBounty } from "@aden/shared";
+import { MessageType, getZone, getQuest, firstQuestId, getShopPrice, getItem, statsForClass, getClass, getMobCombat, TOWN, getDailyQuest, HEAL_COST_GOLD, firstBountyId, nextBountyId, getBounty, MOVE_SPEED } from "@aden/shared";
 import appConfig from "../testServer.js";
 import { GameRoom } from './GameRoom.js';
 import { MobState } from "../state/MobState.js";
@@ -1013,6 +1013,24 @@ describe("GameRoom", () => {
       expect(p.equipment.get("weapon")).toBe("worn_sword");
       expect(p.pAtk).toBe(atk0 + 4); // bonus de worn_sword
       expect(p.inventory.get("worn_sword")).toBeUndefined();
+    });
+
+    it("replica la velocidad efectiva de movimiento para que el cliente prediga igual que el server", async () => {
+      const room = await colyseus.createRoom("game", {});
+      const c = await colyseus.connectTo(room, { name: "Jinete", className: "knight" });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      expect(p.moveSpeed).toBeCloseTo(MOVE_SPEED);
+      grantItem(p, "aden_cuerno_del_corcel_umbrio", 1);
+      const mountId = [...p.inventory.keys()].find((k) => k.startsWith("aden_cuerno_del_corcel_umbrio"))!;
+      c.send(MessageType.EquipItem, { itemTemplateId: mountId });
+      await room.waitForNextPatch();
+      expect(p.equipment.get("pet")).toBe(mountId);
+      expect(p.moveSpeed).toBeCloseTo(MOVE_SPEED * 1.2);
+      await vi.waitFor(() => expect(c.state.players.get(c.sessionId)?.moveSpeed).toBeCloseTo(MOVE_SPEED * 1.2));
+      c.send(MessageType.UnequipItem, { slot: "pet" });
+      await room.waitForNextPatch();
+      expect(p.moveSpeed).toBeCloseTo(MOVE_SPEED);
     });
 
     it("desequipar devuelve el ítem al inventario y restaura el stat", async () => {

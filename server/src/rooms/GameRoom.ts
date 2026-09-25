@@ -121,7 +121,7 @@ import { PARTY_REWARD_RANGE } from '@aden/shared';
 import { WorldObjectState } from "../state/WorldObjectState.js";
 import { InventoryItemState } from "../state/InventoryItemState.js";
 import { LeaderPlayerEntry, LeaderGuildEntry } from "../state/LeaderboardState.js";
-import { advanceMovable } from "../systems/MovementSystem.js";
+import { advanceMovable } from "@aden/shared";
 import { createSpawns } from "../systems/SpawnSystem.js";
 import { stepMobAI } from "../systems/MobAISystem.js";
 import { canAttack, resolveAttack, tickCooldown } from "../systems/CombatSystem.js";
@@ -195,6 +195,7 @@ export class GameRoom extends Room<GameState> {
     const bonus = equipmentBonuses(equipped);
     const effects = loadoutEffects(equipped);
     p.itemEffects = effects;
+    p.moveSpeed = MOVE_SPEED * (1 + effects.moveSpeed);
     p.appearanceModel=equipped.ring && getItem(equipped.ring).ref_origen==='transformation_ring'?'DeathWraith':'';
     // Etapa 21: bonus de atributos primarios asignados (str/agi/vit/ene).
     const attr = attributeBonuses({ str: p.str, agi: p.agi, vit: p.vit, ene: p.ene });
@@ -1170,7 +1171,7 @@ export class GameRoom extends Room<GameState> {
     this.state.players.forEach((p) => {
       if (p.dead) return; // un jugador muerto no se mueve
       if (p.stunMs > 0 || p.rootMs > 0) { p.moving = false; return; } // Etapa 22: aturdido/enraizado no se mueve
-      advanceMovable(p, dt, MOVE_SPEED*(1+p.itemEffects.moveSpeed));
+      advanceMovable(p, dt, p.moveSpeed);
     });
 
     // Etapa 15: aggro por MAPA — un mob sólo persigue jugadores vivos de su mismo mapa.
