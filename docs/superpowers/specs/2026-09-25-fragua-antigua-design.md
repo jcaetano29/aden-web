@@ -99,13 +99,13 @@ Se entrega y deploya antes del contenido, como etapa propia. Criterio de éxito 
 
 ### 6.1 Estado del jugador en sub-estados
 
-`PlayerState` tiene 61 de los 64 campos `@type` que admite Colyseus 0.15. Se agrupan:
+`PlayerState` tiene 56 de los 64 campos `@type` que admite Colyseus 0.15 (medido con `PlayerState._definition.schema`; el conteo de 61 incluía comentarios). Se agrupan:
 
 - `attributes: AttributesState` ← `str`, `agi`, `vit`, `ene`, `statPoints`
 - `retention: RetentionState` ← `loginStreak`, `dailyQuestId`, `dailyProgress`, `dailyDone`, `totalKills`
 - `sideChains: MapSchema<SideChainState{ id, progress }>` ← `bountyId/bountyProgress` (clave `varek`) y `veilContractId/veilContractProgress` (clave `boren`)
 
-Resultado: 61 → 50 campos. El formato de guardado (`ProgressSave`) sigue leyendo los campos viejos: si el save no trae `sideChains`, se migra desde `bountyId`/`veilContractId` al cargar. Se escribe el formato nuevo. Sin migración de Supabase (todo vive en el blob `progress`). El cliente adapta sus lecturas en `NetworkClient`; los paneles no cambian.
+Resultado: 56 → 45 campos. El formato de guardado (`ProgressSave`) sigue leyendo los campos viejos: si el save no trae `sideChains`, se migra desde `bountyId`/`veilContractId` al cargar. Se escribe el formato nuevo. Sin migración de Supabase (todo vive en el blob `progress`). El cliente adapta sus lecturas en `NetworkClient`; los paneles no cambian.
 
 ### 6.2 Capítulos como datos
 
@@ -154,7 +154,7 @@ interface EncounterDef {
 }
 ```
 
-El server interpreta estos datos; los seis encuentros actuales (Behemoth, Custodio, Guardián del Velo, Carcelero, Nihil, Prior) migran con **los mismos números** y sus tests deben pasar sin tocar los asserts. `MobState` suma `hazardShape` y `hazardAngle` sincronizados; `HazardViews` dibuja círculo o cono. El impacto usa la misma geometría que se dibuja.
+El server interpreta estos datos; los seis encuentros actuales (Behemoth, Custodio, Guardián del Velo, Carcelero, Nihil, Prior) migran con **los mismos números** y sus tests deben pasar sin tocar los asserts. `MobState` suma `hazardArc` (apertura en radianes; 2π = círculo, valor por defecto) y `hazardAngle` (orientación fijada al iniciar el aviso), ambos sincronizados; `HazardViews` dibuja el sector correspondiente. El impacto usa la misma geometría que se dibuja.
 
 Las invocaciones no dan EXP ni botín, se limpian al morir el jefe o al reiniciarse el encuentro, y respetan `maxAlive`.
 
