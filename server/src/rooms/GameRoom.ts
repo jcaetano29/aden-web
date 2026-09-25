@@ -533,8 +533,9 @@ export class GameRoom extends Room<GameState> {
           return;
         }
         const gapCloser = skill.dash === "toTarget";
-        // Las skills no esperan al golpe automático: las limitan su cooldown, su maná y su alcance.
-        if (!inSkillRange(p, t.entity, skillRange(skill))) return;
+        // Las skills no esperan al golpe automático: las limitan su cooldown, su maná, su alcance
+        // y un cooldown global de un golpe entre skills ofensivas.
+        if (p.skillGcdMs > 0 || !inSkillRange(p, t.entity, skillRange(skill))) return;
         if (t.kind === "player") {
           const victim = t.entity;
           if (this.areAllies(p, victim)) return;
@@ -545,6 +546,7 @@ export class GameRoom extends Room<GameState> {
           const weapon=p.equipment.get('weapon');if(!weapon || !getItem(weapon).ammo || !consumeAmmo(p))return;
         }
         spend();
+        p.skillGcdMs = atkCd;
         const variance = 0.9 + Math.random() * 0.2;
         const dmg = resolveAttack(p, t.entity, (skill.factor ?? 1) * power, variance, atkCd,Math.random,skillElement(skill.id));
         if (t.kind === 'mob' && dmg > 0) this.engageMob(t.entity, client.sessionId);
@@ -590,10 +592,11 @@ export class GameRoom extends Room<GameState> {
         announceCast("");
       } else if (skill.type === "dot") {
         const target=p.targetId?this.resolveTarget(p.targetId,p.mapId):null;
-        if(!target || !inSkillRange(p,target.entity,skillRange(skill)))return;
+        if(!target || p.skillGcdMs > 0 || !inSkillRange(p,target.entity,skillRange(skill)))return;
         if(target.kind==='mob' && (!canFightDungeonMob(p,target.entity.templateId) || pvePower(p.level,target.entity.level).outgoing === 0)) { client.send(MessageType.ItemResult,{success:false,text:'Fuera de tu alcance o encuentro todavía bloqueado.'}); return; }
         if(target.kind==='player' && (!this.inPvpZone(p)||!this.inPvpZone(target.entity)||this.areAllies(p, target.entity)))return;
         spend();
+        p.skillGcdMs = atkCd;
         if(target.kind==='mob') { const mob=target.entity; mob.dotMs=skill.dotMs??0;mob.dotDps=skill.dotDps??0;mob.dotAttackerId=client.sessionId;mob.dotAttackerLevel=p.level;mob.dotAccumMs=0; this.engageMob(mob,client.sessionId); }
         else { const victim=target.entity;victim.poisonMs=skill.dotMs??0;victim.poisonDps=skill.dotDps??0;victim.poisonAttackerId=client.sessionId;victim.poisonAccumMs=0; }
         this.markCombat(p);
@@ -1282,6 +1285,7 @@ export class GameRoom extends Room<GameState> {
     // cooldowns de jugadores (ataque + skill) y buffs
     this.state.players.forEach((p) => {
       tickCooldown(p, dtMs);
+      if (p.skillGcdMs > 0) p.skillGcdMs = Math.max(0, p.skillGcdMs - dtMs);
       p.hpPotionCooldownMs=potionRecovery.remaining(p.name,'hp');
       p.mpPotionCooldownMs=potionRecovery.remaining(p.name,'mp');
 

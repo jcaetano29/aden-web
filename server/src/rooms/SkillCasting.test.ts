@@ -28,6 +28,26 @@ describe('skills while auto-attacking', () => {
     expect(p.skillCooldowns.get('shield_bash')).toBeGreaterThan(0);
   });
 
+  it('spaces offensive skills by a global cooldown of one swing', async () => {
+    const room = await server.createRoom('game', {}) as GameRoom;
+    const c = await server.connectTo(room, { name: 'SkillPacing', className: 'rogue' });
+    room.setSimulationInterval(() => {}, 1000); room.state.mobs.clear();
+    const p = room.state.players.get(c.sessionId)!;
+    p.mapId = 'bosque'; p.x = p.targetX = 300; p.z = p.targetZ = 40; p.level = 5; p.mp = p.maxMp;
+    const mob = room.spawnMob('dummy', 'skeleton_warrior', 301, 40, 'bosque');
+    mob.maxHp = mob.hp = 100000; mob.stunMs = 1e9;
+    p.targetId = 'dummy';
+    c.send(MessageType.UseSkill, { skillId: 'backstab' });
+    c.send(MessageType.UseSkill, { skillId: 'poison' });
+    await room.waitForNextPatch();
+    expect(p.skillCooldowns.get('backstab')).toBeGreaterThan(0);
+    expect(mob.dotMs).toBe(0);
+    for (let i = 0; i < 40; i++) room.tick(0.05);
+    c.send(MessageType.UseSkill, { skillId: 'poison' });
+    await room.waitForNextPatch();
+    expect(mob.dotMs).toBeGreaterThan(0);
+  });
+
   it('applies a poison while the auto-attack swing is on cooldown', async () => {
     const room = await server.createRoom('game', {}) as GameRoom;
     const c = await server.connectTo(room, { name: 'MeleePoison', className: 'rogue' });

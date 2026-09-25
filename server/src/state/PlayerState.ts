@@ -58,6 +58,8 @@ export class PlayerState extends Schema {
 
   // Per-skill cooldowns — server-only (NO @type)
   skillCooldowns = new Map<string, number>();
+  /** Cooldown global entre skills ofensivas (un golpe), independiente del golpe automático. */
+  skillGcdMs = 0;
   @type(["string"]) learnedTomes = new ArraySchema<string>();
   @type("number") poisonMs = 0;
   poisonDps = 0;
