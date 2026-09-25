@@ -9,7 +9,7 @@ import { CATALOG_ITEMS, createItemInstance } from '@aden/shared';
 import { grantItem } from '../systems/ItemSystem.js';
 import { toCharacterSave } from '../persistence/CharacterSave.js';
 import { CRYPT_BOSS, CRYPT_SEALS, getMobExp } from '@aden/shared';
-import { isWalkable } from '@aden/shared';
+import { isWalkable, TRAVEL_COMBAT_LOCK_MS } from '@aden/shared';
 import { DroppedItemState } from '../state/DroppedItemState.js';
 import { SideChainState } from '../state/SideChainState.js';
 import type { PlayerState } from '../state/PlayerState.js';
@@ -301,6 +301,7 @@ describe("GameRoom", () => {
     expect(prizes()).toHaveLength(1);
     room.spawnMob('dungeon-test','crypt_warden',CRYPT_BOSS.x,CRYPT_BOSS.z,'cripta').stunMs=999999;
     p.attackCooldownMs=0;await room.waitForNextSimulationTick();expect(prizes()).toHaveLength(1);
+    p.msSinceCombat=TRAVEL_COMBAT_LOCK_MS;
     c.send(MessageType.WarpTo,{mapId:'pueblo'});await room.waitForNextPatch();expect(p.dungeonStage).toBe(0);
   });
 

@@ -1,4 +1,4 @@
-import { pvePower, getNpc, potionResource, getEncounter, encounterInterruptFor, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
+import { pvePower, getNpc, potionResource, getEncounter, encounterInterruptFor, travelLockRemainingMs, travelLockText, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
@@ -658,6 +658,11 @@ export class GameRoom extends Room<GameState> {
     this.onMessage(MessageType.UseItem, (client, msg: UseItemMessage) => {
       const p = this.state.players.get(client.sessionId);
       if (!p || p.dead) return;
+      let used; try { used = getItem(msg?.itemTemplateId ?? ''); } catch { used = undefined; }
+      if (used?.useEffect === 'town_portal') {
+        const lock = travelLockRemainingMs(p.msSinceCombat);
+        if (lock > 0) { client.send(MessageType.ItemResult, { success: false, text: travelLockText(lock) }); return; }
+      }
       const resource=potionResource(msg?.itemTemplateId);
       const account=this.accountNames.get(client.sessionId)??p.name;
       const remaining=resource?potionRecovery.remaining(account,resource):0;
@@ -754,6 +759,8 @@ export class GameRoom extends Room<GameState> {
       let zone;
       try { zone = getZone(msg?.mapId ?? ""); } catch { return; }
       if (zone.id === p.mapId) return; // ya estás ahí
+      const lock = travelLockRemainingMs(p.msSinceCombat);
+      if (lock > 0) { client.send(MessageType.ItemResult, { success: false, text: travelLockText(lock) }); return; }
       if (!canEnterZone(zone, p.level)) return; // nivel insuficiente
       const gate = mapGate(zone.id);
       if (gate && !questReached(p.questId, gate.from)) {

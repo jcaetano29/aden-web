@@ -39,4 +39,5 @@ export * from './potions.js';
 export * from './veilContracts.js';
 export * from './sideChains.js';
 export * from './encounters.js';
+export * from './travel.js';
 export * from './movement.js';
