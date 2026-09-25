@@ -1,5 +1,8 @@
-import { VEIL_QUESTS, VEIL_QUEST_ORDER, VEIL_COMPLETE } from './veil.js';
-import { MONASTERY_QUESTS, MONASTERY_QUEST_ORDER, MEMORY_COMPLETE } from './monastery.js';
+import { VEIL_QUESTS } from './veil.js';
+import { MONASTERY_QUESTS } from './monastery.js';
+import { QUEST_ORDER } from './act1.js';
+export { QUEST_ORDER, CAMPAIGN_COMPLETE } from './act1.js';
+export { nextQuestId } from './chapters.js';
 export interface Quest {
   returnNpcId?: string;
   autoAdvance?: boolean;
@@ -93,7 +96,6 @@ export const QUESTS: Record<string, Quest> = {
   },
 };
 
-export const CAMPAIGN_COMPLETE = "campaign_complete";
 Object.assign(QUESTS, VEIL_QUESTS);
 Object.assign(QUESTS, MONASTERY_QUESTS);
 
@@ -118,8 +120,6 @@ QUESTS.q2.rewardByClass = {
 };
 QUESTS.q4.rewardItemId = "crypt_plate";
 
-export const QUEST_ORDER: string[] = ["q1", "q_supplies", "q_shrine", "q2", "q_alpha", "q_ruins", "q3", "q4", "q_crypt", "q5", "q_ash_shrine", "q6"];
-
 export function getQuest(id: string): Quest {
   const quest = QUESTS[id];
   if (!quest) {
@@ -130,19 +130,4 @@ export function getQuest(id: string): Quest {
 
 export function firstQuestId(): string {
   return QUEST_ORDER[0];
-}
-
-export function nextQuestId(current: string): string {
-  if (current === MEMORY_COMPLETE) return MEMORY_COMPLETE;
-  const monasteryIndex = MONASTERY_QUEST_ORDER.indexOf(current);
-  if (monasteryIndex >= 0) return MONASTERY_QUEST_ORDER[monasteryIndex + 1] ?? MEMORY_COMPLETE;
-  if (current === VEIL_COMPLETE) return VEIL_COMPLETE;
-  const veilIndex = VEIL_QUEST_ORDER.indexOf(current);
-  if (veilIndex >= 0) return VEIL_QUEST_ORDER[veilIndex + 1] ?? VEIL_COMPLETE;
-  if (current === CAMPAIGN_COMPLETE) return CAMPAIGN_COMPLETE;
-  const idx = QUEST_ORDER.indexOf(current);
-  if (idx === -1) {
-    return QUEST_ORDER[0];
-  }
-  return QUEST_ORDER[idx + 1] ?? CAMPAIGN_COMPLETE;
 }

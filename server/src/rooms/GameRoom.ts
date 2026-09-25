@@ -1,4 +1,4 @@
-import { pvePower, getNpc, VEIL_COMPLETE, VEIL_QUEST_ORDER, MEMORY_COMPLETE, MONASTERY_QUEST_ORDER, MEMORY_ANCHORS, potionResource } from "@aden/shared";
+import { pvePower, getNpc, MEMORY_ANCHORS, potionResource, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { VEIL_CONTRACTS, VEIL_CONTRACTS_COMPLETE, getVeilContract, nextVeilContract } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
@@ -754,8 +754,9 @@ export class GameRoom extends Room<GameState> {
       try { zone = getZone(msg?.mapId ?? ""); } catch { return; }
       if (zone.id === p.mapId) return; // ya estás ahí
       if (!canEnterZone(zone, p.level)) return; // nivel insuficiente
-      if (zone.id === 'monasterio' && p.questId !== VEIL_COMPLETE && p.questId !== MEMORY_COMPLETE && !MONASTERY_QUEST_ORDER.includes(p.questId)) {
-        client.send(MessageType.ItemResult, {success:false,text:'Recuperá el paso de las Marismas y hablá con Maera antes de viajar al Monasterio.'});
+      const gate = mapGate(zone.id);
+      if (gate && !questReached(p.questId, gate.from)) {
+        client.send(MessageType.ItemResult, { success: false, text: gate.text });
         return;
       }
       this.maintainDungeonRun();
@@ -879,21 +880,17 @@ export class GameRoom extends Room<GameState> {
 
   /** Anciano Rowan: campaña principal (asignar / entregar / avanzar). */
   private serveElder(p: PlayerState, client: Client, npcId = 'elder'): void {
-    if (p.questId === MEMORY_COMPLETE) return;
-    if (p.questId === VEIL_COMPLETE) {
-      if (npcId !== 'maera') return;
-      if (p.level < 12) { client.send(MessageType.ItemResult,{success:false,text:'La expedición al Monasterio requiere nivel 12.'}); return; }
-      p.questId = MONASTERY_QUEST_ORDER[0]; p.questProgress = p.mapId === 'monasterio' ? 1 : 0;
-      client.send(MessageType.ItemResult,{success:true,text:'Nueva expedición: encontrá a Iria en el Monasterio de la Vigilia.'});
+    const next = chapterAfter(p.questId);
+    if (next?.start) {
+      if (npcId !== next.start.npcId) return;
+      if (p.level < next.start.minLevel) { client.send(MessageType.ItemResult, { success: false, text: next.start.lockedText }); return; }
+      const first = getQuest(next.questOrder[0]);
+      p.questId = first.id;
+      p.questProgress = first.objective === 'visit' && p.mapId === first.targetId ? first.amount : 0;
+      client.send(MessageType.ItemResult, { success: true, text: next.start.startedText });
       return;
     }
-    if (p.questId === 'campaign_complete') {
-      if (npcId !== 'elder') return;
-      if (p.level < 10) { client.send(MessageType.ItemResult, {success:false,text:'La expedición a las Marismas requiere nivel 10.'}); return; }
-      p.questId = VEIL_QUEST_ORDER[0]; p.questProgress = 0;
-      client.send(MessageType.ItemResult, {success:true,text:'Nueva expedición: viajá a las Marismas y encontrá a Maera.'});
-      return;
-    }
+    if (isChapterComplete(p.questId)) return;
     if (p.questId === "") {
       if (npcId !== 'elder') return;
       p.questId = firstQuestId();

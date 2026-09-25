@@ -1,4 +1,4 @@
-import { distance2D, getQuest, nextQuestId, MEMORY_COMPLETE, CRYPT_WAVE_SIZE, CRYPT_WAVE_TEMPLATES } from '@aden/shared';
+import { distance2D, getQuest, nextQuestId, isChapterComplete, MEMORY_COMPLETE, CRYPT_WAVE_SIZE, CRYPT_WAVE_TEMPLATES } from '@aden/shared';
 import type { PlayerState } from '../state/PlayerState.js';
 import type { MobState } from '../state/MobState.js';
 
@@ -44,7 +44,7 @@ export function activateSeal(p: DungeonProgress, id: string): boolean {
 }
 
 export function advanceQuest(p: PlayerState, objective: 'kill'|'visit'|'interact'|'dungeon', targetId: string): void {
-  if (p.dead || !p.questId || p.questId === 'campaign_complete') return;
+  if (p.dead || !p.questId || isChapterComplete(p.questId)) return;
   let q;
   try { q = getQuest(p.questId); } catch { return; }
   if ((q.objective ?? 'kill') !== objective || (q.mapId && p.mapId !== q.mapId)) return;
