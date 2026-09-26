@@ -2,7 +2,7 @@ import { boot, type ColyseusTestServer } from '@colyseus/testing';
 import type { Client } from 'colyseus';
 import {
   MessageType, TICK_RATE, availableSkills, getSkill, nearestWalkable, pointsForLevel, weaponRange, distance2D,
-  CATALOG_ITEMS, type SkillConfig,
+  CATALOG_ITEMS, getEncounter, type SkillConfig,
 } from '@aden/shared';
 import config from '../testServer.js';
 import type { GameRoom } from '../rooms/GameRoom.js';
@@ -157,6 +157,9 @@ export class BalanceSimulator {
 
   /** Devuelve 1 si usó una poción en este tick. */
   private attentiveStep(p: PlayerState, mob: MobState): number {
+    // Una persona atenta corta la canalización con el objeto activo más cercano.
+    const anchor = mob.channeling ? this.nearestActive(p, this.encounterObjects(mob).interrupt) : null;
+    if (anchor) { this.reach(p, anchor); return 0; }
     if (mob.hazardMs > 0 && inHazard(mob, p.x, p.z)) {
       this.send(MessageType.MoveTo, escapePoint(mob, p));
       return 0;
@@ -166,11 +169,17 @@ export class BalanceSimulator {
       const potion = HP_POTIONS.find(id => (p.inventory.get(id)?.qty ?? 0) > 0);
       if (potion) { this.send(MessageType.UseItem, { itemTemplateId: potion }); used = 1; }
     }
+    // Enfría los objetos que invocan refuerzos, pero guarda uno si también cortan la canalización.
+    const { cool, interrupt } = this.encounterObjects(mob);
+    const reserve = cool.some(id => interrupt.includes(id)) ? 1 : 0;
+    const coolable = mob.aggroTargetId ? cool.filter(id => this.activeObject(p, id)) : [];
+    if (coolable.length > reserve) { this.reach(p, this.nearestActive(p, coolable)!); return used; }
     // Una persona atenta despeja primero los refuerzos del jefe.
     const add = [...this.room.state.mobs.entries()].find(([, m]) => m.summonedBy === TARGET_ID && !m.dead && m.mapId === p.mapId);
     const [targetId, target] = add ?? [TARGET_ID, mob];
     if (p.targetId !== targetId) this.send(MessageType.SetTarget, { targetId });
-    for (const s of this.castable(p)) this.send(MessageType.UseSkill, { skillId: s.id });
+    // Con un ataque anunciado no se acerca de un salto: podría caer dentro del área.
+    for (const s of this.castable(p)) if (!(s.dash === 'toTarget' && mob.hazardMs > 0)) this.send(MessageType.UseSkill, { skillId: s.id });
     const range = weaponRange(playerLoadout(p));
     const d = distance2D(p.x, p.z, target.x, target.z);
     if (d > range * 0.9) {
@@ -179,6 +188,35 @@ export class BalanceSimulator {
       if (!(mob.hazardMs > 0 && inHazard(mob, goal.x, goal.z))) this.send(MessageType.MoveTo, goal);
     }
     return used;
+  }
+
+  /** Objetos del encuentro: los que cortan su canalización y los que se enfrían. */
+  private encounterObjects(mob: MobState): { interrupt: string[]; cool: string[] } {
+    const def = getEncounter(mob.templateId);
+    const patterns = [...(def?.patterns ?? []), ...(def?.belowHalf?.patterns ?? [])];
+    return { interrupt: patterns.flatMap(pt => pt.channel ? pt.interruptObjects ?? [] : []), cool: [...(def?.coolObjects ?? [])] };
+  }
+
+  private activeObject(p: PlayerState, id: string) {
+    const o = this.room.state.worldObjects.get(id);
+    return o && o.active && o.mapId === p.mapId ? o : undefined;
+  }
+
+  /** Objeto activo más cercano de la lista (null si no queda ninguno). */
+  private nearestActive(p: PlayerState, ids: string[]): { id: string; x: number; z: number } | null {
+    let best: { id: string; x: number; z: number } | null = null, bestD = Infinity;
+    for (const id of ids) {
+      const o = this.activeObject(p, id);
+      const d = o ? distance2D(p.x, p.z, o.x, o.z) : Infinity;
+      if (o && d < bestD) { bestD = d; best = { id, x: o.x, z: o.z }; }
+    }
+    return best;
+  }
+
+  /** Camina hasta el objeto y lo usa al llegar. */
+  private reach(p: PlayerState, o: { id: string; x: number; z: number }): void {
+    if (distance2D(p.x, p.z, o.x, o.z) > 3) this.send(MessageType.MoveTo, { x: o.x, z: o.z });
+    else this.send(MessageType.InteractObject, { objectId: o.id });
   }
 
   private skills(p: PlayerState): SkillConfig[] {
@@ -204,6 +242,7 @@ export class BalanceSimulator {
   private resetWorld(profile: Profile): PlayerState {
     const r = this.room;
     r.state.mobs.clear(); r.state.players.clear(); r.state.droppedItems.clear();
+    r.state.worldObjects.forEach(o => { o.active = true; o.cooled = false; o.respawnMs = 0; });
     (r as unknown as { dungeonRun: { dungeonStage: number; dungeonKills: number } }).dungeonRun.dungeonStage = 0;
     const p = new PlayerState();
     p.name = BOT_ID; p.className = profile.className; p.level = profile.level;

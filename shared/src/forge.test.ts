@@ -52,7 +52,7 @@ describe('Fragua de los Primeros: mapa y enemigos', () => {
     expect(v.patterns.map(p => p.shape)).toEqual(['cone', 'circle']);
     const channel = v.belowHalf!.patterns!.find(p => p.channel)!;
     expect(channel.interruptObjects).toEqual(FORGE_ANVILS);
-    expect(v.summons).toEqual([{ templateId: 'forged_guardian', everyMs: 15000, fromObjects: FORGE_ANVILS, maxAlive: 1 }]);
+    expect(v.summons).toEqual([{ templateId: 'forged_guardian', everyMs: 20000, fromObjects: FORGE_ANVILS, maxAlive: 1 }]);
   });
 });
 

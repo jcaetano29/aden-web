@@ -2,7 +2,8 @@ import { SPAWN_ZONES, getItem, getQuest, questReward, dungeonReward, createItemI
 import type { GameRoom } from '../rooms/GameRoom.js';
 import type { Profile, Scenario } from './BalanceSimulator.js';
 
-export type GearStage = 'ruins' | 'crypt' | 'throne' | 'act2' | 'mines' | 'mines_late';
+export type ScenarioSet = (className: string) => Scenario[];
+export type GearStage = 'ruins' | 'crypt' | 'throne' | 'act2' | 'mines' | 'mines_late' | 'forge' | 'forge_mid' | 'forge_late';
 
 function spawnOf(templateId: string): { mapId: string; x: number; z: number } {
   const zone = SPAWN_ZONES.find(z => z.templateId === templateId);
@@ -23,6 +24,9 @@ export function gearFor(className: string, stage: GearStage): Record<string, str
     case 'act2': return { weapon: crypt, armor: 'nihil_aegis', ...trinkets };
     case 'mines': return { weapon: crypt, armor: 'nihil_aegis', accessory: 'memory_locket', ring: trinkets.ring };
     case 'mines_late': return { weapon: questReward(getQuest('f_foreman'), className)!, armor: 'nihil_aegis', accessory: 'memory_locket', ring: trinkets.ring };
+    case 'forge': return { weapon: questReward(getQuest('f_halden'), className)!, armor: 'nihil_aegis', accessory: 'memory_locket', ring: trinkets.ring };
+    case 'forge_mid': return { weapon: questReward(getQuest('f_halden'), className)!, armor: questReward(getQuest('f_drakes'), className)!, accessory: 'memory_locket', ring: trinkets.ring };
+    case 'forge_late': return { weapon: questReward(getQuest('f_smelter'), className)!, armor: questReward(getQuest('f_drakes'), className)!, accessory: 'memory_locket', ring: trinkets.ring };
   }
 }
 
@@ -58,6 +62,17 @@ export function minesScenarios(className: string): Scenario[] {
     scenario('Troll', 'cave_troll', profile(className, 18, 'mines')),
     scenario('Capataz', 'mine_foreman', profile(className, 19, 'mines')),
     scenario('Halden', 'halden', profile(className, 20, 'mines_late', 'f_halden')),
+  ];
+}
+
+/** Enemigos de la Fragua al nivel previsto de la ruta. */
+export function forgeScenarios(className: string): Scenario[] {
+  return [
+    scenario('Imp', 'ember_imp', profile(className, 21, 'forge')),
+    scenario('Draco', 'young_drake', profile(className, 22, 'forge')),
+    scenario('Guardián', 'forge_construct', profile(className, 23, 'forge_mid')),
+    scenario('Fundidor', 'primal_smelter', profile(className, 24, 'forge_mid')),
+    scenario('Vharzul', 'vharzul', profile(className, 25, 'forge_late', 'f_vharzul')),
   ];
 }
 

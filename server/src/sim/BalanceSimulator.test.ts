@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BalanceSimulator, balancedAttributes, seededRandom } from './BalanceSimulator.js';
-import { baselineScenarios, manaProfile, minesScenarios } from './scenarios.js';
+import { baselineScenarios, forgeScenarios, manaProfile, minesScenarios, type ScenarioSet } from './scenarios.js';
 import { CLASS_ORDER } from '@aden/shared';
 
 describe('BalanceSimulator', () => {
@@ -31,20 +31,32 @@ describe('BalanceSimulator', () => {
     expect(max!).toBeLessThanOrEqual(70);
     expect(sim.manaRun(manaProfile(), 'primary')).toBeNull();
   });
+  /** Mediana del tiempo de victoria de las cinco clases atentas (Infinity si no gana). */
+  const median = (set: ScenarioSet, name: string) => {
+    const t = CLASS_ORDER.map(cls => sim.fight(set(cls).find(s => s.name === name)!, 'attentive'))
+      .map(r => r.outcome === 'kill' ? r.seconds : Infinity).sort((a, b) => a - b);
+    return t[Math.floor(t.length / 2)];
+  };
+  const within = (m: number, min: number, max: number, name: string) => { expect(m, name).toBeGreaterThanOrEqual(min); expect(m, name).toBeLessThanOrEqual(max); };
   it('calibrates the Mines: normals 5–9 s, the foreman 15–30 s and Halden 60–100 s (median, attentive)', () => {
-    const median = (name: string) => {
-      const t = CLASS_ORDER.map(cls => sim.fight(minesScenarios(cls).find(s => s.name === name)!, 'attentive'))
-        .map(r => r.outcome === 'kill' ? r.seconds : Infinity).sort((a, b) => a - b);
-      return t[Math.floor(t.length / 2)];
-    };
-    for (const name of ['Excavador', 'Armadura', 'Troll']) { const m = median(name); expect(m, name).toBeGreaterThanOrEqual(5); expect(m, name).toBeLessThanOrEqual(9); }
-    const foreman = median('Capataz'); expect(foreman).toBeGreaterThanOrEqual(15); expect(foreman).toBeLessThanOrEqual(30);
-    const halden = median('Halden'); expect(halden).toBeGreaterThanOrEqual(60); expect(halden).toBeLessThanOrEqual(100);
+    for (const name of ['Excavador', 'Armadura', 'Troll']) within(median(minesScenarios, name), 5, 9, name);
+    within(median(minesScenarios, 'Capataz'), 15, 30, 'Capataz');
+    within(median(minesScenarios, 'Halden'), 60, 100, 'Halden');
   });
   it('lets an attentive knight beat Halden but not a stationary one', () => {
     const halden = minesScenarios('knight').find(s => s.name === 'Halden')!;
     expect(sim.fight(halden, 'attentive').outcome).toBe('kill');
     expect(sim.fight(halden, 'stationary').outcome).not.toBe('kill');
+  });
+  it('calibrates the Forge: normals 5–9 s, the smelter 15–30 s and Vharzul 60–100 s (median, attentive)', () => {
+    for (const name of ['Imp', 'Draco', 'Guardián']) within(median(forgeScenarios, name), 5, 9, name);
+    within(median(forgeScenarios, 'Fundidor'), 15, 30, 'Fundidor');
+    within(median(forgeScenarios, 'Vharzul'), 60, 100, 'Vharzul');
+  });
+  it('lets an attentive knight beat Vharzul but not a stationary one', () => {
+    const vharzul = forgeScenarios('knight').find(s => s.name === 'Vharzul')!;
+    expect(sim.fight(vharzul, 'attentive').outcome).toBe('kill');
+    expect(sim.fight(vharzul, 'stationary').outcome).not.toBe('kill');
   });
   it('keeps a far lower level character from beating a boss', () => {
     const prior = baselineScenarios('knight').find(s => s.templateId === 'memory_prior')!;

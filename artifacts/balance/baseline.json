@@ -160,9 +160,9 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 88.1,
-    "hpLostPct": 54,
-    "potions": 0
+    "seconds": 72.6,
+    "hpLostPct": 59,
+    "potions": 3
   },
   {
     "scenario": "Prior",
@@ -336,7 +336,7 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 34.9,
+    "seconds": 30.5,
     "hpLostPct": 48,
     "potions": 0
   },
@@ -512,8 +512,8 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 28.8,
-    "hpLostPct": 40,
+    "seconds": 28.2,
+    "hpLostPct": 52,
     "potions": 0
   },
   {
@@ -688,9 +688,9 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 33.5,
-    "hpLostPct": 77,
-    "potions": 2
+    "seconds": 31.3,
+    "hpLostPct": 57,
+    "potions": 1
   },
   {
     "scenario": "Prior",
@@ -864,8 +864,8 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 42.5,
-    "hpLostPct": 41,
+    "seconds": 38.9,
+    "hpLostPct": 46,
     "potions": 0
   },
   {

@@ -70,7 +70,7 @@ export const ENCOUNTERS: Record<string, EncounterDef> = {
         interruptObjects: FORGE_ANVILS, interruptCooldownMs: 9000, interruptStunMs: 3000,
         interruptTexts: { success: '¡Cortaste el aliento de la Fragua! Vharzul quedó aturdido.', tooWeak: 'El yunque no responde a tu poder actual.', idle: 'El yunque late con el pulso del dragón.' } },
     ] },
-    summons: [{ templateId: 'forged_guardian', everyMs: 15000, fromObjects: FORGE_ANVILS, maxAlive: 1 }],
+    summons: [{ templateId: 'forged_guardian', everyMs: 20000, fromObjects: FORGE_ANVILS, maxAlive: 1 }],
     coolObjects: FORGE_ANVILS,
     coolTexts: { success: 'Enfriaste el yunque: dejó de forjar guardianes.', tooWeak: 'El yunque no responde a tu poder actual.', idle: 'El yunque late con el pulso del dragón. Solo se enfría cuando Vharzul pelea.' },
   },

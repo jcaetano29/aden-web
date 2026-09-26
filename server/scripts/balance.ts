@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { CLASS_ORDER } from '@aden/shared';
 import { BalanceSimulator, type Behavior, type FightResult } from '../src/sim/BalanceSimulator.js';
-import { baselineScenarios, manaProfile, minesScenarios } from '../src/sim/scenarios.js';
+import { baselineScenarios, forgeScenarios, manaProfile, minesScenarios, type ScenarioSet } from '../src/sim/scenarios.js';
 
 const OUT = '../artifacts/balance';
 const sim = await BalanceSimulator.start();
@@ -12,10 +12,11 @@ try {
     const report = { max: sim.manaRun(profile, 'max'), primary: sim.manaRun(profile, 'primary') };
     writeFileSync(`${OUT}/mana.json`, JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report));
-  } else if (process.argv.includes('--mines')) {
+  } else if (process.argv.includes('--mines') || process.argv.includes('--forge')) {
+    const [file, scenarios]: [string, ScenarioSet] = process.argv.includes('--forge') ? ['forge', forgeScenarios] : ['mines', minesScenarios];
     const rows: FightResult[] = [];
-    for (const cls of CLASS_ORDER) for (const s of minesScenarios(cls)) for (const b of ['attentive', 'stationary'] as Behavior[]) rows.push(sim.fight(s, b));
-    writeFileSync(`${OUT}/mines.json`, JSON.stringify(rows, null, 2));
+    for (const cls of CLASS_ORDER) for (const s of scenarios(cls)) for (const b of ['attentive', 'stationary'] as Behavior[]) rows.push(sim.fight(s, b));
+    writeFileSync(`${OUT}/${file}.json`, JSON.stringify(rows, null, 2));
     for (const name of [...new Set(rows.map(r => r.scenario))]) {
       const attentive = rows.filter(r => r.scenario === name && r.behavior === 'attentive');
       const times = attentive.filter(r => r.outcome === 'kill').map(r => r.seconds).sort((a, b) => a - b);
