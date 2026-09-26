@@ -1,6 +1,7 @@
 import { AdventureTracker } from "./render/AdventureTracker.js";
 import { NPCS, chooseHealthPotion, sideChainForNpc, sideChainStep, campaignRoleNow, encounterCoolFor, encounterInterruptFor } from '@aden/shared';
 import { campaignDialog } from './render/campaignDialog.js';
+import { sideChainDialog } from './render/sideChainDialog.js';
 import { HazardViews } from "./render/HazardViews.js";
 import * as THREE from "three";
 import { preloadMaterialAtlas } from "./render/materialAtlas.js";
@@ -381,14 +382,10 @@ async function main() {
     const chain = sideChainForNpc(npcId);
     if (chain) {
       shopPanel.close(); smithPanel.close(); closeFieldShops();
-      const entry = self.sideChains[chain.id], step = entry ? sideChainStep(chain, entry.id) : chain.steps[0];
-      const finished = entry?.id === chain.completeId, ready = !!entry && !!step && entry.progress >= step.amount;
-      const reward = step ? `Recompensa: ${step.rewardGold} oro${step.rewardItemId ? ` y ${step.rewardQty ?? 1} ${getItem(step.rewardItemId).name}` : ''}.` : '';
+      const d = sideChainDialog(chain, self.sideChains[chain.id]);
       const shop = fieldShops.get(npcId);
-      dialog.open({ speaker,
-        text: finished || !step ? (chain.finishedText ?? '') : `${step.title}\n\n${ready ? step.done : step.intro}\n\n${reward}`,
-        actionLabel: finished ? 'Gracias' : ready ? 'Entregar encargo' : entry ? 'Seguir buscando' : 'Aceptar encargo',
-        onAction: () => { if (!finished && (!entry || ready)) net.sendInteractNpc(npcId); },
+      dialog.open({ speaker, text: d.text, actionLabel: d.actionLabel,
+        onAction: () => { if (d.send) net.sendInteractNpc(npcId); },
         ...(shop ? { secondaryAction: { label: 'Comprar provisiones', onAction: () => { shop.updateGold(self.gold); shop.toggle(); } } } : {}) });
       return;
     }

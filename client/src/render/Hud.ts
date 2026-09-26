@@ -1,4 +1,4 @@
-import { expToNextLevel, getQuest, getClass, getSkill, getNpc, VEIL_COMPLETE, MEMORY_COMPLETE } from "@aden/shared";
+import { expToNextLevel, getQuest, getClass, getSkill, getNpc, chapterForComplete, VEIL_COMPLETE, MEMORY_COMPLETE } from "@aden/shared";
 import { COLORS, FONT_DISPLAY, makeThemedBar } from "./theme.js";
 
 const BAR_WIDTH_PX = 190;
@@ -265,6 +265,8 @@ export class Hud {
       this.questLabel.textContent = '✦ La Memoria del Velo completada';
     } else if (questId === "campaign_complete") {
       this.questLabel.textContent = "✦ Nihil cayó — hablá con Rowan";
+    } else if (chapterForComplete(questId)) {
+      this.questLabel.textContent = `✦ ${chapterForComplete(questId)!.completeTitle}`;
     } else {
       try {
         const quest = getQuest(questId);
