@@ -2,6 +2,7 @@ import { AUTHORED_STRUCTURES, STRUCTURE_SIZE, TOWN_FENCES } from "@aden/shared";
 import { addCryptEnvironment } from "./CryptEnvironment.js";
 import { addVeilEnvironment } from './VeilEnvironment.js';
 import { addMonasteryEnvironment } from './MonasteryEnvironment.js';
+import { addMinesEnvironment } from './MinesEnvironment.js';
 import * as THREE from "three";
 import { addMapDressing } from "./MapDressing.js";
 import { ZONES, WORLD_OBJECTS, getZone, zoneAt, TOWN, SAFE_RADIUS, distance2D, type Zone } from "@aden/shared";
@@ -205,6 +206,7 @@ export class Environment {
   private structures(): void {
     addVeilEnvironment(this.scene);
     addMonasteryEnvironment(this.scene);
+    addMinesEnvironment(this.scene);
     this.buildTown();
 
     for (const p of AUTHORED_STRUCTURES) {
