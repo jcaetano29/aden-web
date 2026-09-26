@@ -37,3 +37,15 @@ export function skillElement(id:string):DamageElement|undefined {
   if(id==='tome_twister')return 'wind';
   if(id==='tome_lightning')return 'lightning';
 }
+
+/** Skills de disparo: necesitan un arma con munición equipada y munición de su tipo. */
+export const AMMO_SKILLS: readonly string[] = ['aimed_shot', 'snaring_shot', 'piercing_shot', 'item_volley'];
+
+/** Por qué una skill de disparo no puede salir ('weapon' sin arco/ballesta, 'ammo' sin munición), o null si puede. */
+export function ammoSkillBlock(skillId: string, weaponId: string | undefined, inventory: readonly { itemTemplateId: string; qty: number }[]): 'weapon' | 'ammo' | null {
+  if (!AMMO_SKILLS.includes(skillId)) return null;
+  let ammo: string | undefined;
+  try { ammo = weaponId ? getItem(weaponId).ammo : undefined; } catch { ammo = undefined; }
+  if (!ammo) return 'weapon';
+  return inventory.some(e => { try { const item = getItem(e.itemTemplateId); return e.qty > 0 && item.category === 'municion' && item.ammo === ammo; } catch { return false; } }) ? null : 'ammo';
+}

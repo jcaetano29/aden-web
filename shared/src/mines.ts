@@ -21,6 +21,9 @@ function mission(id: string, title: string, objective: Quest['objective'], targe
     hint: `${intro}${autoAdvance ? ' Después seguí el siguiente marcador.' : ' Volvé con Brenna en el campamento del sur al completar el objetivo.'}` };
 }
 
+/** Ballesta del catálogo mejorada (+2, mágica): ningún arco o ballesta de explorador cubre los niveles 15–20. */
+export const FOREMAN_RANGER_REWARD = 'aden_trueno_de_la_frontera~1~magic~2~0~0~0~0~foreman';
+
 export const MINES_QUESTS: Record<string, Quest> = {
   f_arrival: mission('f_arrival', 'El taller de Halden', 'visit', 'minas', 1, 1500, 200,
     'Dorne reconoció las marcas del Custodio: son de Halden, su maestro, desaparecido con la Hermandad del Yunque. Viajá con M a las Minas de Hierro Negro y buscá a la capataz Brenna en el campamento del sur.',
@@ -45,7 +48,7 @@ export const MINES_QUESTS: Record<string, Quest> = {
   f_foreman: { ...mission('f_foreman', 'El capataz de hierro', 'kill', 'mine_foreman', 1, 4200, 400,
     'El Capataz de Hierro, nivel 19, custodia el camino a la Puerta (1500, 120). Golpea con un barrido frontal: cuando levante el martillo, salí de adelante.',
     'Era la armadura del viejo capataz de la Hermandad. Halden la usa de guardián. Tomá esta arma de nuestras reservas: con la que tenés no vas a pasar la Puerta.'),
-    rewardByClass: { knight: 'aden_hoja_de_la_sierpe_palida', barbarian: 'aden_pica_de_la_sierpe', ranger: 'aden_destral_silvano', mage: 'aden_baculo_de_la_tormenta', rogue: 'gallery_dagger' } },
+    rewardByClass: { knight: 'aden_hoja_de_la_sierpe_palida', barbarian: 'aden_pica_de_la_sierpe', ranger: FOREMAN_RANGER_REWARD, mage: 'aden_baculo_de_la_tormenta', rogue: 'gallery_dagger' } },
   f_halden: { ...mission('f_halden', 'La Puerta de la Fragua', 'kill', 'halden', 1, 5800, 600,
     'Halden espera en la Puerta de la Fragua (1500, 97), nivel 20. Barre de frente con el martillo y marca el suelo bajo tus pies; a media vida llama a dos armaduras. Detenelo.',
     'Halden está vivo, pero vencido. Dijo que no lo hizo solo: despertó a algo bajo la montaña para encender la Fragua como en los días de los primeros herreros. Dorne tiene que saberlo. Tomá esta arma del taller de Halden: la forjó para su último aprendiz.'),

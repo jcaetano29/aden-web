@@ -1,5 +1,5 @@
 import { AdventureTracker } from "./render/AdventureTracker.js";
-import { NPCS, chooseHealthPotion, sideChainForNpc, sideChainStep, campaignRoleNow, encounterCoolFor, encounterInterruptFor } from '@aden/shared';
+import { NPCS, chooseHealthPotion, sideChainForNpc, sideChainStep, campaignRoleNow, encounterCoolFor, encounterInterruptFor, ammoSkillBlock } from '@aden/shared';
 import { campaignDialog } from './render/campaignDialog.js';
 import { sideChainDialog } from './render/sideChainDialog.js';
 import { HazardViews } from "./render/HazardViews.js";
@@ -564,6 +564,8 @@ async function main() {
     if (self.mp < skill.mpCost) { hud.toast(`Sin maná (necesitás ${skill.mpCost})`, "#6ba6ff"); return; }
     const needsTarget = skill.type === "damage" || skill.type === "dot";
     if (needsTarget && !currentTargetId) { hud.toast("Necesitás un objetivo", "#ffe066"); return; }
+    const shot = ammoSkillBlock(skillId, net.getEquipment().weapon, net.getInventory());
+    if (shot) { hud.toast(shot === 'weapon' ? 'Necesitás un arco o una ballesta equipados' : 'Sin munición para tu arma', '#ffe066'); return; }
     if (needsTarget && currentTargetId) {
       const from = views.selfPosition();
       const to = views.hasMob(currentTargetId) ? views.mobWorldPosition(currentTargetId) : views.playerWorldPosition(currentTargetId);

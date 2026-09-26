@@ -2,7 +2,7 @@ import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vites
 import { boot, type ColyseusTestServer } from '@colyseus/testing';
 import config from '../testServer.js';
 import type { GameRoom } from './GameRoom.js';
-import { MessageType, getItem, getNpc, getQuest, getWorldObject, MEMORY_COMPLETE, MINES_COMPLETE, questReward } from '@aden/shared';
+import { MessageType, getItem, getNpc, getQuest, getWorldObject, MEMORY_COMPLETE, MINES_COMPLETE, FOREMAN_RANGER_REWARD, questReward } from '@aden/shared';
 import type { PlayerState } from '../state/PlayerState.js';
 
 /** El equipo del catálogo se entrega como instancia: se busca por su id base. */
@@ -76,6 +76,21 @@ describe('Mines campaign over real connections', () => {
     c.send(MessageType.InteractNpc, { npcId: 'brenna' }); await room.waitForNextPatch();
     // Volver a hablarle no repite el pago: ofrece el capítulo siguiente (la Fragua).
     expect(p.gold).toBe(gold); expect(p.questId).toBe('f_caldera');
+  });
+
+  it('hands each ranger their own upgraded crossbow for the foreman', async () => {
+    const room = await server.createRoom('game', {}) as GameRoom;
+    const c = await server.connectTo(room, { name: 'MinesRanger', className: 'ranger' });
+    room.setSimulationInterval(() => {}, 50);
+    const p = room.state.players.get(c.sessionId)!;
+    c.onMessage(MessageType.ItemResult, () => {});
+    const brenna = getNpc('brenna');
+    p.level = 19; p.mapId = 'minas'; p.x = brenna.x; p.z = brenna.z; p.questId = 'f_foreman'; p.questProgress = 1;
+    c.send(MessageType.InteractNpc, { npcId: 'brenna' });
+    await vi.waitFor(() => expect(p.questId).toBe('f_halden'));
+    const key = [...p.inventory.keys()].find(k => getItem(k).baseId === 'aden_trueno_de_la_frontera')!;
+    expect(getItem(key).options?.level).toBe(2);
+    expect(key).not.toBe(FOREMAN_RANGER_REWARD);
   });
 
   it('runs Tobías errands and sells supplies only near his post', async () => {

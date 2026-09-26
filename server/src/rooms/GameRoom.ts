@@ -1,4 +1,4 @@
-import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterInterruptFor, encounterCoolFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
+import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterInterruptFor, encounterCoolFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached, AMMO_SKILLS } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
@@ -542,7 +542,7 @@ export class GameRoom extends Room<GameState> {
           if (!this.inPvpZone(p) || !this.inPvpZone(victim)) return;
         }
         if (gapCloser && !this.dashToTarget(p, t.entity.x, t.entity.z)) return;
-        if(['aimed_shot','snaring_shot','piercing_shot','item_volley'].includes(skill.id)) {
+        if(AMMO_SKILLS.includes(skill.id)) {
           const weapon=p.equipment.get('weapon');if(!weapon || !getItem(weapon).ammo || !consumeAmmo(p))return;
         }
         spend();
@@ -930,7 +930,9 @@ export class GameRoom extends Room<GameState> {
         // Etapa 21: la misión puede entregar una pieza de equipo.
         const reward = questReward(q,p.className);
         if (reward) {
-          this.addToInventory(p, reward, q.rewardItemQty ?? 1);
+          // Una recompensa mejorada se entrega como un ejemplar propio de cada jugador.
+          const item = getItem(reward);
+          this.addToInventory(p, item.options ? createItemInstance(item, item.options, randomUUID()) : reward, q.rewardItemQty ?? 1);
           this.checkAchievements(p, client.sessionId);
         }
         p.questId = nextQuestId(p.questId);
