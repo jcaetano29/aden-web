@@ -17,13 +17,14 @@ describe('fuentes de recompensas',()=>{
     for(const id of ['bone_blade','crypt_plate','aden_gema_del_pacto','aden_filo_del_verdugo','toString'])expect(()=>getShopPrice(id)).toThrow();
     expect(Object.keys(CATALOG_ITEMS)).toHaveLength(208);
   });
-  it('fuentes tienen selección acotada y equipable antes de nivel 11',()=>{
+  it('fuentes tienen selección acotada y equipable dentro del tramo de su mapa (Acto I: antes de nivel 11)',()=>{
     for(const source of [...SPAWN_ZONES.map(s=>({mapId:s.mapId,lootId:s.templateId})),...WORLD_OBJECTS]){
       const pool=catalogDropPool(source.mapId,source.lootId??'');
       expect(pool.length).toBeLessThanOrEqual(5);
       for(const id of pool){
         const item=getItem(id);
-        expect(item.requiredLevel??1).toBeLessThanOrEqual(10);
+        const zone=getZone(source.mapId), cap=zone.levelMax<=10?10:zone.levelMax+1;
+        expect(item.requiredLevel??1).toBeLessThanOrEqual(cap);
         expect(['alas','mascota']).not.toContain(item.category);
         if(item.category==='joya')expect(['crypt_warden','skeleton_king']).toContain(source.lootId);
       }

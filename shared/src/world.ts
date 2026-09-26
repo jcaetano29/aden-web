@@ -132,6 +132,12 @@ export const ZONES: Zone[] = [
     biome: { ground: 0x827b72, fog: 0x98a5a0, fogNear: 40, fogFar: 145, accent: 0xc4b68a },
   },
   {
+    id: 'minas', name: 'Minas de Hierro Negro', subtitle: 'Los martillos suenan donde no trabaja nadie',
+    center: { x: 1500, z: 150 }, bounds: boundsAround(1500, 150), spawn: { x: 1500, z: 200 },
+    levelReq: 15, levelMin: 15, levelMax: 20, safe: false,
+    biome: { ground: 0x3a3632, fog: 0x4b4540, fogNear: 32, fogFar: 125, accent: 0xd08a3a },
+  },
+  {
     id: "cripta", name: "Cripta de las Dos Llamas", subtitle: "Dos sellos protegen al Custodio",
     center: { x: 900, z: -40 }, bounds: CRYPT_BOUNDS,
     spawn: CRYPT_SPAWN, levelReq: 5, levelMin: 5, levelMax: 7, safe: false,

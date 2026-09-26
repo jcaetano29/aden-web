@@ -25,6 +25,12 @@ export interface MobTemplate {
 // con sus IDs de gameplay conservados. El tinte da la identidad
 // visual: Bosque = musgoso (verde), Ruinas = cripta (violeta), Yermo = ardiente (rojo).
 export const MOB_TEMPLATES: Record<string, MobTemplate> = {
+  mine_digger: { id: 'mine_digger', level: 15, rank: 'normal', name: 'Excavador Hueco', model: 'BoneWarden', tint: 0x9a8f7e },
+  mine_armor: { id: 'mine_armor', level: 16, rank: 'normal', name: 'Armadura Animada', model: 'DreadKnight', tint: 0x8d9399 },
+  cave_troll: { id: 'cave_troll', level: 18, rank: 'normal', name: 'Troll de Caverna', model: 'ForestTroll', tint: 0x7d8a96, scale: 1.1 },
+  mine_foreman: { id: 'mine_foreman', level: 19, rank: 'elite', name: 'Capataz de Hierro', model: 'DreadKnight', miniBoss: true, scale: 1.5, tint: 0x6f7780, respawnMs: 45000 },
+  halden: { id: 'halden', level: 20, rank: 'boss', name: 'Maestro Halden', model: 'DreadKnight', boss: true, scale: 1.4, tint: 0xc99a5b, respawnMs: 60000 },
+  iron_colossus: { id: 'iron_colossus', level: 24, rank: 'elite', name: 'Coloso de Hierro Negro', model: 'ForestTroll', miniBoss: true, scale: 1.6, tint: 0x4d5358, respawnMs: 60000 },
   memory_guard: { id:'memory_guard', level:13, rank:'normal', name:'Guardia de la Vigilia', model:'BoneWarden', tint:0xb6c9bd },
   memory_jailer: { id:'memory_jailer', level:14, rank:'elite', name:'Carcelero de la Vigilia', model:'DreadKnight', miniBoss:true, tint:0xa5b3c0, scale:1.4, respawnMs:45000 },
   memory_prior: { id:'memory_prior', level:15, rank:'boss', name:'Prior sin Nombre', model:'DeathWraith', boss:true, tint:0xe3d09c, scale:1.8, respawnMs:60000 },
@@ -83,6 +89,15 @@ export interface SpawnZone {
 // grande (center ±65). Más clusters/mobs para llenar los mapas amplios. Los mapas se
 // viajan con M (no se camina entre ellos); la dificultad sigue escalando por mapa.
 export const SPAWN_ZONES: SpawnZone[] = [
+  { id: 'mines_diggers_west', mapId: 'minas', templateId: 'mine_digger', centerX: 1466, centerZ: 172, radius: 4, count: 5 },
+  { id: 'mines_diggers_east', mapId: 'minas', templateId: 'mine_digger', centerX: 1534, centerZ: 172, radius: 4, count: 5 },
+  { id: 'mines_armors_west', mapId: 'minas', templateId: 'mine_armor', centerX: 1460, centerZ: 140, radius: 4, count: 4 },
+  { id: 'mines_armors_east', mapId: 'minas', templateId: 'mine_armor', centerX: 1540, centerZ: 140, radius: 4, count: 4 },
+  { id: 'mines_trolls_west', mapId: 'minas', templateId: 'cave_troll', centerX: 1474, centerZ: 112, radius: 4, count: 4 },
+  { id: 'mines_trolls_east', mapId: 'minas', templateId: 'cave_troll', centerX: 1526, centerZ: 112, radius: 4, count: 4 },
+  { id: 'mines_foreman', mapId: 'minas', templateId: 'mine_foreman', centerX: 1500, centerZ: 120, radius: 0, count: 1 },
+  { id: 'mines_halden', mapId: 'minas', templateId: 'halden', centerX: 1500, centerZ: 97, radius: 0, count: 1 },
+  { id: 'mines_colossus', mapId: 'minas', templateId: 'iron_colossus', centerX: 1555, centerZ: 100, radius: 0, count: 1 },
   { id:'monastery_guards_west', mapId:'monasterio', templateId:'memory_guard', centerX:1175, centerZ:444, radius:4, count:2 },
   { id:'monastery_guards_east', mapId:'monasterio', templateId:'memory_guard', centerX:1230, centerZ:447, radius:3, count:2 },
   { id:'monastery_jailer', mapId:'monasterio', templateId:'memory_jailer', centerX:1178, centerZ:417, radius:0, count:1 },

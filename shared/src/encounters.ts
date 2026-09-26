@@ -56,6 +56,15 @@ export const ENCOUNTERS: Record<string, EncounterDef> = {
   veil_guardian: heavy('veil_guardian'),
   memory_jailer: heavy('memory_jailer'),
   skeleton_king: { templateId: 'skeleton_king', aggroRadius: 14, cooldownMs: 8000, patterns: [circle(6, 1800, 2.8)], belowHalf: { cooldownMs: 5000 } },
+  mine_foreman: { templateId: 'mine_foreman', aggroRadius: 14, cooldownMs: 8000,
+    patterns: [{ shape: 'cone', anchor: 'self', radius: 6, angleDeg: 80, windupMs: 1800, power: 2.4 }] },
+  halden: {
+    templateId: 'halden', aggroRadius: 14, cooldownMs: 6500, requiresQuest: 'f_halden',
+    patterns: [{ shape: 'cone', anchor: 'self', radius: 7, angleDeg: 90, windupMs: 1600, power: 2.6 }, circle(5, 1800, 2.4)],
+    belowHalf: { cooldownMs: 4500 },
+    summons: [{ templateId: 'mine_armor', atHpPct: 0.5, count: 2, maxAlive: 2 }],
+  },
+  iron_colossus: { templateId: 'iron_colossus', aggroRadius: 10, cooldownMs: 9000, patterns: [circle(5, 2000, 2.4)] },
   memory_prior: {
     templateId: 'memory_prior', aggroRadius: 14, cooldownMs: 6000, requiresQuest: 'a2_prior',
     patterns: [circle(6, 1800, 2.4)],

@@ -21,6 +21,17 @@ export const SOUNDTRACKS: Record<string, Soundtrack> = {
       [[0, 4, 2], [3, 2, 1], [5, 1, 1], [7, 0, 1]],
     ], reverb: 3.8, wind: .18, windHz: 420, percussion: .1,
   },
+  minas: {
+    id: 'minas', title: 'Ecos del yunque', description: 'Trompas graves, tambores y cuerdas bajo la montaña',
+    bpm: 72, meter: 4, tonic: 43, scale: [0, 2, 3, 5, 7, 8, 10],
+    chords: [0, 5, 3, 4, 0, 6, 4, 0], lead: 'horn', pad: 'strings', pluck: 'bell',
+    motifs: [
+      [[0, 0, 1.5], [2, 3, 1], [3, 4, .8], [4, 3, 1.5], [6, 0, 1.5]],
+      [[0, 4, 1], [1, 5, 1], [2, 7, 2], [5, 5, 1], [6, 4, 1.5]],
+      [[.5, 3, 1.5], [2.5, 2, 1], [4, 0, 2], [7, -1, .8]],
+      [[0, 0, 1], [1, 0, .5], [1.5, 3, 1.5], [4, 4, 1], [5, 2, 2]],
+    ], reverb: 2.4, wind: .16, windHz: 380, percussion: .3,
+  },
   marismas: {
     id: 'marismas', title: 'Nombres sobre el agua', description: 'Flauta y campanas entre juncos y recuerdos',
     bpm: 64, meter: 4, tonic: 46, scale: [0, 2, 3, 5, 7, 9, 10],

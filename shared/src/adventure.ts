@@ -64,6 +64,15 @@ const POOLS: Record<string, Record<string, string[]>> = {
     infernal_demon: ['aden_arco_del_fresno_gris', 'aden_cayado_del_heraldo', 'aden_escudo_del_astado'],
     chest_yermo: ['aden_amuleto_del_invierno', 'aden_colgante_del_cefiro'],
   },
+  minas: {
+    mine_digger: ['aden_guantes_de_la_escama_de_brasa', 'aden_botas_de_la_escama_de_brasa'],
+    mine_armor: ['aden_yelmo_de_la_escama_de_brasa', 'aden_grebas_de_la_escama_de_brasa'],
+    cave_troll: ['aden_escudo_de_los_sepultados', 'aden_rodela_del_circulo_de_aden'],
+    mine_foreman: ['aden_corvo_de_la_marca_gris', 'aden_pica_de_la_sierpe', 'aden_destral_silvano', 'aden_baculo_de_la_tormenta'],
+    halden: ['aden_coraza_de_el_bastion_de_ceniza', 'aden_coraza_de_el_enigma_de_umbra', 'aden_coraza_de_el_vendaval_gris'],
+    iron_colossus: ['aden_hoja_de_la_sierpe_palida', 'aden_escudo_del_cerco_espinado'],
+    chest_minas: ['aden_yelmo_de_la_escama_de_brasa', 'aden_escudo_de_los_sepultados'],
+  },
   trono: {
     ancient_drake: ['aden_coraza_de_el_juramento_de_aden', 'aden_ballesta_del_sol_bajo'],
     skeleton_king: ['aden_filo_del_verdugo', 'aden_bifaz_del_bastion', 'aden_lanza_de_sangre_antigua', 'aden_escudo_de_la_cometa_negra', 'aden_gema_del_azar'],
