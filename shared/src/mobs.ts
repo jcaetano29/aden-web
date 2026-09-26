@@ -25,6 +25,13 @@ export interface MobTemplate {
 // con sus IDs de gameplay conservados. El tinte da la identidad
 // visual: Bosque = musgoso (verde), Ruinas = cripta (violeta), Yermo = ardiente (rojo).
 export const MOB_TEMPLATES: Record<string, MobTemplate> = {
+  ember_imp: { id: 'ember_imp', level: 21, rank: 'normal', name: 'Imp de Brasa', model: 'InfernalDemon', scale: 0.7, tint: 0xff8a4c },
+  young_drake: { id: 'young_drake', level: 22, rank: 'normal', name: 'Draco Joven', model: 'AncientDrake', scale: 0.8, tint: 0xc4744a },
+  forge_construct: { id: 'forge_construct', level: 23, rank: 'normal', name: 'Guardián Forjado', model: 'BoneWarden', tint: 0xd08a5a },
+  primal_smelter: { id: 'primal_smelter', level: 24, rank: 'elite', name: 'Fundidor Primordial', model: 'InfernalDemon', miniBoss: true, scale: 1.5, tint: 0xff5a2a, respawnMs: 45000 },
+  forged_guardian: { id: 'forged_guardian', level: 23, rank: 'normal', name: 'Guardián de Yunque', model: 'BoneWarden', tint: 0xe0a060 },
+  vharzul: { id: 'vharzul', level: 25, rank: 'boss', name: 'Vharzul, Dragón de la Fragua', model: 'AncientDrake', boss: true, scale: 2.6, tint: 0xff7a3c, respawnMs: 60000 },
+  magma_wyrm: { id: 'magma_wyrm', level: 30, rank: 'elite', name: 'Sierpe de Magma', model: 'AncientDrake', miniBoss: true, scale: 1.3, tint: 0x9a2a1a, respawnMs: 60000 },
   mine_digger: { id: 'mine_digger', level: 15, rank: 'normal', name: 'Excavador Hueco', model: 'BoneWarden', tint: 0x9a8f7e },
   mine_armor: { id: 'mine_armor', level: 16, rank: 'normal', name: 'Armadura Animada', model: 'DreadKnight', tint: 0x8d9399 },
   cave_troll: { id: 'cave_troll', level: 18, rank: 'normal', name: 'Troll de Caverna', model: 'ForestTroll', tint: 0x7d8a96, scale: 1.1 },
@@ -89,6 +96,15 @@ export interface SpawnZone {
 // grande (center ±65). Más clusters/mobs para llenar los mapas amplios. Los mapas se
 // viajan con M (no se camina entre ellos); la dificultad sigue escalando por mapa.
 export const SPAWN_ZONES: SpawnZone[] = [
+  { id: 'forge_imps_west', mapId: 'fragua', templateId: 'ember_imp', centerX: 1458, centerZ: 488, radius: 4, count: 5 },
+  { id: 'forge_imps_east', mapId: 'fragua', templateId: 'ember_imp', centerX: 1542, centerZ: 488, radius: 4, count: 5 },
+  { id: 'forge_drakes_west', mapId: 'fragua', templateId: 'young_drake', centerX: 1452, centerZ: 452, radius: 4, count: 3 },
+  { id: 'forge_drakes_east', mapId: 'fragua', templateId: 'young_drake', centerX: 1548, centerZ: 452, radius: 4, count: 3 },
+  { id: 'forge_constructs_west', mapId: 'fragua', templateId: 'forge_construct', centerX: 1466, centerZ: 416, radius: 4, count: 3 },
+  { id: 'forge_constructs_east', mapId: 'fragua', templateId: 'forge_construct', centerX: 1534, centerZ: 416, radius: 4, count: 3 },
+  { id: 'forge_smelter', mapId: 'fragua', templateId: 'primal_smelter', centerX: 1500, centerZ: 420, radius: 0, count: 1 },
+  { id: 'forge_vharzul', mapId: 'fragua', templateId: 'vharzul', centerX: 1500, centerZ: 396, radius: 0, count: 1 },
+  { id: 'forge_wyrm', mapId: 'fragua', templateId: 'magma_wyrm', centerX: 1555, centerZ: 395, radius: 0, count: 1 },
   { id: 'mines_diggers_west', mapId: 'minas', templateId: 'mine_digger', centerX: 1466, centerZ: 172, radius: 4, count: 5 },
   { id: 'mines_diggers_east', mapId: 'minas', templateId: 'mine_digger', centerX: 1534, centerZ: 172, radius: 4, count: 5 },
   { id: 'mines_armors_west', mapId: 'minas', templateId: 'mine_armor', centerX: 1460, centerZ: 140, radius: 4, count: 4 },

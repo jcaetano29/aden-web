@@ -1,4 +1,5 @@
 import { MEMORY_ANCHORS } from './monastery.js';
+import { FORGE_ANVILS } from './forge.js';
 
 export type HazardShape = 'circle' | 'cone';
 
@@ -56,6 +57,19 @@ export const ENCOUNTERS: Record<string, EncounterDef> = {
   veil_guardian: heavy('veil_guardian'),
   memory_jailer: heavy('memory_jailer'),
   skeleton_king: { templateId: 'skeleton_king', aggroRadius: 14, cooldownMs: 8000, patterns: [circle(6, 1800, 2.8)], belowHalf: { cooldownMs: 5000 } },
+  primal_smelter: { templateId: 'primal_smelter', aggroRadius: 14, cooldownMs: 7000, patterns: [circle(6, 1800, 2.4)] },
+  vharzul: {
+    templateId: 'vharzul', aggroRadius: 16, cooldownMs: 6000, requiresQuest: 'f_vharzul',
+    patterns: [{ shape: 'cone', anchor: 'self', radius: 9, angleDeg: 70, windupMs: 1800, power: 2.8 }, circle(5, 1600, 2.4)],
+    belowHalf: { cooldownMs: 5000, patterns: [
+      { shape: 'cone', anchor: 'self', radius: 9, angleDeg: 70, windupMs: 1800, power: 2.8 }, circle(5, 1600, 2.4),
+      { shape: 'circle', anchor: 'self', radius: 14, windupMs: 6000, power: 3.2, channel: true,
+        interruptObjects: FORGE_ANVILS, interruptCooldownMs: 9000, interruptStunMs: 3000,
+        interruptTexts: { success: '¡Cortaste el aliento de la Fragua! Vharzul quedó aturdido.', tooWeak: 'El yunque no responde a tu poder actual.', idle: 'El yunque late con el pulso del dragón.' } },
+    ] },
+    summons: [{ templateId: 'forged_guardian', everyMs: 15000, fromObjects: FORGE_ANVILS, maxAlive: 1 }],
+  },
+  magma_wyrm: { templateId: 'magma_wyrm', aggroRadius: 10, cooldownMs: 8000, patterns: [circle(6, 1800, 2.6)] },
   mine_foreman: { templateId: 'mine_foreman', aggroRadius: 14, cooldownMs: 8000,
     patterns: [{ shape: 'cone', anchor: 'self', radius: 6, angleDeg: 80, windupMs: 1800, power: 2.4 }] },
   halden: {

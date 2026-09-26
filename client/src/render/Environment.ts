@@ -29,6 +29,7 @@ const SUN_INTENSITY: Record<string, number> = {
   marismas: 1.3,
   monasterio: 1.4,
   minas: 1.0,
+  fragua: 0.95,
   pueblo: 1.65,
   bosque: 1.2,
   ruinas: 1.05,

@@ -4,6 +4,7 @@ import { ZONES, type Zone } from "./world.js";
 import { WORLD_OBJECTS } from "./worldobjects.js";
 import { CRYPT_ROOMS } from './dungeon.js';
 import { MINES_PITS, MINES_LIFT, MINES_GATE } from './mines.js';
+import { FORGE_LAVA } from './forge.js';
 export interface Point2 {
     readonly x: number;
     readonly z: number;
@@ -100,7 +101,7 @@ for (const [cx, z] of [[860, -7], [940, -91]])
         box('cripta', `crypt-passage-${x}-${z}`, x, 1.4, z, .65, 2.8, .65);
         box('cripta', `crypt-passage-capital-${x}-${z}`, x, 2.9, z, .8, .35, .8, 'gold', false);
     }
-for (const zone of ZONES.filter(z => !z.safe && z.id !== 'cripta' && z.id !== 'monasterio' && z.id !== 'minas'))
+for (const zone of ZONES.filter(z => !z.safe && z.id !== 'cripta' && z.id !== 'monasterio' && z.id !== 'minas' && z.id !== 'fragua'))
     for (const side of [-1, 1])
         for (const row of [-1, 1]) {
             const x = zone.center.x + side * 25, z = zone.center.z + row * 26;
@@ -137,6 +138,12 @@ box('minas', 'mines-headframe-beam', MINES_LIFT.x, 6.2, MINES_LIFT.z, 7, 0.4, 7,
 box('minas', 'mines-headframe-wheel', MINES_LIFT.x, 7.3, MINES_LIFT.z, 0.3, 1.8, 1.8, 'iron', false);
 for (const dx of [-6, 6]) box('minas', `mines-gate-pillar-${dx}`, MINES_GATE.x + dx, 4, MINES_GATE.z, 3, 8, 3, 'stone');
 box('minas', 'mines-gate-lintel', MINES_GATE.x, 8.6, MINES_GATE.z, 15, 1.2, 3, 'stone', false);
+// Fragua de los Primeros: tiendas del campamento y pilares de basalto alrededor de la arena.
+for (const dx of [-20, 20]) {
+  box('fragua', `forge-tent-${dx}`, 1500 + dx, 1.2, 504, 4, 2.4, 3.5, 'cloth');
+  box('fragua', `forge-tent-pole-${dx}`, 1500 + dx, 1.6, 506, 0.2, 3.2, 0.2, 'timber', false);
+}
+for (const [dx, dz] of [[-17, -6], [17, -6], [-15, 10], [15, 10]]) box('fragua', `forge-arena-pillar-${dx}-${dz}`, 1500 + dx, 3.5, 396 + dz, 2.4, 7, 2.4, 'stone');
 // Isolated deterministic stream for scattered ruin columns; central routes stay clear.
 let columnSeed = 4913;
 const columnRandom = () => { columnSeed = (Math.imul(columnSeed, 1664525) + 1013904223) >>> 0; return columnSeed / 4294967296; };
@@ -178,7 +185,7 @@ function random(seed: number): () => number {
 /** Clustered, reproducible decoration. The main route, central arena, spawn and
  * interactables reserve space before any props are emitted. No gameplay state. */
 export function dressingLayout(zone: Zone): Placement[] {
-    if (zone.id === "cripta" || zone.id === 'monasterio' || zone.id === 'minas')
+    if (zone.id === "cripta" || zone.id === 'monasterio' || zone.id === 'minas' || zone.id === 'fragua')
         return []; // The dungeon uses authored chambers, not scattered scenery.
     const rng = random(Array.from(zone.id).reduce((n, c) => n * 31 + c.charCodeAt(0), 8421));
     const objects = WORLD_OBJECTS.filter(o => o.mapId === zone.id);
@@ -217,6 +224,7 @@ for (const zone of ZONES.filter(z => z.id === 'ruinas' || z.id === 'trono'))
     dressingLayout(zone).filter(p => p.kind === 'tree').forEach((p, i) => obstacles.push({ id: zone.id + '-grove-column-' + i, mapId: zone.id, x: p.x, z: p.z, width: S.dressingColumnRadius * 2 * p.scale, depth: S.dressingColumnRadius * 2 * p.scale, rotation: p.yaw }));
 for (const [i, pool] of VEIL_POOLS.entries()) obstacles.push({ ...pool, id: `veil-water-${i}`, mapId: 'marismas', rotation: 0 });
 for (const [i, pit] of MINES_PITS.entries()) obstacles.push({ ...pit, id: `mines-pit-${i}`, mapId: 'minas', rotation: 0 });
+for (const [i, lava] of FORGE_LAVA.entries()) obstacles.push({ ...lava, id: `forge-lava-${i}`, mapId: 'fragua', rotation: 0 });
 export const STRUCTURE_OBSTACLES: readonly StructureObstacle[] = Object.freeze(obstacles.map(p => Object.freeze({ id: p.id, mapId: p.mapId, x: p.x, z: p.z, width: p.width, depth: p.depth, rotation: p.rotation })));
 const obstaclesByMap = new Map(ZONES.map(zone => [zone.id, Object.freeze(STRUCTURE_OBSTACLES.filter(p => p.mapId === zone.id))]));
 const noObstacles: readonly StructureObstacle[] = Object.freeze([]);

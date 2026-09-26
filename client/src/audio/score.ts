@@ -21,6 +21,17 @@ export const SOUNDTRACKS: Record<string, Soundtrack> = {
       [[0, 4, 2], [3, 2, 1], [5, 1, 1], [7, 0, 1]],
     ], reverb: 3.8, wind: .18, windHz: 420, percussion: .1,
   },
+  fragua: {
+    id: 'fragua', title: 'El corazón de la Fragua', description: 'Tambores, trompas y coro sobre la lava',
+    bpm: 76, meter: 4, tonic: 41, scale: [0, 1, 4, 5, 7, 8, 10],
+    chords: [0, 3, 5, 4, 0, 6, 5, 0], lead: 'horn', pad: 'choir', pluck: 'bell',
+    motifs: [
+      [[0, 0, 1], [1, 1, .5], [1.5, 4, 1.5], [4, 5, 1], [5, 4, 2]],
+      [[0, 7, 1.5], [2, 5, 1], [3, 4, 1], [4, 1, 2]],
+      [[.5, 4, 1], [1.5, 5, 1], [2.5, 7, 1.5], [5, 5, 2]],
+      [[0, 0, 2], [3, -1, 1], [4, 0, 1], [6, 1, 1.5]],
+    ], reverb: 2.8, wind: .2, windHz: 300, percussion: .35,
+  },
   minas: {
     id: 'minas', title: 'Ecos del yunque', description: 'Trompas graves, tambores y cuerdas bajo la montaña',
     bpm: 72, meter: 4, tonic: 43, scale: [0, 2, 3, 5, 7, 8, 10],

@@ -42,5 +42,6 @@ export * from './encounters.js';
 export * from './travel.js';
 export * from './regen.js';
 export * from './mines.js';
+export * from './forge.js';
 export * from './campaignNpcs.js';
 export * from './movement.js';

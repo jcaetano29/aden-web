@@ -138,6 +138,12 @@ export const ZONES: Zone[] = [
     biome: { ground: 0x3a3632, fog: 0x4b4540, fogNear: 32, fogFar: 125, accent: 0xd08a3a },
   },
   {
+    id: 'fragua', name: 'Fragua de los Primeros', subtitle: 'Donde nacieron las dos llamas',
+    center: { x: 1500, z: 450 }, bounds: boundsAround(1500, 450), spawn: { x: 1500, z: 500 },
+    levelReq: 20, levelMin: 20, levelMax: 25, safe: false,
+    biome: { ground: 0x3a2d28, fog: 0x5a3a2c, fogNear: 30, fogFar: 120, accent: 0xff7a3c },
+  },
+  {
     id: "cripta", name: "Cripta de las Dos Llamas", subtitle: "Dos sellos protegen al Custodio",
     center: { x: 900, z: -40 }, bounds: CRYPT_BOUNDS,
     spawn: CRYPT_SPAWN, levelReq: 5, levelMin: 5, levelMax: 7, safe: false,

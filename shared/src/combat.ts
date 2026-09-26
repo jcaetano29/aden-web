@@ -18,6 +18,13 @@ export const PLAYER_COMBAT: CombatStats = { maxHp: 100, maxMp: 50, pAtk: 15, pDe
 // Etapa 11: las stats escalan con la profundidad de la zona (ver world.ts). El salto
 // de dificultad entre zonas es lo que gatea la progresión sin muros.
 export const MOB_COMBAT: Record<string, CombatStats> = {
+  ember_imp: { maxHp: 1600, pAtk: 118, pDef: 60, attackCooldownMs: 2200 },
+  young_drake: { maxHp: 1750, pAtk: 124, pDef: 64, attackCooldownMs: 2400 },
+  forge_construct: { maxHp: 1900, pAtk: 130, pDef: 68, attackCooldownMs: 2600 },
+  primal_smelter: { maxHp: 4800, pAtk: 138, pDef: 70, attackCooldownMs: 2600 },
+  forged_guardian: { maxHp: 1500, pAtk: 120, pDef: 62, attackCooldownMs: 2600 },
+  vharzul: { maxHp: 12000, pAtk: 150, pDef: 76, attackCooldownMs: 2400 },
+  magma_wyrm: { maxHp: 14000, pAtk: 200, pDef: 95, attackCooldownMs: 2800 },
   mine_digger: { maxHp: 1400, pAtk: 90, pDef: 46, attackCooldownMs: 2200 },
   mine_armor: { maxHp: 1400, pAtk: 95, pDef: 54, attackCooldownMs: 2400 },
   cave_troll: { maxHp: 1500, pAtk: 108, pDef: 58, attackCooldownMs: 2600 },

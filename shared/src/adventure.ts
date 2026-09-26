@@ -64,6 +64,15 @@ const POOLS: Record<string, Record<string, string[]>> = {
     infernal_demon: ['aden_arco_del_fresno_gris', 'aden_cayado_del_heraldo', 'aden_escudo_del_astado'],
     chest_yermo: ['aden_amuleto_del_invierno', 'aden_colgante_del_cefiro'],
   },
+  fragua: {
+    ember_imp: ['aden_guantes_de_el_bastion_de_ceniza', 'aden_guantes_de_el_enigma_de_umbra', 'aden_guantes_de_el_vendaval_gris'],
+    young_drake: ['aden_botas_de_el_bastion_de_ceniza', 'aden_botas_de_el_enigma_de_umbra', 'aden_botas_de_el_vendaval_gris'],
+    forge_construct: ['aden_yelmo_de_el_bastion_de_ceniza', 'aden_yelmo_de_el_enigma_de_umbra', 'aden_yelmo_de_el_vendaval_gris'],
+    primal_smelter: ['aden_filo_de_brasa_viva', 'aden_hacha_de_guerra_de_aden', 'aden_vara_de_la_mirada_petrea', 'aden_paves_de_la_muralla'],
+    vharzul: ['aden_sable_del_astronomo', 'aden_asta_de_doble_luna', 'aden_egida_de_la_sierpe', 'aden_ballesta_del_rayo_blanco'],
+    magma_wyrm: ['aden_egida_de_la_sierpe'],
+    chest_fragua: ['aden_grebas_de_el_bastion_de_ceniza', 'aden_grebas_de_el_enigma_de_umbra', 'aden_grebas_de_el_vendaval_gris'],
+  },
   minas: {
     mine_digger: ['aden_guantes_de_la_escama_de_brasa', 'aden_botas_de_la_escama_de_brasa'],
     mine_armor: ['aden_yelmo_de_la_escama_de_brasa', 'aden_grebas_de_la_escama_de_brasa'],
