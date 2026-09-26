@@ -5,6 +5,16 @@ import { AudioPanel } from './AudioPanel.js';
 
 afterEach(() => { document.body.innerHTML = ''; });
 describe('map sound controls', () => {
+  it('keeps an icon and a hideable label so narrow screens can show only the icon', () => {
+    const audio = new AudioEngine(() => null, null);
+    new AudioPanel(audio);
+    const toggle = document.querySelector<HTMLButtonElement>('[data-audio-toggle]')!;
+    expect(toggle.querySelector('.aden-audio-label')?.textContent).toBe('Música y sonido');
+    expect(toggle.getAttribute('aria-label')).toBe('Música y sonido');
+    audio.toggleMuted();
+    expect(toggle.querySelector('.aden-audio-label')?.textContent).toBe('Sonido apagado');
+    expect(toggle.getAttribute('aria-label')).toBe('Sonido apagado');
+  });
   it('shows the current piece, adjusts channels and reflects the N mute state', () => {
     const audio = new AudioEngine(() => null, null);
     const panel = new AudioPanel(audio);

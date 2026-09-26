@@ -65,7 +65,13 @@ export class AudioPanel {
 
   private refresh(): void {
     const settings = this.audio.settings, track = this.audio.currentSoundtrack;
-    this.toggle.textContent = settings.muted ? '♫  Sonido apagado' : '♫  Música y sonido';
+    // Ícono y texto separados: en pantallas angostas el CSS deja sólo el ícono.
+    const state = settings.muted ? 'Sonido apagado' : 'Música y sonido';
+    const icon = document.createElement('span'), label = document.createElement('span');
+    icon.textContent = '♫'; icon.setAttribute('aria-hidden', 'true');
+    label.className = 'aden-audio-label'; label.textContent = state;
+    this.toggle.replaceChildren(icon, label);
+    this.toggle.setAttribute('aria-label', state);
     this.title.textContent = track?.title ?? 'El viaje está por comenzar';
     this.description.textContent = track?.description ?? 'La música acompaña al mapa que estés explorando.';
     this.mute.textContent = settings.muted ? 'Activar sonido' : 'Silenciar todo';

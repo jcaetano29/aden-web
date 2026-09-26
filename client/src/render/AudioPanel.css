@@ -26,3 +26,10 @@
 @media (max-height: 650px) {
   .aden-audio .aden-audio-mixer { position: fixed; top: 12px; right: 12px; max-height: calc(100vh - 24px); }
 }
+.aden-audio-label { margin-left: 8px; }
+/* Pantallas angostas: el botón queda como ícono para no tapar los controles del chat. */
+@media (max-width: 640px) {
+  .aden-audio { width: auto; }
+  .aden-audio-toggle { width: 44px; padding: 8px 0; font-size: 16px; }
+  .aden-audio-label { display: none; }
+}

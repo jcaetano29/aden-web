@@ -45,3 +45,7 @@
   .aden-chat-header { gap: 8px; }
   .aden-chat { font-size: 14px; }
 }
+/* Deja libre la columna derecha (música y rastreador de misión, 28vw) en pantallas angostas. */
+@media (max-width: 640px) {
+  .aden-chat { width: min(390px, calc(72vw - 34px)); }
+}
