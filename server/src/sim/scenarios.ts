@@ -1,8 +1,8 @@
-import { SPAWN_ZONES, getItem, dungeonReward, createItemInstance, CRYPT_BOSS } from '@aden/shared';
+import { SPAWN_ZONES, getItem, getQuest, questReward, dungeonReward, createItemInstance, CRYPT_BOSS } from '@aden/shared';
 import type { GameRoom } from '../rooms/GameRoom.js';
 import type { Profile, Scenario } from './BalanceSimulator.js';
 
-export type GearStage = 'ruins' | 'crypt' | 'throne' | 'act2';
+export type GearStage = 'ruins' | 'crypt' | 'throne' | 'act2' | 'mines' | 'mines_late';
 
 function spawnOf(templateId: string): { mapId: string; x: number; z: number } {
   const zone = SPAWN_ZONES.find(z => z.templateId === templateId);
@@ -21,6 +21,8 @@ export function gearFor(className: string, stage: GearStage): Record<string, str
     case 'crypt': return { weapon: early, armor: 'crypt_plate', ...trinkets };
     case 'throne': return { weapon: crypt, armor: 'ash_guard', ...trinkets };
     case 'act2': return { weapon: crypt, armor: 'nihil_aegis', ...trinkets };
+    case 'mines': return { weapon: crypt, armor: 'nihil_aegis', accessory: 'memory_locket', ring: trinkets.ring };
+    case 'mines_late': return { weapon: questReward(getQuest('f_foreman'), className)!, armor: 'nihil_aegis', accessory: 'memory_locket', ring: trinkets.ring };
   }
 }
 
@@ -45,6 +47,17 @@ export function baselineScenarios(className: string): Scenario[] {
     scenario('Guardia', 'memory_guard', profile(className, 13, 'act2')),
     scenario('Carcelero', 'memory_jailer', profile(className, 14, 'act2')),
     scenario('Prior', 'memory_prior', profile(className, 15, 'act2', 'a2_prior')),
+  ];
+}
+
+/** Enemigos de las Minas al nivel previsto de la ruta. */
+export function minesScenarios(className: string): Scenario[] {
+  return [
+    scenario('Excavador', 'mine_digger', profile(className, 15, 'mines')),
+    scenario('Armadura', 'mine_armor', profile(className, 16, 'mines')),
+    scenario('Troll', 'cave_troll', profile(className, 18, 'mines')),
+    scenario('Capataz', 'mine_foreman', profile(className, 19, 'mines')),
+    scenario('Halden', 'halden', profile(className, 20, 'mines_late', 'f_halden')),
   ];
 }
 

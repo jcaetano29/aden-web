@@ -166,13 +166,16 @@ export class BalanceSimulator {
       const potion = HP_POTIONS.find(id => (p.inventory.get(id)?.qty ?? 0) > 0);
       if (potion) { this.send(MessageType.UseItem, { itemTemplateId: potion }); used = 1; }
     }
-    if (!p.targetId) this.send(MessageType.SetTarget, { targetId: TARGET_ID });
+    // Una persona atenta despeja primero los refuerzos del jefe.
+    const add = [...this.room.state.mobs.entries()].find(([, m]) => m.summonedBy === TARGET_ID && !m.dead && m.mapId === p.mapId);
+    const [targetId, target] = add ?? [TARGET_ID, mob];
+    if (p.targetId !== targetId) this.send(MessageType.SetTarget, { targetId });
     for (const s of this.castable(p)) this.send(MessageType.UseSkill, { skillId: s.id });
     const range = weaponRange(playerLoadout(p));
-    const d = distance2D(p.x, p.z, mob.x, mob.z);
+    const d = distance2D(p.x, p.z, target.x, target.z);
     if (d > range * 0.9) {
       const k = (d - range * 0.7) / d;
-      const goal = { x: p.x + (mob.x - p.x) * k, z: p.z + (mob.z - p.z) * k };
+      const goal = { x: p.x + (target.x - p.x) * k, z: p.z + (target.z - p.z) * k };
       if (!(mob.hazardMs > 0 && inHazard(mob, goal.x, goal.z))) this.send(MessageType.MoveTo, goal);
     }
     return used;

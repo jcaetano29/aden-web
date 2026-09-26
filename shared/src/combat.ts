@@ -19,10 +19,10 @@ export const PLAYER_COMBAT: CombatStats = { maxHp: 100, maxMp: 50, pAtk: 15, pDe
 // de dificultad entre zonas es lo que gatea la progresión sin muros.
 export const MOB_COMBAT: Record<string, CombatStats> = {
   mine_digger: { maxHp: 1400, pAtk: 90, pDef: 46, attackCooldownMs: 2200 },
-  mine_armor: { maxHp: 1650, pAtk: 95, pDef: 54, attackCooldownMs: 2400 },
-  cave_troll: { maxHp: 2100, pAtk: 108, pDef: 58, attackCooldownMs: 2600 },
-  mine_foreman: { maxHp: 6200, pAtk: 122, pDef: 64, attackCooldownMs: 2600 },
-  halden: { maxHp: 11500, pAtk: 140, pDef: 70, attackCooldownMs: 2400 },
+  mine_armor: { maxHp: 1400, pAtk: 95, pDef: 54, attackCooldownMs: 2400 },
+  cave_troll: { maxHp: 1500, pAtk: 108, pDef: 58, attackCooldownMs: 2600 },
+  mine_foreman: { maxHp: 3950, pAtk: 122, pDef: 64, attackCooldownMs: 2600 },
+  halden: { maxHp: 8750, pAtk: 133, pDef: 70, attackCooldownMs: 2400 },
   iron_colossus: { maxHp: 9800, pAtk: 175, pDef: 84, attackCooldownMs: 2800 },
   memory_guard: { maxHp:650, pAtk:80, pDef:42, attackCooldownMs:2200 },
   memory_jailer: { maxHp:2300, pAtk:105, pDef:54, attackCooldownMs:2600 },

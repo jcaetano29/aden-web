@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { CLASS_ORDER } from '@aden/shared';
 import { BalanceSimulator, type Behavior, type FightResult } from '../src/sim/BalanceSimulator.js';
-import { baselineScenarios, manaProfile } from '../src/sim/scenarios.js';
+import { baselineScenarios, manaProfile, minesScenarios } from '../src/sim/scenarios.js';
 
 const OUT = '../artifacts/balance';
 const sim = await BalanceSimulator.start();
@@ -12,6 +12,15 @@ try {
     const report = { max: sim.manaRun(profile, 'max'), primary: sim.manaRun(profile, 'primary') };
     writeFileSync(`${OUT}/mana.json`, JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report));
+  } else if (process.argv.includes('--mines')) {
+    const rows: FightResult[] = [];
+    for (const cls of CLASS_ORDER) for (const s of minesScenarios(cls)) for (const b of ['attentive', 'stationary'] as Behavior[]) rows.push(sim.fight(s, b));
+    writeFileSync(`${OUT}/mines.json`, JSON.stringify(rows, null, 2));
+    for (const name of [...new Set(rows.map(r => r.scenario))]) {
+      const attentive = rows.filter(r => r.scenario === name && r.behavior === 'attentive');
+      const times = attentive.filter(r => r.outcome === 'kill').map(r => r.seconds).sort((a, b) => a - b);
+      console.log(`${name}: mediana ${times[Math.floor(times.length / 2)] ?? '—'} s · atento ${attentive.map(r => `${r.className}:${r.outcome}/${r.seconds}`).join(' ')} · quieto ${rows.filter(r => r.scenario === name && r.behavior === 'stationary').map(r => r.outcome).join(',')}`);
+    }
   } else {
     const rows: FightResult[] = [];
     for (const cls of CLASS_ORDER) for (const s of baselineScenarios(cls)) for (const b of ['attentive', 'stationary'] as Behavior[]) rows.push(sim.fight(s, b));

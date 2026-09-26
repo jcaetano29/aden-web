@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BalanceSimulator, balancedAttributes, seededRandom } from './BalanceSimulator.js';
-import { baselineScenarios, manaProfile } from './scenarios.js';
+import { baselineScenarios, manaProfile, minesScenarios } from './scenarios.js';
+import { CLASS_ORDER } from '@aden/shared';
 
 describe('BalanceSimulator', () => {
   let sim: BalanceSimulator;
@@ -29,6 +30,21 @@ describe('BalanceSimulator', () => {
     expect(max!).toBeGreaterThanOrEqual(40);
     expect(max!).toBeLessThanOrEqual(70);
     expect(sim.manaRun(manaProfile(), 'primary')).toBeNull();
+  });
+  it('calibrates the Mines: normals 5–9 s, the foreman 15–30 s and Halden 60–100 s (median, attentive)', () => {
+    const median = (name: string) => {
+      const t = CLASS_ORDER.map(cls => sim.fight(minesScenarios(cls).find(s => s.name === name)!, 'attentive'))
+        .map(r => r.outcome === 'kill' ? r.seconds : Infinity).sort((a, b) => a - b);
+      return t[Math.floor(t.length / 2)];
+    };
+    for (const name of ['Excavador', 'Armadura', 'Troll']) { const m = median(name); expect(m, name).toBeGreaterThanOrEqual(5); expect(m, name).toBeLessThanOrEqual(9); }
+    const foreman = median('Capataz'); expect(foreman).toBeGreaterThanOrEqual(15); expect(foreman).toBeLessThanOrEqual(30);
+    const halden = median('Halden'); expect(halden).toBeGreaterThanOrEqual(60); expect(halden).toBeLessThanOrEqual(100);
+  });
+  it('lets an attentive knight beat Halden but not a stationary one', () => {
+    const halden = minesScenarios('knight').find(s => s.name === 'Halden')!;
+    expect(sim.fight(halden, 'attentive').outcome).toBe('kill');
+    expect(sim.fight(halden, 'stationary').outcome).not.toBe('kill');
   });
   it('keeps a far lower level character from beating a boss', () => {
     const prior = baselineScenarios('knight').find(s => s.templateId === 'memory_prior')!;
