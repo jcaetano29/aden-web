@@ -108,19 +108,19 @@ export const POWER_STRIKE: SkillConfig = { id: "power_strike", name: "Golpe Pode
 // Etapa 22: 6 skills por clase con roles + counterplay. Números afinables.
 export const SKILLS: Record<string, SkillConfig> = {
   ...ITEM_SKILLS,
-  aimed_shot: { id:"aimed_shot", name:"Tiro del Vigía", type:"damage", factor:2.2, mpCost:10, cooldownMs:3500, range:10, projectile:true, vfxColor:0x8cce74 },
+  aimed_shot: { id:"aimed_shot", name:"Tiro del Vigía", type:"damage", factor:2.8, mpCost:10, cooldownMs:3500, range:10, projectile:true, vfxColor:0x8cce74 },
   trail_mend: { id:"trail_mend", name:"Aliento del Bosque", type:"heal", healPct:.25, mpCost:15, cooldownMs:12000, vfxColor:0x71ca97 },
-  snaring_shot: { id:"snaring_shot", name:"Flecha de Zarzas", type:"damage", factor:1.6, rootMs:1200, mpCost:16, cooldownMs:7000, range:10, projectile:true, vfxColor:0x81a65f },
+  snaring_shot: { id:"snaring_shot", name:"Flecha de Zarzas", type:"damage", factor:2.2, rootMs:1200, mpCost:16, cooldownMs:7000, range:10, projectile:true, vfxColor:0x81a65f },
   retreat: { id:"retreat", name:"Paso del Sendero", type:"dash", dash:"away", dashRange:7, mpCost:14, cooldownMs:9000, vfxColor:0x9de5b1 },
   eagle_focus: { id:"eagle_focus", name:"Ojo del Horizonte", type:"buff", buffStat:"pAtk", buffMult:1.4, buffMs:5000, mpCost:20, cooldownMs:16000, vfxColor:0xffd77f },
   piercing_shot: { id:"piercing_shot", name:"Saeta del Alba", type:"damage", factor:4.2, mpCost:30, cooldownMs:14000, range:12, projectile:true, vfxColor:0xffeaaa },
   power_strike: POWER_STRIKE,
 
   // ── Caballero (tanque / control) ──
-  shield_bash: { id: "shield_bash", name: "Golpe de Escudo", mpCost: 10, cooldownMs: 5000, type: "damage", factor: 2.0, stunMs: 900, vfxColor: 0x9ecbff },
+  shield_bash: { id: "shield_bash", name: "Golpe de Escudo", mpCost: 10, cooldownMs: 5000, type: "damage", factor: 3.4, stunMs: 900, vfxColor: 0x9ecbff },
   guard: { id: "guard", name: "Guardia", mpCost: 12, cooldownMs: 12000, type: "buff", buffStat: "pDef", buffMult: 1.6, buffMs: 6000, vfxColor: 0x4fa3ff },
   second_wind: { id: "second_wind", name: "Segundo Aire", mpCost: 16, cooldownMs: 14000, type: "heal", healPct: 0.4, vfxColor: 0x66e08a },
-  shield_charge: { id: "shield_charge", range: 12, name: "Carga con Escudo", mpCost: 16, cooldownMs: 9000, type: "damage", factor: 1.8, dash: "toTarget", rootMs: 1200, vfxColor: 0xbfe0ff },
+  shield_charge: { id: "shield_charge", range: 12, name: "Carga con Escudo", mpCost: 16, cooldownMs: 9000, type: "damage", factor: 3.0, dash: "toTarget", rootMs: 1200, vfxColor: 0xbfe0ff },
   iron_will: { id: "iron_will", name: "Voluntad de Hierro", mpCost: 18, cooldownMs: 18000, type: "buff", buffStat: "pDef", buffMult: 1.4, buffMs: 5000, cleanse: true, vfxColor: 0xffe066 },
   last_stand: { id: "last_stand", name: "Última Resistencia", mpCost: 28, cooldownMs: 40000, type: "buff", buffStat: "pDef", buffMult: 2.0, buffMs: 8000, healPct: 0.25, vfxColor: 0xffd54f },
 

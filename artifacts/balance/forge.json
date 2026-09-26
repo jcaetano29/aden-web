@@ -6,8 +6,8 @@
     "level": 21,
     "enemyLevel": 21,
     "outcome": "kill",
-    "seconds": 16.7,
-    "hpLostPct": 19,
+    "seconds": 9.1,
+    "hpLostPct": 11,
     "potions": 0
   },
   {
@@ -17,41 +17,41 @@
     "level": 21,
     "enemyLevel": 21,
     "outcome": "kill",
-    "seconds": 31.1,
-    "hpLostPct": 51,
-    "potions": 0
-  },
-  {
-    "scenario": "Draco",
-    "className": "knight",
-    "behavior": "attentive",
-    "level": 22,
-    "enemyLevel": 22,
-    "outcome": "kill",
-    "seconds": 16.4,
-    "hpLostPct": 18,
-    "potions": 0
-  },
-  {
-    "scenario": "Draco",
-    "className": "knight",
-    "behavior": "stationary",
-    "level": 22,
-    "enemyLevel": 22,
-    "outcome": "kill",
-    "seconds": 29.5,
+    "seconds": 25.3,
     "hpLostPct": 41,
     "potions": 0
   },
   {
+    "scenario": "Draco",
+    "className": "knight",
+    "behavior": "attentive",
+    "level": 22,
+    "enemyLevel": 22,
+    "outcome": "kill",
+    "seconds": 9.1,
+    "hpLostPct": 11,
+    "potions": 0
+  },
+  {
+    "scenario": "Draco",
+    "className": "knight",
+    "behavior": "stationary",
+    "level": 22,
+    "enemyLevel": 22,
+    "outcome": "kill",
+    "seconds": 23.7,
+    "hpLostPct": 36,
+    "potions": 0
+  },
+  {
     "scenario": "Guardián",
     "className": "knight",
     "behavior": "attentive",
     "level": 23,
     "enemyLevel": 23,
     "outcome": "kill",
-    "seconds": 16.7,
-    "hpLostPct": 18,
+    "seconds": 9.1,
+    "hpLostPct": 14,
     "potions": 0
   },
   {
@@ -61,8 +61,8 @@
     "level": 23,
     "enemyLevel": 23,
     "outcome": "kill",
-    "seconds": 29.5,
-    "hpLostPct": 52,
+    "seconds": 25.3,
+    "hpLostPct": 40,
     "potions": 0
   },
   {
@@ -72,8 +72,8 @@
     "level": 24,
     "enemyLevel": 24,
     "outcome": "kill",
-    "seconds": 46.8,
-    "hpLostPct": 43,
+    "seconds": 28.5,
+    "hpLostPct": 25,
     "potions": 0
   },
   {
@@ -94,9 +94,9 @@
     "level": 25,
     "enemyLevel": 25,
     "outcome": "kill",
-    "seconds": 259.9,
-    "hpLostPct": 60,
-    "potions": 8
+    "seconds": 111.5,
+    "hpLostPct": 42,
+    "potions": 0
   },
   {
     "scenario": "Vharzul",
@@ -446,8 +446,8 @@
     "level": 21,
     "enemyLevel": 21,
     "outcome": "kill",
-    "seconds": 10.7,
-    "hpLostPct": 27,
+    "seconds": 8.6,
+    "hpLostPct": 20,
     "potions": 0
   },
   {
@@ -468,7 +468,7 @@
     "level": 22,
     "enemyLevel": 22,
     "outcome": "kill",
-    "seconds": 10,
+    "seconds": 8.5,
     "hpLostPct": 20,
     "potions": 0
   },
@@ -490,7 +490,7 @@
     "level": 23,
     "enemyLevel": 23,
     "outcome": "kill",
-    "seconds": 10.7,
+    "seconds": 8.6,
     "hpLostPct": 28,
     "potions": 0
   },
@@ -512,7 +512,7 @@
     "level": 24,
     "enemyLevel": 24,
     "outcome": "kill",
-    "seconds": 29.6,
+    "seconds": 25.4,
     "hpLostPct": 46,
     "potions": 0
   },
@@ -534,9 +534,9 @@
     "level": 25,
     "enemyLevel": 25,
     "outcome": "kill",
-    "seconds": 105.6,
-    "hpLostPct": 58,
-    "potions": 2
+    "seconds": 83.3,
+    "hpLostPct": 56,
+    "potions": 1
   },
   {
     "scenario": "Vharzul",

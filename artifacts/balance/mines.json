@@ -6,8 +6,8 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 11.7,
-    "hpLostPct": 17,
+    "seconds": 8.1,
+    "hpLostPct": 7,
     "potions": 0
   },
   {
@@ -17,8 +17,8 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 34.3,
-    "hpLostPct": 60,
+    "seconds": 28.3,
+    "hpLostPct": 49,
     "potions": 0
   },
   {
@@ -28,8 +28,8 @@
     "level": 16,
     "enemyLevel": 16,
     "outcome": "kill",
-    "seconds": 11.7,
-    "hpLostPct": 17,
+    "seconds": 8.1,
+    "hpLostPct": 7,
     "potions": 0
   },
   {
@@ -39,8 +39,8 @@
     "level": 16,
     "enemyLevel": 16,
     "outcome": "kill",
-    "seconds": 34.3,
-    "hpLostPct": 54,
+    "seconds": 28.3,
+    "hpLostPct": 44,
     "potions": 0
   },
   {
@@ -50,8 +50,8 @@
     "level": 18,
     "enemyLevel": 18,
     "outcome": "kill",
-    "seconds": 11.7,
-    "hpLostPct": 12,
+    "seconds": 8.1,
+    "hpLostPct": 7,
     "potions": 0
   },
   {
@@ -61,8 +61,8 @@
     "level": 18,
     "enemyLevel": 18,
     "outcome": "kill",
-    "seconds": 34.3,
-    "hpLostPct": 48,
+    "seconds": 28.3,
+    "hpLostPct": 38,
     "potions": 0
   },
   {
@@ -72,8 +72,8 @@
     "level": 19,
     "enemyLevel": 19,
     "outcome": "kill",
-    "seconds": 33.3,
-    "hpLostPct": 29,
+    "seconds": 21.6,
+    "hpLostPct": 18,
     "potions": 0
   },
   {
@@ -94,9 +94,9 @@
     "level": 20,
     "enemyLevel": 20,
     "outcome": "kill",
-    "seconds": 159.4,
-    "hpLostPct": 60,
-    "potions": 4
+    "seconds": 91.6,
+    "hpLostPct": 57,
+    "potions": 1
   },
   {
     "scenario": "Halden",
@@ -446,8 +446,8 @@
     "level": 15,
     "enemyLevel": 15,
     "outcome": "kill",
-    "seconds": 10.9,
-    "hpLostPct": 27,
+    "seconds": 9.4,
+    "hpLostPct": 21,
     "potions": 0
   },
   {
@@ -468,7 +468,7 @@
     "level": 16,
     "enemyLevel": 16,
     "outcome": "kill",
-    "seconds": 10.9,
+    "seconds": 9.4,
     "hpLostPct": 22,
     "potions": 0
   },
@@ -490,7 +490,7 @@
     "level": 18,
     "enemyLevel": 18,
     "outcome": "kill",
-    "seconds": 10.9,
+    "seconds": 9.4,
     "hpLostPct": 21,
     "potions": 0
   },
@@ -512,7 +512,7 @@
     "level": 19,
     "enemyLevel": 19,
     "outcome": "kill",
-    "seconds": 28.3,
+    "seconds": 25.3,
     "hpLostPct": 45,
     "potions": 0
   },
@@ -534,9 +534,9 @@
     "level": 20,
     "enemyLevel": 20,
     "outcome": "kill",
-    "seconds": 207.5,
-    "hpLostPct": 72,
-    "potions": 5
+    "seconds": 80.8,
+    "hpLostPct": 58,
+    "potions": 2
   },
   {
     "scenario": "Halden",
@@ -545,7 +545,7 @@
     "level": 20,
     "enemyLevel": 20,
     "outcome": "death",
-    "seconds": 22,
+    "seconds": 18.9,
     "hpLostPct": 100,
     "potions": 0
   }

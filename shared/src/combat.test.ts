@@ -69,7 +69,7 @@ describe("skills y config defensiva", () => {
     const skill = getSkill("shield_bash");
     expect(skill.mpCost).toBe(10);
     expect(skill.cooldownMs).toBe(5000);
-    expect(skill.factor).toBe(2.0);
+    expect(skill.factor).toBe(3.4);
 
     expect(getSkill("fireball").mpCost).toBe(16);
     expect(getSkill("fireball").factor).toBe(3.4);

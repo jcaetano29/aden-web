@@ -58,6 +58,17 @@ describe('BalanceSimulator', () => {
     expect(sim.fight(vharzul, 'attentive').outcome).toBe('kill');
     expect(sim.fight(vharzul, 'stationary').outcome).not.toBe('kill');
   });
+  it('lets every class beat Halden and Vharzul within 1.5× the median time', () => {
+    for (const [set, name] of [[minesScenarios, 'Halden'], [forgeScenarios, 'Vharzul']] as const) {
+      const results = CLASS_ORDER.map(cls => sim.fight(set(cls).find(s => s.name === name)!, 'attentive'));
+      const times = results.map(r => r.outcome === 'kill' ? r.seconds : Infinity).sort((a, b) => a - b);
+      const limit = times[Math.floor(times.length / 2)] * 1.5;
+      for (const r of results) {
+        expect(r.outcome, `${r.className} vs ${name}`).toBe('kill');
+        expect(r.seconds, `${r.className} vs ${name}`).toBeLessThanOrEqual(limit);
+      }
+    }
+  });
   it('keeps a far lower level character from beating a boss', () => {
     const prior = baselineScenarios('knight').find(s => s.templateId === 'memory_prior')!;
     const r = sim.fight({ ...prior, profile: { ...prior.profile, level: 8 } }, 'stationary', 1, 30);
