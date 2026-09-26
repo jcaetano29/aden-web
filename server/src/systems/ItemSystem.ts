@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
-import { getItem, createItemInstance, rollItemOptions, canEquipItem, upgradeItem, getZone, getSkill, nearestWalkable, CATALOG_ITEMS, type Loadout } from '@aden/shared';
+import { getItem, createItemInstance, rollItemOptions, canEquipItem, upgradeItem, getZone, getSkill, nearestWalkable, CATALOG_ITEMS, type Loadout, type QualityOdds } from '@aden/shared';
 import { PlayerState } from '../state/PlayerState.js';
 import { InventoryItemState } from '../state/InventoryItemState.js';
 
 export function playerLoadout(p:PlayerState):Loadout { return Object.fromEntries(p.equipment.entries()); }
-export function instantiateItem(id:string, random=false, maxExcellent=2):string {
+export function instantiateItem(id:string, random=false, maxExcellent=2, odds?:QualityOdds):string {
   const item=getItem(id);
   return item.type==='equipment' && item.allowedQualities?.length && !item.options
-    ? createItemInstance(item,random?rollItemOptions(item,Math.random,maxExcellent):{},randomUUID()) : id;
+    ? createItemInstance(item,random?rollItemOptions(item,Math.random,maxExcellent,odds):{},randomUUID()) : id;
 }
 export function grantItem(p:PlayerState,id:string,qty:number):void {
   if(!Number.isSafeInteger(qty)||qty<=0||qty>10000) return;

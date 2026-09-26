@@ -1,6 +1,6 @@
 import type { EquipSlot, Rarity, StatBonuses } from "./equipment.js";
 import { resolveItemInstance, type ItemOptions, type ItemQuality } from "./itemOptions.js";
-import { CATALOG_ITEMS } from './catalog.js';
+import { CATALOG_ITEMS, type CatalogItem } from './catalog.js';
 
 export interface ItemTemplate {
   id: string;
@@ -31,6 +31,20 @@ export interface ItemTemplate {
   bonuses?: StatBonuses;
 }
 
+// Las piezas sin calidad valen por lo que hacen: las gemas de mejora y los tomos de más daño
+// son raros; el resto del catálogo muestra la calidad con la que cae (Normal, Mágico, Excelente).
+const RARE_TOMES = new Set(['tome_hellfire', 'tome_meteorite', 'tome_evil_spirit']);
+const UNCOMMON_TOMES = new Set(['tome_flame', 'tome_fire_ball', 'tome_lightning', 'tome_teleport']);
+function catalogRarity(item: CatalogItem): Rarity | undefined {
+  if (item.category === 'joya') return 'rare';
+  if (!item.learnSkill) return undefined;
+  return RARE_TOMES.has(item.learnSkill) ? 'rare' : UNCOMMON_TOMES.has(item.learnSkill) ? 'uncommon' : undefined;
+}
+const CATALOG_WITH_RARITY = Object.fromEntries(Object.entries(CATALOG_ITEMS).map(([id, item]) => {
+  const rarity = catalogRarity(item);
+  return [id, rarity ? { ...item, rarity } : item];
+}));
+
 export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
   veil_charm: {id:'veil_charm',name:'Amuleto del Regreso',type:'equipment',stackable:false,slot:'accessory',rarity:'uncommon',requiredLevel:12,bonuses:{maxHp:50,pDef:4},description:'Boren lo entrega a quienes hacen posible el regreso de los viajeros.'},
   ember_dagger: { id: 'ember_dagger', name: 'Daga de Brasa', type: 'equipment', stackable: false, category: 'arma', subcategory: 'espada', classes: ['rogue'], hands: '1H', slot: 'weapon', rarity: 'rare', requiredLevel: 24, bonuses: { pAtk: 23 }, description: 'Templada en la última colada del Fundidor. Todavía despide calor al desenvainarla.' },
@@ -40,7 +54,7 @@ export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
   anvil_staff: { id: 'anvil_staff', name: 'Báculo del Yunque', type: 'equipment', stackable: false, category: 'arma', subcategory: 'baston', classes: ['mage'], hands: '2H', slot: 'weapon', rarity: 'rare', requiredLevel: 21, bonuses: { pAtk: 21 }, description: 'Hierro negro coronado por una piedra de fragua. Halden lo usaba para medir el calor del metal.' },
   miner_amulet: { id: 'miner_amulet', name: 'Amuleto del Minero', type: 'equipment', stackable: false, slot: 'accessory', rarity: 'uncommon', requiredLevel: 15, bonuses: { maxHp: 80, pDef: 6 }, description: 'Cada minero de la cuadrilla de Tobías lleva uno. Dicen que avisa cuando el techo cede.' },
   memory_locket: { id:'memory_locket', name:'Relicario de los Nombres', type:'equipment', stackable:false, slot:'accessory', rarity:'rare', requiredLevel:15, bonuses:{pAtk:8,pDef:6,maxMp:65}, description:'Los recuerdos devueltos a los vivos. Recompensa de la Vigilia.' },
-  ...CATALOG_ITEMS,
+  ...CATALOG_WITH_RARITY,
   gold: { id: "gold", name: "Oro", type: "currency", stackable: true },
   bone: { id: "bone", name: "Hueso", type: "material", stackable: true },
   health_potion: { id: "health_potion", name: "Poción de Vida", type: "consumable", stackable: true, heal: 60 },

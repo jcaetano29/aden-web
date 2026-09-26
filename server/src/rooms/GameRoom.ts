@@ -15,7 +15,7 @@ import { characterGender, isCharacterGender } from '@aden/shared';
 import colyseusPkg from "colyseus";
 import type { Client } from "colyseus";
 import { randomUUID } from 'node:crypto';
-import { catalogDropPool, dungeonReward, questReward, createItemInstance } from '@aden/shared';
+import { rollCatalogDrop, lootSourceFor, LOOT_QUALITY_ODDS, dungeonReward, questReward, createItemInstance } from '@aden/shared';
 import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, resetDungeon } from '../systems/AdventureSystem.js';
 import { stepEncounter } from '../systems/EncounterSystem.js';
 const { Room } = colyseusPkg;
@@ -1240,15 +1240,13 @@ export class GameRoom extends Room<GameState> {
   /** Rueda una tabla de loot y deja los ítems en el piso (mobs y objetos de mundo). */
   private dropLoot(lootId: string, x: number, z: number, mapId: string, goldBonus=0): void {
     const drops=rollDrops(lootId, Math.random);
-    // Un roll adicional por muerte/cofre, acotado a la profundidad del mapa.
-    if(lootId!=='breakable' && Math.random() < (lootId==='skeleton_king'?.9:.25)) {
-      const pool=catalogDropPool(mapId,lootId);
-      const chosen=pool[Math.floor(Math.random()*pool.length)];
-      if(chosen)drops.push({itemTemplateId:chosen,qty:getItem(chosen).category==='municion'?30:1});
-    }
+    // Una pieza del catálogo por muerte/cofre: la fuente decide cuán seguido y cuán buena sale.
+    const chosen=lootId==='breakable'?undefined:rollCatalogDrop(mapId,lootId,Math.random);
+    if(chosen)drops.push({itemTemplateId:chosen,qty:getItem(chosen).category==='municion'?30:1});
+    const odds=LOOT_QUALITY_ODDS[lootSourceFor(lootId)];
     for (const [index, d] of drops.entries()) {
       const item = new DroppedItemState();
-      item.itemTemplateId = instantiateItem(d.itemTemplateId,true,lootId==='skeleton_king'?6:2);
+      item.itemTemplateId = instantiateItem(d.itemTemplateId,true,lootId==='skeleton_king'?6:2,odds);
       item.qty = d.itemTemplateId==='gold'?Math.round(d.qty*(1+goldBonus)):d.qty;
       item.mapId = mapId;
       const position = dropPosition(this.state,mapId,x,z,index);

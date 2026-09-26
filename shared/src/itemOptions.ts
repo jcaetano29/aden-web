@@ -114,20 +114,24 @@ export function upgradeItem(item: ItemTemplate, effect: string, rng: () => numbe
   return o;
 }
 
-export function rollItemOptions(item: ItemTemplate, rng: () => number, maxExcellent=2): ItemOptions {
+/** Probabilidad de Excelente y de mejora +N al soltar una pieza (el contenido difícil da mejores tiradas). */
+export interface QualityOdds { excellent: number; upgrade: number }
+export const DEFAULT_QUALITY_ODDS: QualityOdds = { excellent: .04, upgrade: .2 };
+
+export function rollItemOptions(item: ItemTemplate, rng: () => number, maxExcellent=2, odds: QualityOdds = DEFAULT_QUALITY_ODDS): ItemOptions {
   const o = defaultOptions();
   const roll = rng();
-  if (item.allowedQualities?.includes('excellent') && roll < .04) {
+  if (item.allowedQualities?.includes('excellent') && roll < odds.excellent) {
     o.quality = 'excellent';
     o.excellent = [Math.min(5,Math.floor(rng()*6))];
     while(o.excellent.length<Math.min(6,Math.max(1,maxExcellent)) && rng()<.2){
       const remaining=[0,1,2,3,4,5].filter(n=>!o.excellent.includes(n));
       o.excellent.push(remaining[Math.min(remaining.length-1,Math.floor(rng()*remaining.length))]);
     }
-  } else if (item.allowedQualities?.includes('magic') && roll < .25 && ['arma','armadura','escudo','alas'].includes(item.category ?? '')) {
+  } else if (item.allowedQualities?.includes('magic') && roll < odds.excellent + .21 && ['arma','armadura','escudo','alas'].includes(item.category ?? '')) {
     o.quality = 'magic'; o.luck = true;
   }
-  if (['arma','armadura','escudo','alas'].includes(item.category ?? '') && rng() < .2) o.level = 1+Math.min(2,Math.floor(rng()*3));
+  if (['arma','armadura','escudo','alas'].includes(item.category ?? '') && rng() < odds.upgrade) o.level = 1+Math.min(2,Math.floor(rng()*3));
   if(item.category==='arma' && item.allowedQualities?.includes('magic') && rng()<.1){o.skill=true;if(o.quality==='normal')o.quality='magic';}
   return o;
 }

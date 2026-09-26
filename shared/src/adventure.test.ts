@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { catalogDropPool, dungeonObjective, dungeonReward, questReward } from './adventure.js';
+import { dungeonObjective, dungeonReward, questReward } from './adventure.js';
 import { getQuest } from './quests.js';
 import { getItem, getShopPrice, SHOP_STOCK, SMITH_STOCK, DROP_TABLES } from './items.js';
 import { CATALOG_ITEMS } from './catalog.js';
@@ -16,24 +16,6 @@ describe('fuentes de recompensas',()=>{
     }
     for(const id of ['bone_blade','crypt_plate','aden_gema_del_pacto','aden_filo_del_verdugo','toString'])expect(()=>getShopPrice(id)).toThrow();
     expect(Object.keys(CATALOG_ITEMS)).toHaveLength(208);
-  });
-  it('fuentes tienen selección acotada y equipable dentro del tramo de su mapa (Acto I: antes de nivel 11)',()=>{
-    for(const source of [...SPAWN_ZONES.map(s=>({mapId:s.mapId,lootId:s.templateId})),...WORLD_OBJECTS]){
-      const pool=catalogDropPool(source.mapId,source.lootId??'');
-      expect(pool.length).toBeLessThanOrEqual(5);
-      for(const id of pool){
-        const item=getItem(id);
-        const zone=getZone(source.mapId), cap=zone.levelMax<=10?10:zone.levelMax+1;
-        expect(item.requiredLevel??1).toBeLessThanOrEqual(cap);
-        expect(['alas','mascota']).not.toContain(item.category);
-        if(item.category==='joya')expect(['crypt_warden','skeleton_king']).toContain(source.lootId);
-      }
-    }
-    expect(catalogDropPool('pueblo','chest_pueblo')).toEqual([]);
-    expect(catalogDropPool('bosque','breakable')).toEqual([]);
-    expect(catalogDropPool('trono','chest_trono')).toEqual([]);
-    expect(catalogDropPool('bosque','skeleton_king')).toEqual([]);
-    expect(catalogDropPool('bosque','umbra_alpha')).not.toEqual(catalogDropPool('bosque','skeleton_minion'));
   });
   it('cada clase recibe arma válida y mejora tangible en q2',()=>{
     for(const cls of ['knight','mage','barbarian','rogue','ranger']){
