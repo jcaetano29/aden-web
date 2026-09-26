@@ -1,4 +1,4 @@
-import { pvePower, getNpc, potionResource, getEncounter, encounterInterruptFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
+import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterInterruptFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
@@ -621,7 +621,7 @@ export class GameRoom extends Room<GameState> {
       if (npcId === "healer") { this.serveHealer(p); return; }
       const chain = sideChainForNpc(npcId);
       if (chain) { this.serveSideChain(p, client, chain); return; }
-      if (npc.role === 'elder') this.serveElder(p, client, npcId);
+      if (npc.role === 'elder' || campaignRoleNow(p.questId, npcId)) this.serveElder(p, client, npcId);
     });
 
     // Etapa 4b-2: handler de compra en el mercader
@@ -630,9 +630,8 @@ export class GameRoom extends Room<GameState> {
       if (!p || p.dead) return;
 
       // Gate de proximidad al pueblo (igual que interactNpc)
-      const boren = getNpc('boren');
       const townShop = p.mapId === 'pueblo' && distance2D(p.x, p.z, TOWN.x, TOWN.z) <= TOWN_SERVICE_RADIUS;
-      const fieldShop = p.mapId === boren.mapId && distance2D(p.x, p.z, boren.x, boren.z) <= 5;
+      const fieldShop = NPCS.some(n => n.shop && n.mapId === p.mapId && distance2D(p.x, p.z, n.x, n.z) <= 5);
       if (!townShop && !fieldShop) return;
 
       // Validar cantidad
@@ -1539,7 +1538,7 @@ export class GameRoom extends Room<GameState> {
           const wasBoss = isBoss(mob.templateId);
           this.spawnMob(id, mob.templateId, mob.homeX, mob.homeZ, mob.mapId);
           // Etapa 14: evento de mundo — el jefe reaparece (carrera al Trono).
-          if (wasBoss) this.broadcast(MessageType.WorldAnnounce, { text: "⚔ ¡El Rey Nihil ha despertado en su Trono!" });
+          if (wasBoss) this.broadcast(MessageType.WorldAnnounce, { text: `⚔ ¡${getTemplate(mob.templateId).name} ha despertado en ${getZone(mob.mapId).name}!` });
         }
       }
     });

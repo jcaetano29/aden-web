@@ -1,5 +1,6 @@
 import { VEIL_QUESTS } from './veil.js';
 import { MONASTERY_QUESTS } from './monastery.js';
+import { MINES_QUESTS } from './mines.js';
 import { QUEST_ORDER } from './act1.js';
 export { QUEST_ORDER, CAMPAIGN_COMPLETE } from './act1.js';
 export { nextQuestId } from './chapters.js';
@@ -98,6 +99,7 @@ export const QUESTS: Record<string, Quest> = {
 
 Object.assign(QUESTS, VEIL_QUESTS);
 Object.assign(QUESTS, MONASTERY_QUESTS);
+Object.assign(QUESTS, MINES_QUESTS);
 
 Object.assign(QUESTS, {
   q_supplies: { id: "q_supplies", title: "Provisiones extraviadas", objective: "interact", targetId: "bosque_chest_1", mapId: "bosque", mobTemplateId: "", amount: 1, rewardExp: 80, rewardGold: 20, rewardItemId: "health_potion", rewardItemQty: 3, intro: "Bram abandonó el cofre al oeste de la entrada del Bosque. Recuperá sus provisiones: Elenya necesita los remedios. Entre la carga también hay una piedra tallada del santuario. Quiero entender por qué interesó tanto a los muertos.", done: "Elenya ya tiene los remedios. Te dejó tres pociones para que puedas volver. La piedra lleva dos llamas grabadas; Bram la encontró junto al santuario de Umbra. No parece un simple adorno.", hint: "Buscá el cofre de Bram al oeste de la llegada del Bosque (250, 40). Acercate y hacé clic; después volvé con Rowan." },

@@ -33,6 +33,10 @@ export interface ItemTemplate {
 
 export const ITEM_TEMPLATES: Record<string, ItemTemplate> = {
   veil_charm: {id:'veil_charm',name:'Amuleto del Regreso',type:'equipment',stackable:false,slot:'accessory',rarity:'uncommon',requiredLevel:12,bonuses:{maxHp:50,pDef:4},description:'Boren lo entrega a quienes hacen posible el regreso de los viajeros.'},
+  gallery_dagger: { id: 'gallery_dagger', name: 'Daga de la Galería', type: 'equipment', stackable: false, category: 'arma', subcategory: 'espada', classes: ['rogue'], hands: '1H', slot: 'weapon', rarity: 'uncommon', requiredLevel: 18, bonuses: { pAtk: 19 }, description: 'Forjada en la mina para trabajar en espacios estrechos. Brenna la guardaba para un aprendiz ágil.' },
+  black_iron_fang: { id: 'black_iron_fang', name: 'Colmillo de Hierro Negro', type: 'equipment', stackable: false, category: 'arma', subcategory: 'espada', classes: ['rogue'], hands: '1H', slot: 'weapon', rarity: 'rare', requiredLevel: 21, bonuses: { pAtk: 21 }, description: 'La última hoja que Halden templó para un aprendiz. El filo guarda un brillo de fragua.' },
+  anvil_staff: { id: 'anvil_staff', name: 'Báculo del Yunque', type: 'equipment', stackable: false, category: 'arma', subcategory: 'baston', classes: ['mage'], hands: '2H', slot: 'weapon', rarity: 'rare', requiredLevel: 21, bonuses: { pAtk: 21 }, description: 'Hierro negro coronado por una piedra de fragua. Halden lo usaba para medir el calor del metal.' },
+  miner_amulet: { id: 'miner_amulet', name: 'Amuleto del Minero', type: 'equipment', stackable: false, slot: 'accessory', rarity: 'uncommon', requiredLevel: 15, bonuses: { maxHp: 80, pDef: 6 }, description: 'Cada minero de la cuadrilla de Tobías lleva uno. Dicen que avisa cuando el techo cede.' },
   memory_locket: { id:'memory_locket', name:'Relicario de los Nombres', type:'equipment', stackable:false, slot:'accessory', rarity:'rare', requiredLevel:15, bonuses:{pAtk:8,pDef:6,maxMp:65}, description:'Los recuerdos devueltos a los vivos. Recompensa de la Vigilia.' },
   ...CATALOG_ITEMS,
   gold: { id: "gold", name: "Oro", type: "currency", stackable: true },
