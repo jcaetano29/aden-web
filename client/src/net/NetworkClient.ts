@@ -115,6 +115,8 @@ export interface SelfCombatSnapshot {
   /** Contrato del Capitán (Etapa 20). */
   bountyId: string;
   bountyProgress: number;
+  /** Encargos opcionales por cadena (paso activo y progreso). */
+  sideChains: Record<string, { id: string; progress: number }>;
   /** Atributos primarios + puntos sin gastar (Etapa 21). */
   str: number;
   agi: number;
@@ -509,6 +511,7 @@ export class NetworkClient {
       bountyProgress: p.sideChains?.get?.('varek')?.progress ?? 0,
       veilContractId: p.sideChains?.get?.('boren')?.id ?? '',
       veilContractProgress: p.sideChains?.get?.('boren')?.progress ?? 0,
+      sideChains: Object.fromEntries([...(p.sideChains?.entries?.() ?? [])].map(([k, v]: [string, { id: string; progress: number }]) => [k, { id: v.id, progress: v.progress }])),
       str: p.attributes?.str ?? 0,
       agi: p.attributes?.agi ?? 0,
       vit: p.attributes?.vit ?? 0,

@@ -1,10 +1,10 @@
 import { cryptStory, dungeonObjective, getQuest, getZone, getWorldObject, getNpc, CRYPT_ROOMS, CRYPT_SEALS, CRYPT_BOSS } from "@aden/shared";
-import { VEIL_COMPLETE, MEMORY_COMPLETE, getVeilContract } from '@aden/shared';
+import { chapterAfter, chapterForComplete, SIDE_CHAINS, sideChainStep } from '@aden/shared';
 
 export interface AdventureState {
   questId: string; questProgress: number; mapId: string;
   dungeonStage?: number; dungeonKills?: number;
-  veilContractId?: string; veilContractProgress?: number;
+  sideChains?: Record<string, { id: string; progress: number }>;
 }
 export interface ObjectiveMarker { x: number; z: number; label: string; }
 
@@ -24,9 +24,15 @@ export function adventureGuide(state: AdventureState): { title: string; hint: st
       story: state.questId === 'q_crypt' ? cryptStory(stage) : undefined,
     };
   }
-  if (state.questId === VEIL_COMPLETE) return { title: 'El camino recuperado', hint: 'Hablá con Maera en el puesto de las Marismas para iniciar la expedición al Monasterio de la Vigilia (nivel 12).', marker: state.mapId === 'marismas' ? {...getNpc('maera'),label:'Nueva expedición'} : undefined };
-  if (state.questId === MEMORY_COMPLETE) return { title: 'La Memoria del Velo · completada', hint: 'El Prior cayó y los cautivos recuperaron sus nombres. Conservá el relicario de Iria y continuá explorando Aden.' };
-  if (state.questId === "campaign_complete") return { title: "Campaña completada · Acto I", hint: "Derrotaste a Nihil. Hablá con Rowan en Aden para iniciar la expedición a las Marismas (nivel 10).", marker: state.mapId === 'pueblo' ? {...getNpc('elder'),label:'Nueva expedición'} : undefined };
+  const done = chapterForComplete(state.questId);
+  if (done) {
+    const next = chapterAfter(state.questId);
+    if (!next?.start) return { title: done.completeTitle, hint: done.completeText };
+    const starter = getNpc(next.start.npcId), mapId = starter.mapId ?? 'pueblo';
+    return { title: done.completeTitle,
+      hint: `${done.completeText} Hablá con ${starter.name} en ${getZone(mapId).name} para iniciar la próxima expedición (nivel ${next.start.minLevel}).`,
+      marker: state.mapId === mapId ? { ...starter, label: 'Nueva expedición' } : undefined };
+  }
   if (!state.questId) return { title: "Tu aventura empieza aquí", hint: "Hablá con el Anciano en la plaza para aceptar tu primera misión.", marker: state.mapId === "pueblo" ? { ...getNpc("elder"), label: "Anciano" } : undefined };
   try {
     const q = getQuest(state.questId);
@@ -69,10 +75,14 @@ export class AdventureTracker {
     if (this.hint.textContent !== guide.hint) this.hint.textContent = guide.hint;
     if (this.story.textContent !== (guide.story ?? '')) this.story.textContent = guide.story ?? '';
     this.story.hidden = !guide.story;
-    const errand=getVeilContract(state.veilContractId??'');
-    const errandText=errand?`Boren · ${errand.title}\n${(state.veilContractProgress??0)>=1?'Listo para entregar. Volvé al puesto de las Marismas.':errand.intro}`:'';
-    this.contract.hidden=!errand;
-    if(this.contract.textContent!==errandText)this.contract.textContent=errandText;
+    const errands = SIDE_CHAINS.filter(c => c.announce).flatMap(chain => {
+      const entry = state.sideChains?.[chain.id]; const step = entry ? sideChainStep(chain, entry.id) : undefined;
+      if (!entry || !step) return [];
+      return [`${getNpc(chain.npcId).name} · ${step.title}\n${entry.progress >= step.amount ? `Listo para entregar. ${chain.returnHint ?? ''}` : step.intro}`];
+    });
+    const errandText = errands.join('\n\n');
+    this.contract.hidden = errands.length === 0;
+    if (this.contract.textContent !== errandText) this.contract.textContent = errandText;
     return guide.marker;
   }
 }

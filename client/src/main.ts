@@ -1,5 +1,6 @@
 import { AdventureTracker } from "./render/AdventureTracker.js";
-import { NPCS, VEIL_COMPLETE, VEIL_QUEST_ORDER, MEMORY_COMPLETE, MONASTERY_QUEST_ORDER, chooseHealthPotion, VEIL_CONTRACTS, VEIL_CONTRACTS_COMPLETE, getVeilContract } from '@aden/shared';
+import { NPCS, chooseHealthPotion, sideChainForNpc, sideChainStep, campaignRoleNow } from '@aden/shared';
+import { campaignDialog } from './render/campaignDialog.js';
 import { HazardViews } from "./render/HazardViews.js";
 import * as THREE from "three";
 import { preloadMaterialAtlas } from "./render/materialAtlas.js";
@@ -35,7 +36,7 @@ import { ShopPanel } from "./render/ShopPanel.js";
 import { ClassSelect } from "./render/ClassSelect.js";
 import { Minimap } from "./render/Minimap.js";
 import { StoryCard } from "./render/StoryCard.js";
-import { classAdvice, npcStory, questTurnInText } from "@aden/shared";
+import { classAdvice, npcStory } from "@aden/shared";
 import { DialogPanel } from "./render/DialogPanel.js";
 import { ZoneIndicator } from "./render/ZoneIndicator.js";
 import { ZoneBanner } from "./render/ZoneBanner.js";
@@ -49,7 +50,7 @@ import { attachAudioLifecycle } from './audio/lifecycle.js';
 import { AudioPanel } from './render/AudioPanel.js';
 import { ScreenShake } from "./render/ScreenShake.js";
 import { MODEL_NAMES, MOB_MODEL_NAMES, modelForClass, modelForTemplate } from "./assets/manifest.js";
-import { availableSkills, getItem, getQuest, TOWN, distance2D, getClass, getSkill, ELDER_NAME, firstQuestId, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE, SMITH_STOCK, getNpc, TOWN_SERVICE_RADIUS, HEAL_COST_GOLD, getBounty, firstBountyId, type Attribute } from "@aden/shared";
+import { availableSkills, getItem, getQuest, TOWN, distance2D, getClass, getSkill, zoneAt, getZone, respawnForTemplate, getWorldObject, OBJECT_INTERACT_RANGE, SMITH_STOCK, getNpc, TOWN_SERVICE_RADIUS, HEAL_COST_GOLD, getBounty, firstBountyId, type Attribute } from "@aden/shared";
 
 async function main() {
   injectTheme(); // sistema de diseño (fuentes, tokens, clases) — antes de crear cualquier panel
@@ -86,8 +87,16 @@ async function main() {
   const smith = new ServiceNpc(renderer.scene, renderer.css2d, "smith", factory);
   const captain = new ServiceNpc(renderer.scene, renderer.css2d, "captain", factory);
   const regionalNpcs = NPCS.filter(def => def.mapId !== 'pueblo').map(def => ({ def, view: new Npc(renderer.scene, renderer.css2d, factory, def.id) }));
-  const fieldShop = new ShopPanel(itemId => net.sendBuyItem(itemId), { title: 'Provisiones de Boren' });
-  fieldShop.setGreeting('Llegaron sin nombres, pero todavía necesitan comer. Maera busca respuestas; yo mantengo este puesto en pie. Llevá pociones y munición antes de seguir al norte.');
+  const FIELD_SHOP_GREETINGS: Record<string, string> = {
+    boren: 'Llegaron sin nombres, pero todavía necesitan comer. Maera busca respuestas; yo mantengo este puesto en pie. Llevá pociones y munición antes de seguir al norte.',
+    tobias: 'La mina no perdona al que baja sin provisiones. Llevá pociones y munición; lo demás lo pone Brenna.',
+  };
+  const fieldShops = new Map(NPCS.filter(n => n.shop).map(n => {
+    const panel = new ShopPanel(itemId => net.sendBuyItem(itemId), { title: `Provisiones de ${n.name.split(' ').pop()}` });
+    panel.setGreeting(FIELD_SHOP_GREETINGS[n.id] ?? '');
+    return [n.id, panel] as const;
+  }));
+  const closeFieldShops = () => fieldShops.forEach(panel => panel.close());
   const shopPanel = new ShopPanel((itemId) => {
     net.sendBuyItem(itemId);
   });
@@ -369,88 +378,24 @@ async function main() {
       hud.toast(`Acercate a ${speaker} para hablarle`, "#ffe066");
       return;
     }
-    if (npcId === 'boren') {
-      shopPanel.close();smithPanel.close();fieldShop.close();
-      const id=self.veilContractId??'',contract=getVeilContract(id)||VEIL_CONTRACTS[0];
-      const finished=id===VEIL_CONTRACTS_COMPLETE,ready=(self.veilContractProgress??0)>=1;
-      const reward=`Recompensa: ${contract.rewardGold} oro y ${contract.rewardQty} ${getItem(contract.rewardItemId).name}.`;
-      dialog.open({speaker,text:finished?'Los viajeros tienen provisiones, su familia tiene noticias y los carros están reparados. Gracias por ayudarlos a regresar.':`${contract.title}\n\n${ready?contract.done:contract.intro}\n\n${reward}`,
-        actionLabel:finished?'Gracias':ready?'Entregar encargo':id?'Seguir buscando':'Aceptar encargo',
-        onAction:()=>{if(!finished && (!id||ready))net.sendInteractNpc('boren');},
-        secondaryAction:{label:'Comprar provisiones',onAction:()=>{fieldShop.updateGold(self.gold);fieldShop.toggle();}}});
+    const chain = sideChainForNpc(npcId);
+    if (chain) {
+      shopPanel.close(); smithPanel.close(); closeFieldShops();
+      const entry = self.sideChains[chain.id], step = entry ? sideChainStep(chain, entry.id) : chain.steps[0];
+      const finished = entry?.id === chain.completeId, ready = !!entry && !!step && entry.progress >= step.amount;
+      const reward = step ? `Recompensa: ${step.rewardGold} oro${step.rewardItemId ? ` y ${step.rewardQty ?? 1} ${getItem(step.rewardItemId).name}` : ''}.` : '';
+      const shop = fieldShops.get(npcId);
+      dialog.open({ speaker,
+        text: finished || !step ? (chain.finishedText ?? '') : `${step.title}\n\n${ready ? step.done : step.intro}\n\n${reward}`,
+        actionLabel: finished ? 'Gracias' : ready ? 'Entregar encargo' : entry ? 'Seguir buscando' : 'Aceptar encargo',
+        onAction: () => { if (!finished && (!entry || ready)) net.sendInteractNpc(npcId); },
+        ...(shop ? { secondaryAction: { label: 'Comprar provisiones', onAction: () => { shop.updateGold(self.gold); shop.toggle(); } } } : {}) });
       return;
     }
-    if (self.questId === VEIL_COMPLETE) {
-      const ready = npcId === 'maera' && self.level >= 12;
-      dialog.open({ speaker, text: npcId === 'maera' ? getQuest(MONASTERY_QUEST_ORDER[0]).intro + '\n\nIria conoce los registros de la caravana. Encontrala y traé a los desaparecidos de vuelta. Requiere nivel 12.' : 'Hablá con Maera en las Marismas para iniciar la expedición al Monasterio (nivel 12).', actionLabel: ready ? 'Viajaré al Monasterio' : 'Entendido', onAction: () => { if (ready) net.sendInteractNpc(npcId); } });
-      return;
-    }
-    if (self.questId === MEMORY_COMPLETE) {
-      dialog.open({ speaker, text: 'El Prior cayó. Los cautivos recuperaron sus nombres y Maera se reunió con su hermano. Iria conserva los testimonios para que Aden no vuelva a olvidar. La Memoria del Velo está a salvo.', actionLabel: 'Seguir explorando', onAction: () => {} });
-      return;
-    }
-    if ((npcId === 'maera' || npcId === 'iria') && !self.questId.startsWith('a2_')) {
-      dialog.open({ speaker, text: 'Rowan está reuniendo una expedición. Hablá con él en Aden después de vencer a Nihil; a partir del nivel 10 podremos investigar juntos.', actionLabel: 'Entendido', onAction: () => {} });
-      return;
-    }
-    if (self.questId.startsWith('a2_')) {
-      const receiver = getNpc(getQuest(self.questId).returnNpcId ?? 'elder');
-      if (npcId !== receiver.id) {
-        dialog.open({ speaker, text: `${receiver.name} espera noticias. Seguí el diario de misión y entregá allí tus descubrimientos.`, actionLabel: 'Entendido', onAction: () => {} });
-        return;
-      }
-    }
-
-    // Si no hay misión asignada: ofrecer la primera
-    if (self.questId === "") {
-      try {
-        const firstQuestId_ = firstQuestId();
-        const q = getQuest(firstQuestId_);
-        dialog.open({
-          speaker,
-          text: q.intro,
-          actionLabel: "Aceptar",
-          onAction: () => net.sendInteractNpc(npcId),
-        });
-      } catch {
-        // No hay quests disponibles (no debería pasar)
-        hud.toast("No hay misiones disponibles", "#ff6b6b");
-      }
-      return;
-    }
-
-    if (self.questId === "campaign_complete") {
-      dialog.open({ speaker, text: getQuest(VEIL_QUEST_ORDER[0]).intro + '\n\nRequiere nivel 10.', actionLabel: self.level >= 10 ? 'Iniciar expedición' : 'Volver al camino', onAction: () => { if (self.level >= 10) net.sendInteractNpc(npcId); } });
-      return;
-    }
-
-    // Hay una misión activa
-    try {
-      const q = getQuest(self.questId);
-
-      // Si la misión está completada: mostrar diálogo de entrega
-      if (self.questProgress >= q.amount) {
-        dialog.open({
-          speaker,
-          text: questTurnInText(q.id),
-          actionLabel: "Recibir recompensa",
-          onAction: () => net.sendInteractNpc(npcId),
-        });
-      } else {
-        // Misión en progreso: recordatorio + progreso
-        const advice = q.id === "q_alpha" ? classAdvice(self.className, self.level) : "";
-        const progressText = `${q.intro}${advice ? `\n\n${advice}` : ""}\n\n(Progreso: ${self.questProgress}/${q.amount})`;
-        dialog.open({
-          speaker,
-          text: progressText,
-          actionLabel: "Entendido",
-          onAction: () => {},
-        });
-      }
-    } catch {
-      // questId desconocido
-      hud.toast("Error desconocido en la misión", "#ff6b6b");
-    }
+    const d = campaignDialog({ questId: self.questId, questProgress: self.questProgress, level: self.level }, npcId);
+    if (!d) return;
+    const advice = self.questId === 'q_alpha' && !d.send ? `\n\n${classAdvice(self.className, self.level)}` : '';
+    dialog.open({ speaker, text: d.text + advice, actionLabel: d.actionLabel, onAction: () => { if (d.send) net.sendInteractNpc(npcId); } });
   }
 
   // Gate común: ¿el jugador está cerca de los servicios del pueblo?
@@ -479,6 +424,15 @@ async function main() {
   function interactSmith() {
     if (!net.getSelf()) return;
     if (!nearTown()) { hud.toast(`Acercate al ${getNpc("smith").name} para forjar`, "#ffe066"); return; }
+    const self = net.getSelf()!;
+    if (campaignRoleNow(self.questId, 'smith')) {
+      const d = campaignDialog({ questId: self.questId, questProgress: self.questProgress, level: self.level }, 'smith')!;
+      shopPanel.close(); smithPanel.close();
+      dialog.open({ speaker: getNpc('smith').name, text: d.text, actionLabel: d.actionLabel,
+        onAction: () => { if (d.send) net.sendInteractNpc('smith'); },
+        secondaryAction: { label: 'Abrir la fragua', onAction: () => { smithPanel.setGreeting(serviceStory('smith', '')); smithPanel.toggle(); } } });
+      return;
+    }
     shopPanel.close();
     smithPanel.setGreeting(serviceStory("smith", ""));
     smithPanel.toggle();
@@ -767,11 +721,14 @@ async function main() {
       if (view.object.visible) view.update(dt);
       let ready = false;
       try { const q = getQuest(selfCombat?.questId ?? ''); ready = q.returnNpcId === def.id && (selfCombat?.questProgress ?? 0) >= q.amount; } catch { /* No active regional quest. */ }
-      if(def.id==='boren')ready=(selfCombat?.veilContractProgress??0)>=1;
+      const chain = sideChainForNpc(def.id);
+      if (chain) { const entry = selfCombat?.sideChains?.[chain.id]; const step = entry ? sideChainStep(chain, entry.id) : undefined; ready = !!entry && !!step && entry.progress >= step.amount; }
       view.setReady(ready);
     }
-    if (myMapId !== 'marismas') fieldShop.close();
-    else if (selfCombat && fieldShop.isOpen()) fieldShop.updateGold(selfCombat.gold);
+    fieldShops.forEach((panel, npcId) => {
+      if (myMapId !== getNpc(npcId).mapId) panel.close();
+      else if (selfCombat && panel.isOpen()) panel.updateGold(selfCombat.gold);
+    });
     const objective = selfCombat ? adventure.update(selfCombat) : undefined;
     minimap.update(net.getMinimapEntities(), net.getAdventureTarget() ?? objective);
     // Barra del jefe en pantalla + contador de reaparición (Etapa 14).

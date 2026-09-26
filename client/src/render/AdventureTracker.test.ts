@@ -23,6 +23,20 @@ describe("adventure guidance", () => {
     const guide = adventureGuide({ questId: "q1", questProgress: getQuest("q1").amount, mapId: "bosque" });
     expect(guide.title).toBe("Recompensa disponible"); expect(guide.hint).toContain("M"); expect(guide.marker).toBeUndefined();
   });
+  it('hands the Memory ending to Dorne and guides the Mines chapter to Brenna', () => {
+    const ending = adventureGuide({ questId: 'memory_campaign_complete', questProgress: 0, mapId: 'pueblo' });
+    expect(ending.hint).toContain('Herrero Dorne'); expect(ending.marker).toMatchObject({ label: 'Nueva expedición', x: 9, z: -1 });
+    const ready = adventureGuide({ questId: 'f_armors', questProgress: 8, mapId: 'minas' });
+    expect(ready.hint).toContain('Brenna'); expect(ready.marker).toMatchObject({ x: 1494, z: 194 });
+    expect(adventureGuide({ questId: 'f_mark_1', questProgress: 0, mapId: 'minas' }).marker).toMatchObject({ x: 1478, z: 184 });
+  });
+  it('lists active errands from any announced side chain', () => {
+    const parent = document.createElement('div'); const tracker = new AdventureTracker(parent);
+    tracker.update({ questId: 'f_diggers', questProgress: 0, mapId: 'minas', sideChains: { tobias: { id: 't_supplies', progress: 1 }, varek: { id: 'b_forest', progress: 2 } } });
+    expect(parent.textContent).toContain('Intendente Tobías · Carga perdida en el tajo');
+    expect(parent.textContent).toContain('Listo para entregar');
+    expect(parent.textContent).not.toContain('Limpieza del Bosque');
+  });
   it("does not show unknown quest for campaign completion", () => {
     const parent = document.createElement("div"); const tracker = new AdventureTracker(parent);
     tracker.update({ questId: "campaign_complete", questProgress: 0, mapId: "pueblo" });
