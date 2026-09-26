@@ -1,5 +1,5 @@
 import { AdventureTracker } from "./render/AdventureTracker.js";
-import { NPCS, chooseHealthPotion, sideChainForNpc, sideChainStep, campaignRoleNow } from '@aden/shared';
+import { NPCS, chooseHealthPotion, sideChainForNpc, sideChainStep, campaignRoleNow, encounterCoolFor, encounterInterruptFor } from '@aden/shared';
 import { campaignDialog } from './render/campaignDialog.js';
 import { HazardViews } from "./render/HazardViews.js";
 import * as THREE from "three";
@@ -520,7 +520,8 @@ async function main() {
       return;
     }
     if (def.kind === "chest") hud.toast("Abriste un cofre 🎁", "#ffd54f");
-    else if (def.kind === "shrine") hud.toast("¡Bendición del santuario! ✨", "#66e0ff");
+    // Los objetos de un encuentro (anclajes, yunques) responden con el texto del server.
+    else if (def.kind === "shrine" && !encounterCoolFor(id) && !encounterInterruptFor(id)) hud.toast("¡Bendición del santuario! ✨", "#66e0ff");
   };
 
   const input = new InputController(

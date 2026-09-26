@@ -17,4 +17,6 @@ export class WorldObjectState extends Schema {
 
   // server-only (NO @type)
   respawnMs = 0;
+  /** Enfriado durante un encuentro: no reaparece por timer hasta que el encuentro termina. */
+  cooled = false;
 }

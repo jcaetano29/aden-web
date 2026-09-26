@@ -5,14 +5,15 @@ import { MINES_COMPLETE } from './mines.js';
 
 describe('campaign NPCs', () => {
   it('knows who takes part in the campaign', () => {
-    for (const id of ['elder', 'maera', 'iria', 'smith', 'brenna']) expect(isCampaignNpc(id), id).toBe(true);
-    for (const id of ['merchant', 'healer', 'captain', 'boren', 'tobias']) expect(isCampaignNpc(id), id).toBe(false);
+    for (const id of ['elder', 'maera', 'iria', 'smith', 'brenna', 'ysolde']) expect(isCampaignNpc(id), id).toBe(true);
+    for (const id of ['merchant', 'healer', 'captain', 'boren', 'tobias', 'halden_npc']) expect(isCampaignNpc(id), id).toBe(false);
   });
   it('finds where each NPC first appears', () => {
     expect(npcFirstAppearance('elder')).toBe('q1');
     expect(npcFirstAppearance('maera')).toBe('a2_arrival');
     expect(npcFirstAppearance('smith')).toBe(MEMORY_COMPLETE);
     expect(npcFirstAppearance('brenna')).toBe('f_arrival');
+    expect(npcFirstAppearance('ysolde')).toBe('f_caldera');
     expect(npcFirstAppearance('merchant')).toBeNull();
   });
   it('maps complete states to their chapter and tells when an NPC has a role now', () => {

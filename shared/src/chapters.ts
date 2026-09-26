@@ -2,6 +2,7 @@ import { QUEST_ORDER, CAMPAIGN_COMPLETE } from './act1.js';
 import { VEIL_QUEST_ORDER, VEIL_COMPLETE } from './veil.js';
 import { MONASTERY_QUEST_ORDER, MEMORY_COMPLETE } from './monastery.js';
 import { MINES_QUEST_ORDER, MINES_COMPLETE } from './mines.js';
+import { FORGE_QUEST_ORDER, FORGE_COMPLETE } from './forge.js';
 
 /** Cómo se ofrece un capítulo desde el estado final del anterior. */
 export interface ChapterStart {
@@ -43,11 +44,18 @@ export const CHAPTERS: readonly ChapterDef[] = [
     mapGates: { monasterio: { from: VEIL_COMPLETE, text: 'Recuperá el paso de las Marismas y hablá con Maera antes de viajar al Monasterio.' } } },
   { id: 'mines', questOrder: MINES_QUEST_ORDER, completeId: MINES_COMPLETE,
     completeTitle: 'Las Minas de Hierro Negro · completadas',
-    completeText: 'Halden cayó y confesó lo que despertó bajo la montaña. La Fragua de los Primeros espera: pronto se abrirá el camino.',
+    completeText: 'Halden cayó y confesó lo que despertó bajo la montaña. Brenna prepara la expedición a la Fragua de los Primeros.',
     start: { after: MEMORY_COMPLETE, npcId: 'smith', minLevel: 15,
       lockedText: 'La expedición a las Minas requiere nivel 15.',
       startedText: 'Nueva expedición: viajá a las Minas de Hierro Negro y encontrá a Brenna.' },
     mapGates: { minas: { from: 'f_arrival', text: 'Hablá con Dorne en Aden antes de bajar a las Minas de Hierro Negro.' } } },
+  { id: 'forge', questOrder: FORGE_QUEST_ORDER, completeId: FORGE_COMPLETE,
+    completeTitle: 'La Fragua Antigua · completada',
+    completeText: 'Vharzul cayó y la Fragua de los Primeros vuelve a dormir. Halden se queda en la caldera, junto a Ysolde, para custodiar las runas. Las dos llamas descansan.',
+    start: { after: MINES_COMPLETE, npcId: 'brenna', minLevel: 20,
+      lockedText: 'La expedición a la Fragua requiere nivel 20.',
+      startedText: 'Nueva expedición: viajá a la Fragua de los Primeros y encontrá a Ysolde.' },
+    mapGates: { fragua: { from: 'f_caldera', text: 'Hablá con Brenna en las Minas antes de viajar a la Fragua de los Primeros.' } } },
 ];
 
 /** Secuencia global: misiones de cada capítulo seguidas de su estado final. */

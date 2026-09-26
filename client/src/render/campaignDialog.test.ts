@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { campaignDialog } from './campaignDialog.js';
-import { getQuest, MEMORY_COMPLETE, MINES_COMPLETE, VEIL_COMPLETE } from '@aden/shared';
+import { getQuest, MEMORY_COMPLETE, MINES_COMPLETE, FORGE_COMPLETE, VEIL_COMPLETE } from '@aden/shared';
 
 const at = (questId: string, questProgress = 0, level = 30) => ({ questId, questProgress, level });
 
@@ -22,7 +22,8 @@ describe('campaign dialog', () => {
   it('tells future NPCs it is not time yet and stays silent for non-campaign NPCs', () => {
     expect(campaignDialog(at('q3'), 'brenna')!.text).toContain('Todavía no es momento');
     expect(campaignDialog(at('q3'), 'merchant')).toBeNull();
-    expect(campaignDialog(at(MINES_COMPLETE), 'brenna')!.text).toContain('Halden cayó');
+    expect(campaignDialog(at(MINES_COMPLETE), 'brenna')).toMatchObject({ text: expect.stringContaining(getQuest('f_caldera').intro), send: true });
+    expect(campaignDialog(at(FORGE_COMPLETE), 'ysolde')!.text).toContain('Vharzul cayó');
   });
   it('offers the first quest only through Rowan', () => {
     expect(campaignDialog(at(''), 'elder')).toMatchObject({ actionLabel: 'Aceptar', send: true });

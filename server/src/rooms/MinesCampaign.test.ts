@@ -74,7 +74,8 @@ describe('Mines campaign over real connections', () => {
     expect(owns(p, 'black_iron_fang')).toBe(true);
     const gold = p.gold;
     c.send(MessageType.InteractNpc, { npcId: 'brenna' }); await room.waitForNextPatch();
-    expect(p.gold).toBe(gold); expect(p.questId).toBe(MINES_COMPLETE);
+    // Volver a hablarle no repite el pago: ofrece el capítulo siguiente (la Fragua).
+    expect(p.gold).toBe(gold); expect(p.questId).toBe('f_caldera');
   });
 
   it('runs Tobías errands and sells supplies only near his post', async () => {

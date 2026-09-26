@@ -1,4 +1,4 @@
-import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterInterruptFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
+import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterInterruptFor, encounterCoolFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
@@ -801,6 +801,20 @@ export class GameRoom extends Room<GameState> {
       }
       advanceQuest(p,'interact',o.id);
       this.creditSideChains(p, 'interact', o.id, client);
+      const cooling = encounterCoolFor(o.id);
+      if (cooling) {
+        const boss = [...this.state.mobs.values()].find(m => m.templateId === cooling.templateId && !m.dead && !!m.aggroTargetId && m.mapId === p.mapId && distance2D(p.x, p.z, m.x, m.z) <= 25);
+        if (!boss) { client.send(MessageType.ItemResult, { success: true, text: cooling.texts.idle }); return; }
+        if (!canFightDungeonMob(p, boss.templateId) || pvePower(p.level, boss.level).outgoing === 0) { client.send(MessageType.ItemResult, { success: false, text: cooling.texts.tooWeak }); return; }
+        const channelBreak = boss.channeling ? encounterInterruptFor(o.id) : null;
+        if (channelBreak && channelBreak.templateId === boss.templateId) {
+          boss.channeling = false; boss.hazardMs = 0; boss.hazardCooldownMs = channelBreak.pattern.interruptCooldownMs ?? 0;
+          boss.stunMs = Math.max(boss.stunMs, channelBreak.pattern.interruptStunMs ?? 0);
+        }
+        o.active = false; o.cooled = true;
+        client.send(MessageType.ItemResult, { success: true, text: channelBreak ? (channelBreak.pattern.interruptTexts?.success ?? cooling.texts.success) : cooling.texts.success });
+        return;
+      }
       const interrupt = encounterInterruptFor(o.id);
       if (interrupt) {
         const texts = interrupt.pattern.interruptTexts;
@@ -1182,7 +1196,14 @@ export class GameRoom extends Room<GameState> {
       this.broadcast(MessageType.Death, { entityId: id });
     });
     const owner = this.state.mobs.get(ownerId);
-    if (owner) { owner.summonTimers.clear(); owner.summonFlags.clear(); }
+    if (owner) {
+      owner.summonTimers.clear(); owner.summonFlags.clear();
+      // Los objetos enfriados vuelven a arder cuando el encuentro termina o se reinicia.
+      for (const id of getEncounter(owner.templateId)?.coolObjects ?? []) {
+        const obj = this.state.worldObjects.get(id);
+        if (obj) { obj.active = true; obj.cooled = false; }
+      }
+    }
   }
 
   private areAllies(a: PlayerState, b: PlayerState): boolean {
@@ -1548,6 +1569,7 @@ export class GameRoom extends Room<GameState> {
     // santuario sale de cooldown).
     this.state.worldObjects.forEach((o) => {
       if (o.active) return;
+      if (o.cooled) return;
       if(o.mapId==='cripta')return;
       o.respawnMs -= dtMs;
       if (o.respawnMs <= 0) o.active = true;

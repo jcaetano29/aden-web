@@ -4,10 +4,11 @@ import { QUEST_ORDER, CAMPAIGN_COMPLETE, getQuest } from './quests.js';
 import { VEIL_QUEST_ORDER, VEIL_COMPLETE } from './veil.js';
 import { MONASTERY_QUEST_ORDER, MEMORY_COMPLETE } from './monastery.js';
 import { MINES_COMPLETE } from './mines.js';
+import { FORGE_COMPLETE } from './forge.js';
 
 describe('campaign chapters', () => {
   it('chains every chapter in order and ends each on its complete state', () => {
-    expect(CHAPTERS.map(c => c.id)).toEqual(['act1', 'veil', 'memory', 'mines']);
+    expect(CHAPTERS.map(c => c.id)).toEqual(['act1', 'veil', 'memory', 'mines', 'forge']);
     expect(nextQuestId(QUEST_ORDER[QUEST_ORDER.length - 1])).toBe(CAMPAIGN_COMPLETE);
     expect(nextQuestId(VEIL_QUEST_ORDER[VEIL_QUEST_ORDER.length - 1])).toBe(VEIL_COMPLETE);
     expect(nextQuestId(MONASTERY_QUEST_ORDER[MONASTERY_QUEST_ORDER.length - 1])).toBe(MEMORY_COMPLETE);
@@ -19,7 +20,8 @@ describe('campaign chapters', () => {
     expect(chapterAfter(CAMPAIGN_COMPLETE)?.start).toMatchObject({ npcId: 'elder', minLevel: 10 });
     expect(chapterAfter(VEIL_COMPLETE)?.start).toMatchObject({ npcId: 'maera', minLevel: 12 });
     expect(chapterAfter(MEMORY_COMPLETE)?.start).toMatchObject({ npcId: 'smith', minLevel: 15 });
-    expect(chapterAfter(MINES_COMPLETE)).toBeNull();
+    expect(chapterAfter(MINES_COMPLETE)?.start).toMatchObject({ npcId: 'brenna', minLevel: 20 });
+    expect(chapterAfter(FORGE_COMPLETE)).toBeNull();
     expect(chapterAfter('q1')).toBeNull();
   });
   it('orders progress globally for gates', () => {

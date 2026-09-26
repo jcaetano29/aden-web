@@ -46,6 +46,9 @@ export interface EncounterDef {
   summons?: readonly EncounterSummon[];
   /** Solo pueden pelearlo quienes llegaron a esta misión o más allá. */
   requiresQuest?: string;
+  /** Objetos que se enfrían en combate: dejan de invocar hasta que el encuentro termina o se reinicia. */
+  coolObjects?: readonly string[];
+  coolTexts?: { success: string; tooWeak: string; idle: string };
 }
 
 const circle = (radius: number, windupMs: number, power: number): HazardPattern => ({ shape: 'circle', anchor: 'target', radius, windupMs, power });
@@ -68,6 +71,8 @@ export const ENCOUNTERS: Record<string, EncounterDef> = {
         interruptTexts: { success: '¡Cortaste el aliento de la Fragua! Vharzul quedó aturdido.', tooWeak: 'El yunque no responde a tu poder actual.', idle: 'El yunque late con el pulso del dragón.' } },
     ] },
     summons: [{ templateId: 'forged_guardian', everyMs: 15000, fromObjects: FORGE_ANVILS, maxAlive: 1 }],
+    coolObjects: FORGE_ANVILS,
+    coolTexts: { success: 'Enfriaste el yunque: dejó de forjar guardianes.', tooWeak: 'El yunque no responde a tu poder actual.', idle: 'El yunque late con el pulso del dragón. Solo se enfría cuando Vharzul pelea.' },
   },
   magma_wyrm: { templateId: 'magma_wyrm', aggroRadius: 10, cooldownMs: 8000, patterns: [circle(6, 1800, 2.6)] },
   mine_foreman: { templateId: 'mine_foreman', aggroRadius: 14, cooldownMs: 8000,
@@ -104,6 +109,14 @@ export function encounterInterruptFor(objectId: string): { templateId: string; p
     for (const pattern of [...def.patterns, ...(def.belowHalf?.patterns ?? [])]) {
       if (pattern.channel && pattern.interruptObjects?.includes(objectId)) return { templateId: def.templateId, pattern };
     }
+  }
+  return null;
+}
+
+/** Encuentro que permite enfriar este objeto (y sus textos). */
+export function encounterCoolFor(objectId: string): { templateId: string; texts: NonNullable<EncounterDef['coolTexts']> } | null {
+  for (const def of Object.values(ENCOUNTERS)) {
+    if (def.coolObjects?.includes(objectId) && def.coolTexts) return { templateId: def.templateId, texts: def.coolTexts };
   }
   return null;
 }
