@@ -34,7 +34,7 @@ import {
   CRYPT_WAVE_TEMPLATES,
 } from "@aden/shared";
 import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
-import type { PartyInvitation } from '@aden/shared';
+import type { PartyInvitation, WorldEventView } from '@aden/shared';
 import type { PartyPanelData, PartyMember } from '../render/PartyPanel.js';
 import { TRADE_RANGE, distance2D, type TradeSnapshot, type TradeOffer } from '@aden/shared';
 import type { TradePanelData } from '../render/TradePanel.js';
@@ -148,7 +148,9 @@ export interface RoomCallbacks {
   onMobChange: (id: string, snap: MobSnapshot) => void;
   onMobRemove: (id: string) => void;
   /** Ítem droppeado en el piso (sincronizado desde `state.droppedItems`). */
-  onItemAdd: (id: string, itemTemplateId: string, x: number, z: number, mapId:string, qty:number) => void;
+  onItemAdd: (id: string, itemTemplateId: string, x: number, z: number, mapId:string, qty:number, reservedFor?: string) => void;
+  /** Cambió la reserva de un botín de invasión ('' = ya es público). */
+  onItemReserved?: (id: string, reservedFor: string) => void;
   onItemRemove: (id: string) => void;
   onDamage: (ev: DamageEvent) => void;
   onDeath: (entityId: string) => void;
@@ -252,9 +254,10 @@ export class NetworkClient {
     });
     this.room.state.mobs.onRemove((_m: any, id: string) => cb.onMobRemove(id));
 
-    this.room.state.droppedItems.onAdd((it: any, id: string) =>
-      cb.onItemAdd(id, it.itemTemplateId, it.x, it.z, it.mapId, it.qty),
-    );
+    this.room.state.droppedItems.onAdd((it: any, id: string) => {
+      cb.onItemAdd(id, it.itemTemplateId, it.x, it.z, it.mapId, it.qty, it.reservedFor ?? "");
+      it.listen?.("reservedFor", (value: string) => cb.onItemReserved?.(id, value ?? ""));
+    });
     this.room.state.droppedItems.onRemove((_it: any, id: string) => cb.onItemRemove(id));
 
     this.room.onMessage(MessageType.Damage, (data: DamageEvent) => cb.onDamage(data));
@@ -580,7 +583,18 @@ export class NetworkClient {
       if (m.dead || (m.mapId ?? "") !== myMap) return;
       out.push({ x: m.x, z: m.z, kind: isBoss(m.templateId) ? "boss" : "mob" });
     });
+    // Invasión anunciada en este mapa: marcar dónde va a aparecer el jefe.
+    const ev: any = this.room.state.worldEvent;
+    if (ev?.phase === "announced" && ev.mapId === myMap) out.push({ x: ev.x, z: ev.z, kind: "boss" });
     return out;
+  }
+
+  /** Evento de mundo visible (invasión anunciada o activa), o null. */
+  getWorldEvent(): WorldEventView | null {
+    const ev: any = this.room.state.worldEvent;
+    if (!ev?.phase) return null;
+    return { invaderId: ev.invaderId, phase: ev.phase, mapId: ev.mapId, x: ev.x, z: ev.z, radius: ev.radius,
+      startsAt: ev.startsAt, endsAt: ev.endsAt, ranking: [...(ev.ranking ?? [])] };
   }
 
   /**

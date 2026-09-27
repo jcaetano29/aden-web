@@ -45,10 +45,10 @@ export class MapPanel {
   }
 
   /** Alterna la visibilidad; al abrir, redibuja con el nivel/mapa actuales. */
-  toggle(level: number, currentMapId: string): void {
+  toggle(level: number, currentMapId: string, eventMapId = ""): void {
     this.visible = !this.visible;
     this.root.style.display = this.visible ? "" : "none";
-    if (this.visible) this.render(level, currentMapId);
+    if (this.visible) this.render(level, currentMapId, eventMapId);
   }
 
   hide(): void {
@@ -56,14 +56,14 @@ export class MapPanel {
     this.root.style.display = "none";
   }
 
-  private render(level: number, currentMapId: string): void {
+  private render(level: number, currentMapId: string, eventMapId: string): void {
     this.list.innerHTML = "";
     for (const z of ZONES) {
-      this.list.appendChild(this.row(z, level, currentMapId));
+      this.list.appendChild(this.row(z, level, currentMapId, z.id === eventMapId));
     }
   }
 
-  private row(z: Zone, level: number, currentMapId: string): HTMLDivElement {
+  private row(z: Zone, level: number, currentMapId: string, invaded = false): HTMLDivElement {
     const isCurrent = z.id === currentMapId;
     const unlocked = canEnterZone(z, level);
     const row = document.createElement("div");
@@ -77,7 +77,7 @@ export class MapPanel {
     const info = document.createElement("div");
     const reqTxt = z.levelMin === 0 ? "seguro" : `Nivel ${z.levelMin}-${z.levelMax}`;
     info.innerHTML =
-      `<div style="font-family:${FONT_DISPLAY};font-weight:700;font-size:15px;color:${hex(z.biome.accent)}">${z.name}</div>` +
+      `<div style="font-family:${FONT_DISPLAY};font-weight:700;font-size:15px;color:${hex(z.biome.accent)}">${z.name}${invaded ? ' <span style="color:#ff8a5a;font-size:12px">⚔ Invasión</span>' : ''}</div>` +
       `<div style="opacity:0.8;font-size:12px;margin-top:1px;color:${COLORS.textDim}">${z.subtitle} · ${reqTxt}</div>`;
     row.appendChild(info);
 

@@ -13,8 +13,9 @@ export class ZoneIndicator {
     this.update(false);
   }
   mount(parent: HTMLElement) { parent.appendChild(this.el); }
-  update(inPvp: boolean) {
-    this.el.textContent = inPvp ? "⚔ Zona PvP" : "🛡 Zona segura";
+  /** `label` reemplaza el texto (por ejemplo, el área de una invasión). */
+  update(inPvp: boolean, label?: string) {
+    this.el.textContent = label ?? (inPvp ? "⚔ Zona PvP" : "🛡 Zona segura");
     this.el.style.background = inPvp
       ? "linear-gradient(180deg,rgba(180,40,32,0.85),rgba(110,18,14,0.85))"
       : "linear-gradient(180deg,rgba(48,110,66,0.8),rgba(24,64,38,0.8))";

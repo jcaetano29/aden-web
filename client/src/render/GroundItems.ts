@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { getItem,itemVisual,RARITY_LABELS } from '@aden/shared';
 import { createItemModel } from './ItemModels.js';
 
-interface ActiveItem { mesh:THREE.Group; halo:THREE.Mesh; mapId:string; itemId:string; qty:number; bornAt:number }
+interface ActiveItem { mesh:THREE.Group; halo:THREE.Mesh; mapId:string; itemId:string; qty:number; bornAt:number; reservedFor:string }
 export class GroundItems {
   private readonly haloGeometry=new THREE.RingGeometry(.34,.49,24);
   private readonly haloMaterials=new Map<string,THREE.MeshBasicMaterial>();
@@ -15,14 +15,16 @@ export class GroundItems {
     this.label.style.cssText='position:fixed;display:none;pointer-events:none;z-index:900;background:#10151eee;border:1px solid;padding:7px 10px;border-radius:5px;font:13px Georgia;max-width:310px;white-space:pre-line;text-shadow:0 1px 2px black;';
     document.body.append(this.label);
   }
-  add(id:string,itemId:string,x:number,z:number,mapId='pueblo',qty=1) {
+  /** Botín de invasión reservado: etiqueta del gremio dueño ('' = público). */
+  setReserved(id:string,label:string){const e=this.items.get(id);if(e)e.reservedFor=label;}
+  add(id:string,itemId:string,x:number,z:number,mapId='pueblo',qty=1,reservedFor='') {
     if(this.items.has(id))return;
     const v=itemVisual(getItem(itemId)),mesh=createItemModel(itemId);
     mesh.position.set(x,.7,z);mesh.userData.dropId=id;mesh.visible=mapId===this.mapId;
     let material=this.haloMaterials.get(v.color);
     if(!material){material=new THREE.MeshBasicMaterial({color:v.color,transparent:true,opacity:v.halo,depthWrite:false,side:THREE.DoubleSide});this.haloMaterials.set(v.color,material);}
     const halo=new THREE.Mesh(this.haloGeometry,material);halo.rotation.x=-Math.PI/2;halo.position.set(x,.06,z);halo.visible=mesh.visible;
-    this.scene.add(mesh,halo);this.items.set(id,{mesh,halo,mapId,itemId,qty,bornAt:performance.now()});
+    this.scene.add(mesh,halo);this.items.set(id,{mesh,halo,mapId,itemId,qty,bornAt:performance.now(),reservedFor});
   }
   remove(id:string) {const entry=this.items.get(id);if(!entry)return;this.scene.remove(entry.mesh,entry.halo);this.items.delete(id);if(this.selected===id)this.select(null);}
   setMap(mapId:string) {if(mapId===this.mapId)return;this.mapId=mapId;this.select(null);for(const e of this.items.values())e.mesh.visible=e.halo.visible=e.mapId===mapId;}
@@ -47,7 +49,7 @@ export class GroundItems {
     const p=e.mesh.position.clone().add(new THREE.Vector3(0,1,0)).project(camera);
     if(Math.abs(p.z)>1){this.label.style.display='none';return;}
     const item=getItem(e.itemId),v=itemVisual(item);
-    this.label.textContent=`${item.name}${e.qty>1?` ×${e.qty}`:''}\n${RARITY_LABELS[item.rarity??'common']} · Botín público\nClic para acercarte y recoger`;
+    this.label.textContent=`${item.name}${e.qty>1?` ×${e.qty}`:''}\n${RARITY_LABELS[item.rarity??'common']} · ${e.reservedFor?`Reservado para ${e.reservedFor}`:'Botín público'}\nClic para acercarte y recoger`;
     this.label.style.color=v.color;this.label.style.display='block';
     this.label.style.left=`${Math.max(8,Math.min(window.innerWidth-325,(p.x*.5+.5)*window.innerWidth))}px`;
     this.label.style.top=`${Math.max(8,Math.min(window.innerHeight-95,(-p.y*.5+.5)*window.innerHeight))}px`;

@@ -1,5 +1,5 @@
 import { AdventureTracker } from "./render/AdventureTracker.js";
-import { NPCS, chooseHealthPotion, sideChainForNpc, sideChainStep, campaignRoleNow, encounterCoolFor, encounterInterruptFor, ammoSkillBlock } from '@aden/shared';
+import { NPCS, chooseHealthPotion, sideChainForNpc, sideChainStep, campaignRoleNow, encounterCoolFor, encounterInterruptFor, ammoSkillBlock, inInvasionArea, invasionProtected } from '@aden/shared';
 import { campaignDialog } from './render/campaignDialog.js';
 import { sideChainDialog } from './render/sideChainDialog.js';
 import { HazardViews } from "./render/HazardViews.js";
@@ -40,6 +40,7 @@ import { StoryCard } from "./render/StoryCard.js";
 import { classAdvice, npcStory } from "@aden/shared";
 import { DialogPanel } from "./render/DialogPanel.js";
 import { ZoneIndicator } from "./render/ZoneIndicator.js";
+import { EventBanner } from "./render/EventBanner.js";
 import { ZoneBanner } from "./render/ZoneBanner.js";
 import { injectTheme } from "./render/theme.js";
 import { NetworkClient, isAuthError, type RoomCallbacks } from "./net/NetworkClient.js";
@@ -148,6 +149,7 @@ async function main() {
   zoneIndicator.mount(document.body);
   const zoneBanner = new ZoneBanner();
   zoneBanner.mount(document.body);
+  const eventBanner = new EventBanner(document.body);
 
   // Minimapa (esquina sup. der.): radar del mapa actual (Etapa 15).
   const minimap = new Minimap();
@@ -303,7 +305,8 @@ async function main() {
       screenShake.addTrauma(0.35);
     },
     onItemResult: (result) => hud.toast(result.text, result.success ? "#2ecc40" : "#ff6b6b", 3000),
-    onItemAdd: (id, itemTemplateId, x, z, mapId, qty) => groundItems.add(id, itemTemplateId, x, z, mapId, qty),
+    onItemAdd: (id, itemTemplateId, x, z, mapId, qty, reservedFor) => groundItems.add(id, itemTemplateId, x, z, mapId, qty, reservedFor),
+    onItemReserved: (id, reservedFor) => groundItems.setReserved(id, reservedFor),
     onItemRemove: (id) => groundItems.remove(id),
     onObjectAdd: (id, snap) => worldObjects.add(id, snap),
     onObjectChange: (id, snap) => worldObjects.update(id, snap),
@@ -633,7 +636,7 @@ async function main() {
     // Tecla M: menú de mapas (viajar). Etapa 15.
     if (e.key === "m" || e.key === "M" || e.code === "KeyM") {
       const sc = net.getSelf();
-      mapPanel.toggle(sc?.level ?? 1, sc?.mapId ?? "pueblo");
+      mapPanel.toggle(sc?.level ?? 1, sc?.mapId ?? "pueblo", net.getWorldEvent()?.mapId ?? "");
       return;
     }
     // Tecla N: silenciar/activar sonido (movido desde M).
@@ -693,11 +696,17 @@ async function main() {
       // Bioma/niebla/luz del mapa actual + cartel al entrar a un mapa nuevo.
       environment.updateMood(self.x, self.z, dt);
       const curZone = zoneAt(self.x, self.z);
-      zoneIndicator.update(!curZone.safe);
+      // Dentro del área de una invasión activa manda el área: PvP para nivel 10+, protegido para el resto.
+      const invasion = net.getWorldEvent(), myLevel = selfCombat?.level ?? 1;
+      if (invasion && inInvasionArea(invasion, selfCombat?.mapId ?? "pueblo", self.x, self.z)) {
+        const safe = invasionProtected(myLevel);
+        zoneIndicator.update(!safe, safe ? "🛡 Área de invasión · protegido" : "⚔ Área de invasión · PvP");
+      } else zoneIndicator.update(!curZone.safe);
       zoneBanner.setZone(curZone.id);
     }
     // Etapa 15: mapa actual del jugador → filtra el render y el minimapa; cambia al warpear.
     const myMapId = selfCombat?.mapId ?? "pueblo";
+    eventBanner.update(net.getWorldEvent(), Date.now());
     groundItems.setMap(myMapId);
     views.setCurrentMap(myMapId);
     views.setSelfLevel(selfCombat?.level ?? 1);

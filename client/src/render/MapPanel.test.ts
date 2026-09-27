@@ -18,6 +18,16 @@ describe("MapPanel (viaje entre mapas)", () => {
     expect([...document.querySelectorAll("button")].some((b) => b.textContent === "Aquí")).toBe(true);
   });
 
+  it("marca el mapa donde hay una invasión", () => {
+    document.body.innerHTML = "";
+    const panel = new MapPanel(() => {});
+    panel.mount(document.body);
+    panel.toggle(25, "pueblo", "marismas");
+    const rows = [...document.querySelectorAll("div")].filter((d) => (d.textContent ?? "").startsWith("Marismas del Velo"));
+    expect(rows.some((r) => (r.textContent ?? "").includes("⚔ Invasión"))).toBe(true);
+    expect(document.body.textContent?.match(/⚔ Invasión/g)).toHaveLength(1);
+  });
+
   it("un mapa por encima del nivel aparece bloqueado", () => {
     const panel = new MapPanel(() => {});
     panel.mount(document.body);

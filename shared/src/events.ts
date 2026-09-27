@@ -58,6 +58,19 @@ export const INVASION_SPOTS: Record<string, { x: number; z: number }> = {
   marismas: { x: 1200, z: 150 }, monasterio: { x: 1200, z: 450 }, minas: { x: 1500, z: 150 }, fragua: { x: 1500, z: 450 },
 };
 
+/** Evento de mundo tal como lo ve el cliente. */
+export interface WorldEventView {
+  invaderId: string;
+  phase: 'announced' | 'active';
+  mapId: string;
+  x: number;
+  z: number;
+  radius: number;
+  startsAt: number;
+  endsAt: number;
+  ranking: string[];
+}
+
 export function getInvader(id: string): InvaderDef {
   const inv = INVADERS[id];
   if (!inv) throw new Error(`Invasor desconocido: ${id}`);
