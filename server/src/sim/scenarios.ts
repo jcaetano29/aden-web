@@ -1,4 +1,4 @@
-import { SPAWN_ZONES, getItem, getQuest, questReward, dungeonReward, createItemInstance, CRYPT_BOSS } from '@aden/shared';
+import { SPAWN_ZONES, INVASION_SPOTS, getItem, getQuest, questReward, dungeonReward, createItemInstance, CRYPT_BOSS } from '@aden/shared';
 import type { GameRoom } from '../rooms/GameRoom.js';
 import type { Profile, Scenario } from './BalanceSimulator.js';
 
@@ -73,6 +73,21 @@ export function forgeScenarios(className: string): Scenario[] {
     scenario('Guardián', 'forge_construct', profile(className, 23, 'forge_mid')),
     scenario('Fundidor', 'primal_smelter', profile(className, 24, 'forge_mid')),
     scenario('Vharzul', 'vharzul', profile(className, 25, 'forge_late', 'f_vharzul')),
+  ];
+}
+
+export interface InvasionScenario { name: string; scenario: Scenario; group: Profile[]; soloClass: string; target: [number, number] }
+
+/** Invasores contra el grupo para el que están pensados (y el más fuerte de ese grupo, solo). */
+export function invasionScenarios(): InvasionScenario[] {
+  const at = (name: string, templateId: string, mapId: string, group: Profile[], soloClass: string, target: [number, number]): InvasionScenario =>
+    ({ name, scenario: { name, templateId, mapId, ...INVASION_SPOTS[mapId], profile: group[0] }, group, soloClass, target });
+  const team = (classes: string[], level: number, stage: GearStage) => classes.map(cls => profile(cls, level, stage));
+  return [
+    at('Dragón Carmesí', 'crimson_dragon', 'pueblo', team(['knight', 'mage', 'barbarian', 'rogue', 'ranger'], 25, 'forge_late'), 'barbarian', [240, 360]),
+    at('Heraldo del Yermo', 'waste_herald', 'bosque', team(['knight', 'mage', 'ranger'], 11, 'act2'), 'mage', [120, 180]),
+    at('Espectro del Velo', 'veil_specter', 'marismas', team(['knight', 'mage', 'ranger'], 16, 'mines'), 'mage', [120, 180]),
+    at('Coloso de Brasa', 'ember_colossus', 'minas', team(['knight', 'mage', 'ranger'], 25, 'forge_late'), 'mage', [120, 180]),
   ];
 }
 

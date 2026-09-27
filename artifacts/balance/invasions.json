@@ -1,0 +1,74 @@
+[
+  {
+    "invader": "Dragón Carmesí",
+    "target": [
+      240,
+      360
+    ],
+    "group": {
+      "outcome": "kill",
+      "seconds": 302.6,
+      "deaths": 0
+    },
+    "solo": {
+      "className": "barbarian",
+      "outcome": "wipe",
+      "seconds": 103.6,
+      "deaths": 0
+    }
+  },
+  {
+    "invader": "Heraldo del Yermo",
+    "target": [
+      120,
+      180
+    ],
+    "group": {
+      "outcome": "kill",
+      "seconds": 159.3,
+      "deaths": 0
+    },
+    "solo": {
+      "className": "mage",
+      "outcome": "wipe",
+      "seconds": 390.5,
+      "deaths": 0
+    }
+  },
+  {
+    "invader": "Espectro del Velo",
+    "target": [
+      120,
+      180
+    ],
+    "group": {
+      "outcome": "kill",
+      "seconds": 145.3,
+      "deaths": 0
+    },
+    "solo": {
+      "className": "mage",
+      "outcome": "wipe",
+      "seconds": 306.3,
+      "deaths": 0
+    }
+  },
+  {
+    "invader": "Coloso de Brasa",
+    "target": [
+      120,
+      180
+    ],
+    "group": {
+      "outcome": "kill",
+      "seconds": 138,
+      "deaths": 0
+    },
+    "solo": {
+      "className": "mage",
+      "outcome": "wipe",
+      "seconds": 128.9,
+      "deaths": 0
+    }
+  }
+]

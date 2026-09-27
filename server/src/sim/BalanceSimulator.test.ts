@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BalanceSimulator, balancedAttributes, seededRandom } from './BalanceSimulator.js';
-import { baselineScenarios, forgeScenarios, manaProfile, minesScenarios, type ScenarioSet } from './scenarios.js';
+import { baselineScenarios, forgeScenarios, invasionScenarios, manaProfile, minesScenarios, type ScenarioSet } from './scenarios.js';
 import { CLASS_ORDER } from '@aden/shared';
 
 describe('BalanceSimulator', () => {
@@ -69,6 +69,16 @@ describe('BalanceSimulator', () => {
       }
     }
   });
+  it('lets the intended group beat each invader in time and not even its strongest member alone', () => {
+    for (const inv of invasionScenarios()) {
+      const group = sim.fightGroup(inv.scenario, inv.group);
+      expect(group.outcome, inv.name).toBe('kill');
+      expect(group.seconds, inv.name).toBeGreaterThanOrEqual(inv.target[0]);
+      expect(group.seconds, inv.name).toBeLessThanOrEqual(inv.target[1]);
+      const solo = sim.fightGroup(inv.scenario, inv.group.filter(p => p.className === inv.soloClass));
+      expect(solo.outcome, `${inv.name} solo ${inv.soloClass}`).not.toBe('kill');
+    }
+  }, 120_000);
   it('keeps a far lower level character from beating a boss', () => {
     const prior = baselineScenarios('knight').find(s => s.templateId === 'memory_prior')!;
     const r = sim.fight({ ...prior, profile: { ...prior.profile, level: 8 } }, 'stationary', 1, 30);

@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { CLASS_ORDER } from '@aden/shared';
 import { BalanceSimulator, type Behavior, type FightResult } from '../src/sim/BalanceSimulator.js';
-import { baselineScenarios, forgeScenarios, manaProfile, minesScenarios, type ScenarioSet } from '../src/sim/scenarios.js';
+import { baselineScenarios, forgeScenarios, invasionScenarios, manaProfile, minesScenarios, type ScenarioSet } from '../src/sim/scenarios.js';
 
 const OUT = '../artifacts/balance';
 const sim = await BalanceSimulator.start();
@@ -12,6 +12,14 @@ try {
     const report = { max: sim.manaRun(profile, 'max'), primary: sim.manaRun(profile, 'primary') };
     writeFileSync(`${OUT}/mana.json`, JSON.stringify(report, null, 2));
     console.log(JSON.stringify(report));
+  } else if (process.argv.includes('--invasions')) {
+    const rows = invasionScenarios().map(inv => {
+      const group = sim.fightGroup(inv.scenario, inv.group);
+      const solo = sim.fightGroup(inv.scenario, inv.group.filter(p => p.className === inv.soloClass));
+      return { invader: inv.name, target: inv.target, group, solo: { className: inv.soloClass, ...solo } };
+    });
+    writeFileSync(`${OUT}/invasions.json`, JSON.stringify(rows, null, 2));
+    for (const r of rows) console.log(`${r.invader}: grupo ${r.group.outcome}/${r.group.seconds}s (muertes ${r.group.deaths}, objetivo ${r.target.join('–')}) · solo ${r.solo.className} ${r.solo.outcome}/${r.solo.seconds}s`);
   } else if (process.argv.includes('--mines') || process.argv.includes('--forge')) {
     const [file, scenarios]: [string, ScenarioSet] = process.argv.includes('--forge') ? ['forge', forgeScenarios] : ['mines', minesScenarios];
     const rows: FightResult[] = [];

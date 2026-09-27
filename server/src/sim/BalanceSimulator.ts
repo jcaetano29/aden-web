@@ -90,7 +90,9 @@ export function escapePoint(mob: Pick<MobState, 'hazardX' | 'hazardZ' | 'hazardR
  */
 export class BalanceSimulator {
   private clock = Date.now();
-  private readonly client = { sessionId: BOT_ID, send: () => {} } as unknown as Client;
+  /** Un cliente falso por bot; `botId` es el bot que actúa ahora (peleas de grupo). */
+  private readonly clients = new Map<string, Client>();
+  private botId = BOT_ID;
 
   private constructor(private readonly server: ColyseusTestServer, private readonly room: GameRoom) {}
 
@@ -108,6 +110,7 @@ export class BalanceSimulator {
 
   fight(s: Scenario, behavior: Behavior, seed = 1, maxSeconds = 300): FightResult {
     return this.controlled(seed, advance => {
+      this.botId = BOT_ID;
       const p = this.resetWorld(s.profile);
       s.setup?.(this.room);
       const mob = this.room.spawnMob(TARGET_ID, s.templateId, s.x, s.z, s.mapId);
@@ -136,6 +139,7 @@ export class BalanceSimulator {
   /** Segundos hasta que la rotación no se puede pagar con el maná disponible (null = la sostiene). */
   manaRun(profile: Profile, rotation: 'max' | 'primary', seed = 1, maxSeconds = 180): number | null {
     return this.controlled(seed, advance => {
+      this.botId = BOT_ID;
       const p = this.resetWorld(profile);
       const dummy = this.room.spawnMob(TARGET_ID, 'veil_raider', 1200, 130, 'marismas');
       dummy.maxHp = dummy.hp = 1e9; dummy.pAtk = 0; dummy.stunMs = 1e12;
@@ -240,20 +244,65 @@ export class BalanceSimulator {
     return rotation === 'primary' ? list.slice(0, 1) : list;
   }
 
-  private resetWorld(profile: Profile): PlayerState {
+  /**
+   * Pelea de grupo: todos los bots atentos contra el mismo jefe. Los caídos reaparecen en el
+   * spawn del mapa y vuelven caminando, como jugadores reales; 'wipe' = todos caídos a la vez.
+   */
+  fightGroup(s: Scenario, profiles: Profile[], seed = 1, maxSeconds = 1200): { outcome: 'kill' | 'wipe' | 'timeout'; seconds: number; deaths: number } {
+    return this.controlled(seed, advance => {
+      this.clearWorld();
+      const bots = profiles.map((profile, i) => ({ id: `sim_bot_${i}`, p: this.addBot(`sim_bot_${i}`, profile) }));
+      s.setup?.(this.room);
+      const mob = this.room.spawnMob(TARGET_ID, s.templateId, s.x, s.z, s.mapId);
+      bots.forEach(({ id, p }, i) => {
+        const angle = (i / bots.length) * Math.PI * 2;
+        this.place(p, s.mapId, mob.x + Math.cos(angle) * 5, mob.z + Math.sin(angle) * 5);
+        this.botId = id; this.send(MessageType.SetTarget, { targetId: TARGET_ID });
+      });
+      const dt = 1 / TICK_RATE;
+      let t = 0, deaths = 0;
+      const wasDead = new Set<string>();
+      const done = (outcome: 'kill' | 'wipe' | 'timeout') => ({ outcome, seconds: Math.round(t * 10) / 10, deaths });
+      while (t < maxSeconds) {
+        if (mob.dead) return done('kill');
+        if (bots.every(b => b.p.dead)) return done('wipe');
+        for (const { id, p } of bots) {
+          if (p.dead) { if (!wasDead.has(id)) { wasDead.add(id); deaths++; } continue; }
+          wasDead.delete(id);
+          this.botId = id;
+          this.attentiveStep(p, mob);
+        }
+        this.room.tick(dt);
+        advance(dt * 1000);
+        t += dt;
+      }
+      return done('timeout');
+    });
+  }
+
+  private clearWorld(): void {
     const r = this.room;
     r.state.mobs.clear(); r.state.players.clear(); r.state.droppedItems.clear();
     r.state.worldObjects.forEach(o => { o.active = true; o.cooled = false; o.respawnMs = 0; });
     (r as unknown as { dungeonRun: { dungeonStage: number; dungeonKills: number } }).dungeonRun.dungeonStage = 0;
+  }
+
+  private resetWorld(profile: Profile): PlayerState {
+    this.clearWorld();
+    return this.addBot(BOT_ID, profile);
+  }
+
+  private addBot(id: string, profile: Profile): PlayerState {
+    const r = this.room;
     const p = new PlayerState();
-    p.name = BOT_ID; p.className = profile.className; p.level = profile.level;
+    p.name = id; p.className = profile.className; p.level = profile.level;
     p.questId = profile.questId ?? 'q1';
     for (const [slot, id] of Object.entries(profile.equipment)) p.equipment.set(slot, id);
     const a = profile.attributes ?? balancedAttributes(profile.level);
     p.attributes.str = a.str; p.attributes.agi = a.agi; p.attributes.vit = a.vit; p.attributes.ene = a.ene;
     for (const [id, qty] of Object.entries(profile.potions ?? {})) grantItem(p, id, qty);
     for (const item of Object.values(CATALOG_ITEMS)) if (item.category === 'municion') grantItem(p, item.id, 5000);
-    r.state.players.set(BOT_ID, p);
+    r.state.players.set(id, p);
     (r as unknown as { recomputeStats(p: PlayerState): void }).recomputeStats(p);
     p.hp = p.maxHp; p.mp = p.maxMp; p.msSinceCombat = 100000;
     return p;
@@ -266,7 +315,9 @@ export class BalanceSimulator {
 
   private send(type: string, message: unknown): void {
     const handlers = (this.room as unknown as { onMessageHandlers: Record<string, (c: Client, m: unknown) => void> }).onMessageHandlers;
-    handlers[type](this.client, message);
+    let client = this.clients.get(this.botId);
+    if (!client) { client = { sessionId: this.botId, send: () => {} } as unknown as Client; this.clients.set(this.botId, client); }
+    handlers[type](client, message);
   }
 
   /** Azar sembrado y reloj monótono propio (las pociones usan Date.now). */
