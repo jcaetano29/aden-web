@@ -95,6 +95,7 @@ export class BalanceSimulator {
   private constructor(private readonly server: ColyseusTestServer, private readonly room: GameRoom) {}
 
   static async start(port = 2610): Promise<BalanceSimulator> {
+    process.env.ADEN_EVENTS = 'off'; // el reloj del simulador no debe disparar invasiones
     const server = await boot(config, port);
     const room = await server.createRoom('game', {}) as GameRoom;
     room.setSimulationInterval(() => {}, 1000);

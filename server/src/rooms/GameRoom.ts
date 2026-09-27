@@ -1,4 +1,4 @@
-import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterInterruptFor, encounterCoolFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached, AMMO_SKILLS } from "@aden/shared";
+import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterInterruptFor, encounterCoolFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached, AMMO_SKILLS, invaderForTemplate } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
@@ -18,6 +18,7 @@ import { randomUUID } from 'node:crypto';
 import { rollCatalogDrop, lootSourceFor, LOOT_QUALITY_ODDS, dungeonReward, questReward, createItemInstance } from '@aden/shared';
 import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, resetDungeon } from '../systems/AdventureSystem.js';
 import { stepEncounter } from '../systems/EncounterSystem.js';
+import { EventSystem } from '../systems/EventSystem.js';
 const { Room } = colyseusPkg;
 import {
   MessageType,
@@ -152,6 +153,8 @@ export class GameRoom extends Room<GameState> {
   private dropSeq = 0;
   /** Contador para ids únicos de invocaciones de encuentros. */
   private summonSeq = 0;
+  /** Invasiones y otros eventos de mundo. */
+  events!: EventSystem;
   private dungeonActive = false;
   private readonly dungeonRun = { mapId: 'cripta', dead: false, dungeonStage: 0, dungeonKills: 0 };
 
@@ -359,6 +362,16 @@ export class GameRoom extends Room<GameState> {
 
   async onCreate() {
     this.setState(new GameState());
+    this.events = new EventSystem({
+      state: this.state,
+      now: () => Date.now(),
+      rng: () => Math.random(),
+      announce: text => this.broadcast(MessageType.WorldAnnounce, { text }),
+      onlinePlayers: () => this.clients.length,
+      spawnInvader: (id, templateId, x, z, mapId) => this.spawnMob(id, templateId, x, z, mapId),
+      dropReserved: () => {},
+      reward: () => {},
+    }, { scheduled: !process.env.VITEST && process.env.ADEN_EVENTS !== 'off' });
     await this.presence.subscribe(GLOBAL_CHAT_TOPIC, this.deliverGlobalChat);
     this.onMessage(MessageType.ChatSend, async (client, payload: unknown) => {
       const sender = this.state.players.get(client.sessionId);
@@ -1073,7 +1086,8 @@ export class GameRoom extends Room<GameState> {
     mob.hazardMs = 0;
     mob.channeling = false;
     mob.moving = false;
-    mob.respawnMs = respawnForTemplate(mob.templateId) ?? MOB_RESPAWN_MS;
+    // Los invasores no reaparecen: el sistema de eventos los retira.
+    mob.respawnMs = invaderForTemplate(mob.templateId) ? Number.POSITIVE_INFINITY : respawnForTemplate(mob.templateId) ?? MOB_RESPAWN_MS;
     this.broadcast(MessageType.Death, { entityId: mobId });
 
     const killer = killerId ? this.state.players.get(killerId) : undefined;
@@ -1594,6 +1608,9 @@ export class GameRoom extends Room<GameState> {
         p.targetId = "";
       }
     });
+
+    // Eventos de mundo: fuera de los recorridos de mobs (pueden borrar al invasor).
+    this.events.tick();
   }
 
   /**

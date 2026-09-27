@@ -6,6 +6,7 @@ import { GuildState } from "./GuildState.js";
 import { LeaderboardState } from "./LeaderboardState.js";
 import { WorldObjectState } from "./WorldObjectState.js";
 import { PartyState } from './PartyState.js';
+import { WorldEventState } from './WorldEventState.js';
 
 export class GameState extends Schema {
   @type({ map: PartyState }) parties = new MapSchema<PartyState>();
@@ -15,4 +16,5 @@ export class GameState extends Schema {
   @type({ map: GuildState }) guilds = new MapSchema<GuildState>();
   @type(LeaderboardState) leaderboard = new LeaderboardState();
   @type({ map: WorldObjectState }) worldObjects = new MapSchema<WorldObjectState>();
+  @type(WorldEventState) worldEvent = new WorldEventState();
 }
