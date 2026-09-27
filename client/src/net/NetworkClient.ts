@@ -34,7 +34,7 @@ import {
   CRYPT_WAVE_TEMPLATES,
 } from "@aden/shared";
 import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
-import type { PartyInvitation, WorldEventView } from '@aden/shared';
+import type { PartyInvitation, WorldEventView, CastleView } from '@aden/shared';
 import type { PartyPanelData, PartyMember } from '../render/PartyPanel.js';
 import { TRADE_RANGE, distance2D, type TradeSnapshot, type TradeOffer } from '@aden/shared';
 import type { TradePanelData } from '../render/TradePanel.js';
@@ -587,6 +587,14 @@ export class NetworkClient {
     const ev: any = this.room.state.worldEvent;
     if (ev?.phase === "announced" && ev.mapId === myMap) out.push({ x: ev.x, z: ev.z, kind: "boss" });
     return out;
+  }
+
+  /** Castillo del Caos con inscripción abierta o partida en curso, o null. */
+  getCastle(): CastleView | null {
+    const c: any = this.room.state.castle;
+    if (!c?.phase) return null;
+    return { phase: c.phase, bracket: c.bracket, startsAt: c.startsAt, endsAt: c.endsAt, registered: c.registered, alive: c.alive,
+      monsters: c.monsters, ring: c.ring, collapseAt: c.collapseAt, myPoints: c.points?.get(this.room.sessionId) ?? null };
   }
 
   /** Evento de mundo visible (invasión anunciada o activa), o null. */

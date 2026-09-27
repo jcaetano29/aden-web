@@ -1,5 +1,5 @@
 import { AdventureTracker } from "./render/AdventureTracker.js";
-import { NPCS, chooseHealthPotion, sideChainForNpc, sideChainStep, campaignRoleNow, encounterCoolFor, encounterInterruptFor, ammoSkillBlock, inInvasionArea, invasionProtected } from '@aden/shared';
+import { NPCS, chooseHealthPotion, sideChainForNpc, sideChainStep, campaignRoleNow, encounterCoolFor, encounterInterruptFor, ammoSkillBlock, inInvasionArea, invasionProtected, nextCastle, CASTLE_MAP, CHAOS_SEAL } from '@aden/shared';
 import { campaignDialog } from './render/campaignDialog.js';
 import { sideChainDialog } from './render/sideChainDialog.js';
 import { HazardViews } from "./render/HazardViews.js";
@@ -41,6 +41,8 @@ import { classAdvice, npcStory } from "@aden/shared";
 import { DialogPanel } from "./render/DialogPanel.js";
 import { ZoneIndicator } from "./render/ZoneIndicator.js";
 import { EventBanner } from "./render/EventBanner.js";
+import { CastleBanner } from "./render/CastleBanner.js";
+import { castleDialog } from "./render/castleDialog.js";
 import { ZoneBanner } from "./render/ZoneBanner.js";
 import { injectTheme } from "./render/theme.js";
 import { NetworkClient, isAuthError, type RoomCallbacks } from "./net/NetworkClient.js";
@@ -151,6 +153,7 @@ async function main() {
   const zoneBanner = new ZoneBanner();
   zoneBanner.mount(document.body);
   const eventBanner = new EventBanner(document.body);
+  const castleBanner = new CastleBanner(document.body);
 
   // Minimapa (esquina sup. der.): radar del mapa actual (Etapa 15).
   const minimap = new Minimap();
@@ -381,6 +384,12 @@ async function main() {
     // Gate de cercanía (espeja el del server)
     if (self.mapId !== npcDef.mapId || distance2D(pos.x, pos.z, center.x, center.z) > (regional ? 5 : TOWN_SERVICE_RADIUS)) {
       hud.toast(`Acercate a ${speaker} para hablarle`, "#ffe066");
+      return;
+    }
+    if (npcId === 'chaos_keeper') {
+      const now = Date.now(), hasSeal = net.getInventory().some(e => e.itemTemplateId === CHAOS_SEAL && e.qty > 0);
+      const d = castleDialog(net.getCastle(), nextCastle(now), self.level, hasSeal, now);
+      dialog.open({ speaker, text: d.text, actionLabel: d.actionLabel, onAction: () => { if (d.send) net.sendInteractNpc('chaos_keeper'); } });
       return;
     }
     const chain = sideChainForNpc(npcId);
@@ -699,7 +708,8 @@ async function main() {
       const curZone = zoneAt(self.x, self.z);
       // Dentro del área de una invasión activa manda el área: PvP para nivel 10+, protegido para el resto.
       const invasion = net.getWorldEvent(), myLevel = selfCombat?.level ?? 1;
-      if (invasion && inInvasionArea(invasion, selfCombat?.mapId ?? "pueblo", self.x, self.z)) {
+      if (selfCombat?.mapId === CASTLE_MAP) zoneIndicator.update(true, "⚔ Castillo del Caos");
+      else if (invasion && inInvasionArea(invasion, selfCombat?.mapId ?? "pueblo", self.x, self.z)) {
         const safe = invasionProtected(myLevel);
         zoneIndicator.update(!safe, safe ? "🛡 Área de invasión · protegido" : "⚔ Área de invasión · PvP");
       } else zoneIndicator.update(!curZone.safe);
@@ -708,6 +718,9 @@ async function main() {
     // Etapa 15: mapa actual del jugador → filtra el render y el minimapa; cambia al warpear.
     const myMapId = selfCombat?.mapId ?? "pueblo";
     eventBanner.update(net.getWorldEvent(), Date.now());
+    const castle = net.getCastle();
+    castleBanner.update(castle, myMapId === CASTLE_MAP, Date.now());
+    environment.updateCastle(castle?.phase === "active" ? castle.ring : 0, !!castle && castle.phase === "active" && castle.collapseAt > Date.now());
     groundItems.setMap(myMapId);
     views.setCurrentMap(myMapId);
     views.setSelfLevel(selfCombat?.level ?? 1);

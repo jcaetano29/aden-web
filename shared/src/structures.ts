@@ -101,7 +101,7 @@ for (const [cx, z] of [[860, -7], [940, -91]])
         box('cripta', `crypt-passage-${x}-${z}`, x, 1.4, z, .65, 2.8, .65);
         box('cripta', `crypt-passage-capital-${x}-${z}`, x, 2.9, z, .8, .35, .8, 'gold', false);
     }
-for (const zone of ZONES.filter(z => !z.safe && z.id !== 'cripta' && z.id !== 'monasterio' && z.id !== 'minas' && z.id !== 'fragua'))
+for (const zone of ZONES.filter(z => !z.safe && z.id !== 'cripta' && z.id !== 'monasterio' && z.id !== 'minas' && z.id !== 'fragua' && z.id !== 'castillo'))
     for (const side of [-1, 1])
         for (const row of [-1, 1]) {
             const x = zone.center.x + side * 25, z = zone.center.z + row * 26;
@@ -185,7 +185,7 @@ function random(seed: number): () => number {
 /** Clustered, reproducible decoration. The main route, central arena, spawn and
  * interactables reserve space before any props are emitted. No gameplay state. */
 export function dressingLayout(zone: Zone): Placement[] {
-    if (zone.id === "cripta" || zone.id === 'monasterio' || zone.id === 'minas' || zone.id === 'fragua')
+    if (zone.id === "cripta" || zone.id === 'monasterio' || zone.id === 'minas' || zone.id === 'fragua' || zone.id === 'castillo')
         return []; // The dungeon uses authored chambers, not scattered scenery.
     const rng = random(Array.from(zone.id).reduce((n, c) => n * 31 + c.charCodeAt(0), 8421));
     const objects = WORLD_OBJECTS.filter(o => o.mapId === zone.id);

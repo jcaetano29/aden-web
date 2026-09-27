@@ -4,6 +4,7 @@ import { addVeilEnvironment } from './VeilEnvironment.js';
 import { addMonasteryEnvironment } from './MonasteryEnvironment.js';
 import { addMinesEnvironment } from './MinesEnvironment.js';
 import { addFraguaEnvironment } from './FraguaEnvironment.js';
+import { addCastilloEnvironment } from './CastilloEnvironment.js';
 import * as THREE from "three";
 import { addMapDressing } from "./MapDressing.js";
 import { ZONES, WORLD_OBJECTS, getZone, zoneAt, TOWN, SAFE_RADIUS, distance2D, type Zone } from "@aden/shared";
@@ -31,6 +32,7 @@ const SUN_INTENSITY: Record<string, number> = {
   monasterio: 1.4,
   minas: 1.0,
   fragua: 0.95,
+  castillo: 0.55,
   pueblo: 1.65,
   bosque: 1.2,
   ruinas: 1.05,
@@ -47,6 +49,8 @@ const SUN_INTENSITY: Record<string, number> = {
  * cambian suavemente al viajar de una zona a otra (updateMood). Puramente visual.
  */
 export class Environment {
+  /** Arena del Castillo del Caos: sus anillos cambian con la partida. */
+  private castillo?: ReturnType<typeof addCastilloEnvironment>;
   private readonly hemi: THREE.HemisphereLight;
   private readonly sun: THREE.DirectionalLight;
   private readonly fog: THREE.Fog;
@@ -210,6 +214,7 @@ export class Environment {
     addMonasteryEnvironment(this.scene);
     addMinesEnvironment(this.scene);
     addFraguaEnvironment(this.scene);
+    this.castillo = addCastilloEnvironment(this.scene);
     this.buildTown();
 
     for (const p of AUTHORED_STRUCTURES) {
@@ -948,6 +953,11 @@ export class Environment {
    * donde está el jugador — así CRUZAR a una zona nueva se siente distinto. Llamar
    * cada frame con la posición del self. También anima las brasas del Yermo.
    */
+  /** Anillos caídos y aviso de derrumbe del Castillo del Caos. */
+  updateCastle(ring: number, warning: boolean): void {
+    this.castillo?.update(ring, warning);
+  }
+
   updateMood(x: number, z: number, dt: number): void {
     // Etapa 18: el sol (y su cámara de sombra) siguen al jugador para mantener el
     // frustum de sombras acotado a su alrededor. Ángulo de "hora dorada" (SUN_DIR).
