@@ -294,6 +294,8 @@ export class GameRoom extends Room<GameState> {
 
   /** Centraliza la muerte de un jugador (por mob o por PvP). Aplica penalidad si es PvP. */
   private killPlayer(victim: PlayerState, victimId: string, killerId?: string): void {
+    // Castillo del Caos: eliminación sin penalidad (el sistema lo devuelve al pueblo).
+    if (this.castle.onPlayerDeath(victimId, killerId)) { this.broadcast(MessageType.Death, { entityId: victimId }); return; }
     resetDungeon(victim);
     const leftDungeon=victim.mapId==='cripta';
     victim.dead = true;
@@ -602,7 +604,7 @@ export class GameRoom extends Room<GameState> {
         const t = p.targetId ? this.resolveTarget(p.targetId, p.mapId) : null;
         if (!t) return;
         if (t.kind === 'mob' && !canFightDungeonMob(p,t.entity.templateId)) return;
-        const power = t.kind === 'mob' ? pvePower(p.level, t.entity.level).outgoing : 1;
+        const power = t.kind === 'mob' ? pvePower(p.level, t.entity.level).outgoing : this.castle.pvpFactor(p, t.entity) ?? 1;
         if (power === 0) {
           client.send(MessageType.ItemResult, {success:false,text:'Fuera de tu alcance: necesitás acercarte a su nivel.'});
           return;
@@ -836,6 +838,7 @@ export class GameRoom extends Room<GameState> {
       let zone;
       try { zone = getZone(msg?.mapId ?? ""); } catch { return; }
       if (zone.hidden) return; // sólo se entra por su evento
+      if (this.castle.isParticipant(client.sessionId)) { this.castle.eliminate(client.sessionId, 'left'); return; }
       if (zone.id === p.mapId) return; // ya estás ahí
       const lock = travelLockRemainingMs(p.msSinceCombat);
       if (lock > 0) { client.send(MessageType.ItemResult, { success: false, text: travelLockText(lock) }); return; }
@@ -1227,6 +1230,7 @@ export class GameRoom extends Room<GameState> {
     // Loot (R-E3b-2): rodar drop table del mob y crear ítems en el piso con scatter.
     this.dropLoot(mob.templateId, mob.x, mob.z, mob.mapId, killer?.itemEffects.goldPct ?? 0);
     this.clearSummons(mobId);
+    this.castle.onMobKilled(mobId, killerId);
   }
 
   /** Refuerzos de un encuentro: una vez al bajar de cierta vida, o periódicos desde objetos activos. */
@@ -1289,6 +1293,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   private areAllies(a: PlayerState, b: PlayerState): boolean {
+    if (this.castle.pvpFactor(a, b) !== null) return false; // en el Castillo del Caos no hay aliados
     return (!!a.guildId && a.guildId === b.guildId) || (!!a.partyId && a.partyId === b.partyId);
   }
 
@@ -1493,7 +1498,7 @@ export class GameRoom extends Room<GameState> {
         if (canAttack(p, victim, weaponRange(playerLoadout(p)))) {
           if(!consumeAmmo(p))return;
           const variance = 0.9 + Math.random() * 0.2;
-          const dmg = resolveAttack(p, victim, 1, variance, getClass(p.className).base.attackCooldownMs/(1+p.itemEffects.attackSpeed));
+          const dmg = resolveAttack(p, victim, this.castle.pvpFactor(p, victim) ?? 1, variance, getClass(p.className).base.attackCooldownMs/(1+p.itemEffects.attackSpeed));
           this.markCombat(p);
           this.markCombat(victim);
           this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: victim.hp });
@@ -1895,6 +1900,7 @@ export class GameRoom extends Room<GameState> {
   }
 
   async onLeave(client: Client) {
+    this.castle.eliminate(client.sessionId, 'disconnect'); // no queda atrapado en la arena
     this.chat.remove(client.sessionId);
     this.trades.remove(client.sessionId);
     this.parties.leave(client.sessionId);

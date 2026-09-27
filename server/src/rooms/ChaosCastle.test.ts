@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { boot, type ColyseusTestServer } from '@colyseus/testing';
 import config from '../testServer.js';
 import type { GameRoom } from './GameRoom.js';
@@ -65,6 +65,60 @@ describe('Chaos Castle over real connections', () => {
     expect(room.state.castle.phase).toBe('');
     expect(a.p.mapId).toBe('pueblo'); expect(b.p.mapId).toBe('pueblo');
     expect(room.state.mobs.size).toBe(0);
+  });
+
+  /** Partida activa con los jugadores dados; los guardias quedan aturdidos. */
+  const match = async (ctx: Awaited<ReturnType<typeof setup>>, specs: [string, number, string?][]) => {
+    ctx.room.castle.openNow('menor', 60_000);
+    const players = [];
+    for (const [name, level, guild] of specs) { const pl = await ctx.join(name, level, 1, guild ?? ''); await ctx.register(pl); players.push(pl); }
+    ctx.advance(60_000);
+    expect(ctx.room.state.castle.phase).toBe('active');
+    for (const m of ctx.room.state.mobs.values()) m.stunMs = 1e9;
+    return players;
+  };
+  const hit = (ctx: Awaited<ReturnType<typeof setup>>, attacker: { p: any }, victim: { p: any; id: string }) => {
+    attacker.p.x = victim.p.x + 1; attacker.p.z = victim.p.z; attacker.p.moving = false; victim.p.moving = false;
+    attacker.p.targetId = victim.id; attacker.p.attackCooldownMs = 0;
+    ctx.room.tick(0.05); attacker.p.targetId = '';
+  };
+
+  it('pits guildmates against each other at half damage, scores kills and sends the fallen home unpunished', async () => {
+    const ctx = await setup();
+    const [a, b] = await match(ctx, [['Rojo', 15, 'g1'], ['Rojo2', 15, 'g1']]);
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    b.p.hp = b.p.maxHp; hit(ctx, a, b);
+    const inside = b.p.maxHp - b.p.hp;
+    expect(inside).toBeGreaterThan(0);
+    // Mismo golpe fuera del castillo (mapa PvP, sin ser aliados): el doble.
+    const out = await ctx.join('Afuera', 15, 0, 'g9'), target = await ctx.join('Blanco', 15, 0, 'g8');
+    out.p.mapId = target.p.mapId = 'bosque'; out.p.x = 300; out.p.z = 0; target.p.x = 301; target.p.z = 0;
+    target.p.hp = target.p.maxHp; hit(ctx, out, target);
+    expect(inside).toBe(Math.max(1, Math.round((target.p.maxHp - target.p.hp) * 0.5)));
+    vi.restoreAllMocks();
+    // Un guardia: 2 puntos.
+    const guardId = [...ctx.room.state.mobs.keys()][0], guard = ctx.room.state.mobs.get(guardId)!;
+    guard.hp = 1; a.p.x = guard.x; a.p.z = guard.z + 1; a.p.targetId = guardId; a.p.attackCooldownMs = 0; ctx.room.tick(0.05);
+    expect(ctx.room.state.castle.points.get(a.id)).toBe(2);
+    // Eliminar al compañero: 1 punto más; vuelve al pueblo vivo y sin perder nada.
+    const gold = b.p.gold = 700, exp = b.p.exp = 300;
+    b.p.hp = 1; hit(ctx, a, b);
+    expect(ctx.room.state.castle.points.get(a.id)).toBe(3);
+    expect(b.p.mapId).toBe('pueblo'); expect(b.p.dead).toBe(false); expect(b.p.hp).toBe(b.p.maxHp);
+    expect(b.p.gold).toBe(gold); expect(b.p.exp).toBe(exp);
+  });
+
+  it('eliminates whoever travels away or disconnects', async () => {
+    const ctx = await setup();
+    const [a, b, c] = await match(ctx, [['Uno', 15], ['Dos', 15], ['Tres', 15]]);
+    a.c.send(MessageType.WarpTo, { mapId: 'bosque' });
+    await new Promise(r => setTimeout(r, 60));
+    expect(a.p.mapId).toBe('pueblo');
+    expect(ctx.room.state.castle.alive).toBe(2);
+    await c.c.leave();
+    await new Promise(r => setTimeout(r, 100));
+    expect(ctx.room.state.castle.alive).toBe(1);
+    expect(b.p.mapId).toBe('castillo');
   });
 
   it('never lets anyone travel into the arena outside the event', async () => {

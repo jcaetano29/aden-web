@@ -1,9 +1,11 @@
 import {
   CASTLE_MAP, CASTLE_CENTER, CASTLE_CAPACITY, CASTLE_REGISTRATION_MS, CASTLE_DURATION_MS, CASTLE_BRACKETS, CHAOS_SEAL,
+  CASTLE_PVP_FACTOR, CASTLE_POINTS_MONSTER, CASTLE_POINTS_PLAYER,
   TOWN_ZONE_ID, castleBracket, getZone, nextCastle, type CastleBracket,
 } from '@aden/shared';
 import type { GameState } from '../state/GameState.js';
 import type { MobState } from '../state/MobState.js';
+import type { PlayerState } from '../state/PlayerState.js';
 
 /** Lo que el Castillo del Caos necesita del servidor de juego (inyectado: testeable sin sala). */
 export interface CastleHost {
@@ -72,6 +74,57 @@ export class ChaosCastleSystem {
 
   isParticipant(playerId: string): boolean {
     return this.st.phase === 'active' && this.participants.get(playerId)?.alive === true;
+  }
+
+  /** El mismo chequeo a partir del jugador (las reglas de combate reciben jugadores, no ids). */
+  isParticipantPlayer(p: PlayerState): boolean {
+    if (this.st.phase !== 'active') return false;
+    for (const part of this.participants.values()) if (part.alive && this.host.state.players.get(part.id) === p) return true;
+    return false;
+  }
+
+  /** Multiplicador del daño entre dos jugadores: 0,5 si ambos pelean adentro, null si no aplica. */
+  pvpFactor(a: PlayerState, b: PlayerState): number | null {
+    return this.isParticipantPlayer(a) && this.isParticipantPlayer(b) ? CASTLE_PVP_FACTOR : null;
+  }
+
+  /** Muerte adentro: punto para el que mató, eliminación sin penalidad. Devuelve true si la manejó. */
+  onPlayerDeath(victimId: string, killerId?: string): boolean {
+    if (!this.isParticipant(victimId)) return false;
+    if (killerId && this.isParticipant(killerId)) this.addPoints(killerId, CASTLE_POINTS_PLAYER);
+    this.eliminate(victimId, 'death');
+    return true;
+  }
+
+  onMobKilled(mobId: string, killerId?: string): void {
+    if (!this.guards.has(mobId)) return;
+    if (killerId && this.isParticipant(killerId)) this.addPoints(killerId, CASTLE_POINTS_MONSTER);
+    this.syncCounts();
+  }
+
+  isGuard(mobId: string): boolean { return this.guards.has(mobId); }
+
+  /** Sale de la partida (conserva sus puntos) y vuelve al pueblo. */
+  eliminate(playerId: string, reason: 'fall' | 'left' | 'disconnect' | 'death'): void {
+    const part = this.participants.get(playerId);
+    if (!part?.alive || this.st.phase !== 'active') return;
+    part.alive = false;
+    this.sendHome(playerId);
+    const texts = {
+      death: `Quedaste eliminado del ${this.bracket.name}. Tus puntos: ${part.points}.`,
+      fall: `Caíste al abismo: quedaste eliminado del ${this.bracket.name}. Tus puntos: ${part.points}.`,
+      left: `Abandonaste el ${this.bracket.name}. Tus puntos: ${part.points}.`,
+      disconnect: '',
+    };
+    if (texts[reason]) this.host.notify(playerId, texts[reason], false);
+    this.syncCounts();
+  }
+
+  private addPoints(playerId: string, amount: number): void {
+    const part = this.participants.get(playerId);
+    if (!part) return;
+    part.points += amount;
+    this.st.points.set(playerId, part.points);
   }
 
   private open(bracket: CastleBracket, startsAt: number): void {
