@@ -1,6 +1,6 @@
 import {
   CASTLE_MAP, CASTLE_CENTER, CASTLE_CAPACITY, CASTLE_REGISTRATION_MS, CASTLE_DURATION_MS, CASTLE_BRACKETS, CHAOS_SEAL,
-  CASTLE_PVP_FACTOR, CASTLE_POINTS_MONSTER, CASTLE_POINTS_PLAYER,
+  CASTLE_PVP_FACTOR, CASTLE_POINTS_MONSTER, CASTLE_POINTS_PLAYER, CASTLE_COLLAPSES, CASTLE_COLLAPSE_WARNING_MS, UPGRADE_GEMS, fallsAt,
   TOWN_ZONE_ID, castleBracket, getZone, nextCastle, type CastleBracket,
 } from '@aden/shared';
 import type { GameState } from '../state/GameState.js';
@@ -162,12 +162,49 @@ export class ChaosCastleSystem {
   }
 
   private stepMatch(now: number): void {
+    const st = this.st;
+    // Derrumbe: se anuncia al llegar a su umbral (vivos o tiempo) y cae 5 s después.
+    const next = CASTLE_COLLAPSES[st.ring];
+    if (next && st.collapseAt === 0) {
+      this.syncCounts();
+      if (st.alive + st.monsters <= next.alive || now - this.startedAt >= next.atMs) {
+        st.collapseAt = now + CASTLE_COLLAPSE_WARNING_MS;
+        this.host.announce(st.ring === 0 ? '⚔ ¡El borde del Castillo del Caos se derrumba!' : '⚔ ¡El anillo medio del Castillo del Caos se derrumba!');
+      }
+    } else if (next && now >= st.collapseAt) {
+      st.ring += 1; st.collapseAt = 0;
+    }
+    // Caídas al abismo (anillos derrumbados o fuera de la plataforma) y guardias caídos o muertos.
+    for (const part of this.participants.values()) {
+      const p = this.host.state.players.get(part.id);
+      if (part.alive && p?.mapId === CASTLE_MAP && fallsAt(p.x, p.z, st.ring)) this.eliminate(part.id, 'fall');
+    }
+    for (const id of [...this.guards]) {
+      const m = this.host.state.mobs.get(id);
+      if (!m || m.dead || fallsAt(m.x, m.z, st.ring)) { this.host.state.mobs.delete(id); this.guards.delete(id); }
+    }
     this.syncCounts();
-    if (now >= this.st.endsAt) this.finish(now);
+    if (st.alive <= 1 || now >= st.endsAt) this.finish(now);
   }
 
+  /** Gana el último en pie; si no, el sobreviviente con más puntos; si no queda nadie, el de más puntos. */
   private finish(now: number): void {
-    for (const p of this.participants.values()) if (p.alive) this.sendHome(p.id);
+    const b = this.bracket, parts = [...this.participants.values()];
+    const best = (list: Participant[]) => list.reduce((top, p) => (p.points > top.points ? p : top));
+    const alive = parts.filter(p => p.alive);
+    const winner = alive.length ? best(alive) : best(parts);
+    const podium = [winner, ...parts.filter(p => p !== winner).sort((x, y) => y.points - x.points)].slice(0, 3);
+    const gem = () => UPGRADE_GEMS[Math.min(UPGRADE_GEMS.length - 1, Math.floor(this.host.rng() * UPGRADE_GEMS.length))];
+    for (const part of parts) {
+      const items = part === winner ? [gem(), gem()] : podium.includes(part) ? [gem()] : [];
+      const gold = part === winner ? b.gold : 0, exp = part.points * b.expPerPoint;
+      this.host.reward(part.id, gold, exp, items);
+      this.host.notify(part.id, part === winner
+        ? `¡Ganaste el ${b.name}! Recibiste 2 gemas, ${gold} de oro y ${exp} de EXP.`
+        : `Terminó el ${b.name}. Tus puntos: ${part.points} (+${exp} EXP)${items.length ? ' y una gema por el podio' : ''}.`);
+    }
+    this.host.announce(`⚔ ¡${winner.name} ganó el ${b.name}! Podio: ${podium.map((p, i) => `${i + 1}. ${p.name} (${p.points})`).join(' · ')}`);
+    for (const p of alive) this.sendHome(p.id);
     this.close(now);
   }
 

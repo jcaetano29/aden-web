@@ -85,7 +85,7 @@ describe('Chaos Castle over real connections', () => {
 
   it('pits guildmates against each other at half damage, scores kills and sends the fallen home unpunished', async () => {
     const ctx = await setup();
-    const [a, b] = await match(ctx, [['Rojo', 15, 'g1'], ['Rojo2', 15, 'g1']]);
+    const [a, b] = await match(ctx, [['Rojo', 15, 'g1'], ['Rojo2', 15, 'g1'], ['Testigo', 15]]); // un tercero: la partida sigue
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     b.p.hp = b.p.maxHp; hit(ctx, a, b);
     const inside = b.p.maxHp - b.p.hp;
@@ -106,6 +106,66 @@ describe('Chaos Castle over real connections', () => {
     expect(ctx.room.state.castle.points.get(a.id)).toBe(3);
     expect(b.p.mapId).toBe('pueblo'); expect(b.p.dead).toBe(false); expect(b.p.hp).toBe(b.p.maxHp);
     expect(b.p.gold).toBe(gold); expect(b.p.exp).toBe(exp);
+  });
+
+  it('crumbles the edge when few remain and drops whoever stands on it', async () => {
+    const ctx = await setup();
+    const [a, b, c] = await match(ctx, [['Borde', 15], ['Medio', 15], ['Centro', 15]]);
+    const { x: cx, z: cz } = { x: 900, z: 300 };
+    a.p.x = cx + 25; a.p.z = cz; b.p.x = cx + 15; b.p.z = cz; c.p.x = cx; c.p.z = cz;
+    const guards = [...ctx.room.state.mobs.keys()];
+    for (const id of guards.slice(0, 4)) ctx.room.state.mobs.delete(id); // quedan 12 participantes vivos
+    const edgeGuard = ctx.room.state.mobs.get(guards[4])!; edgeGuard.x = cx - 26; edgeGuard.z = cz;
+    ctx.advance(50);
+    expect(ctx.room.state.castle.collapseAt).toBeGreaterThan(0);
+    expect(ctx.room.state.castle.ring).toBe(0);
+    ctx.advance(5_000);
+    expect(ctx.room.state.castle.ring).toBe(1);
+    expect(a.p.mapId).toBe('pueblo');
+    await vi.waitFor(() => expect(a.replies.some(t => t.includes('abismo'))).toBe(true));
+    expect(b.p.mapId).toBe('castillo'); expect(c.p.mapId).toBe('castillo');
+    expect(ctx.room.state.mobs.has(guards[4])).toBe(false);
+    expect(ctx.room.state.castle.points.get(b.id)).toBe(0);
+  });
+
+  it('crumbles the edge after 2:30 even with many alive, and walking off the platform drops you', async () => {
+    const ctx = await setup();
+    const [a, b] = await match(ctx, [['Paciente', 15], ['Torpe', 15]]);
+    a.p.x = 900; a.p.z = 300; b.p.x = 900; b.p.z = 290;
+    ctx.advance(150_000);
+    expect(ctx.room.state.castle.collapseAt).toBeGreaterThan(0);
+    b.p.x = 900 + 31; ctx.advance(50);
+    expect(b.p.mapId).toBe('pueblo');
+  });
+
+  it('crowns the last one standing and rewards the podium', async () => {
+    const ctx = await setup();
+    const [a, b, c] = await match(ctx, [['Campeón', 15], ['Segundo', 15], ['Tercero', 15]]);
+    const guardId = [...ctx.room.state.mobs.keys()][0], guard = ctx.room.state.mobs.get(guardId)!;
+    guard.hp = 1; a.p.x = guard.x; a.p.z = guard.z + 1; a.p.targetId = guardId; a.p.attackCooldownMs = 0; ctx.room.tick(0.05);
+    const before = { gold: a.p.gold, exp: a.p.exp };
+    b.p.hp = 1; hit(ctx, a, b);
+    c.p.hp = 1; hit(ctx, a, c);
+    expect(ctx.room.state.castle.phase).toBe('');
+    const gems = (pl: typeof a) => [...pl.p.inventory.values()].filter(e => ['aden_gema_del_pacto', 'aden_gema_del_azar', 'aden_prisma_del_caos', 'aden_gema_del_pulso'].includes(e.itemTemplateId)).reduce((n, e) => n + e.qty, 0);
+    expect(a.p.gold - before.gold).toBe(1500);
+    expect(gems(a)).toBe(2); expect(gems(b)).toBe(1); expect(gems(c)).toBe(1);
+    expect(a.p.exp !== before.exp || a.p.level > 15).toBe(true); // 4 puntos × 120 de EXP
+    expect(a.p.mapId).toBe('pueblo');
+    await vi.waitFor(() => expect(a.replies.some(t => t.includes('Ganaste'))).toBe(true));
+  });
+
+  it('gives the win to the survivor with most points when time runs out', async () => {
+    const ctx = await setup();
+    const [a, b] = await match(ctx, [['Puntos', 15], ['Quieto', 15]]);
+    const guardId = [...ctx.room.state.mobs.keys()][0], guard = ctx.room.state.mobs.get(guardId)!;
+    guard.hp = 1; a.p.x = guard.x; a.p.z = guard.z + 1; a.p.targetId = guardId; a.p.attackCooldownMs = 0; ctx.room.tick(0.05);
+    a.p.targetId = ''; a.p.x = 900; a.p.z = 300; b.p.x = 902; b.p.z = 300;
+    const gold = { a: a.p.gold, b: b.p.gold };
+    ctx.advance(CASTLE_DURATION_MS);
+    expect(ctx.room.state.castle.phase).toBe('');
+    expect(a.p.gold - gold.a).toBe(1500);
+    expect(b.p.gold).toBe(gold.b);
   });
 
   it('eliminates whoever travels away or disconnects', async () => {
