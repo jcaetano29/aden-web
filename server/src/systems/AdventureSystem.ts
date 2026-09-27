@@ -1,7 +1,7 @@
 import { getQuest, nextQuestId, isChapterComplete, getEncounter, questReached, CRYPT_WAVE_SIZE, CRYPT_WAVE_TEMPLATES } from '@aden/shared';
 import type { PlayerState } from '../state/PlayerState.js';
 
-export type DungeonProgress = Pick<PlayerState,'mapId'|'dead'|'dungeonStage'|'dungeonKills'> & { questId?: string };
+export type DungeonProgress = Pick<PlayerState,'mapId'|'dead'|'dungeonStage'|'dungeonKills'> & { questId?: string; level?: number };
 
 export function resetDungeon(p: DungeonProgress): void {
   p.dungeonStage = 0;
@@ -11,6 +11,7 @@ export function resetDungeon(p: DungeonProgress): void {
 /** Future wings remain protected so killing ahead cannot strand a non-respawning run. */
 export function canFightDungeonMob(p: DungeonProgress, templateId: string): boolean {
   const encounter = getEncounter(templateId);
+  if (encounter?.minTargetLevel && (p.level ?? 0) < encounter.minTargetLevel) return false;
   if (encounter?.requiresQuest) return questReached(p.questId ?? '', encounter.requiresQuest);
   if(templateId === 'crypt_warden') return p.mapId === 'cripta' && p.dungeonStage === 4;
   for(const [stage,templates] of Object.entries(CRYPT_WAVE_TEMPLATES)) {

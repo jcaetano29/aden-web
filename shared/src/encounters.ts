@@ -44,6 +44,8 @@ export interface EncounterDef {
   /** Con media vida o menos: reemplaza la espera y/o los patrones. */
   belowHalf?: { cooldownMs?: number; patterns?: readonly HazardPattern[] };
   summons?: readonly EncounterSummon[];
+  /** Nivel mínimo para ser su objetivo y para dañarlo (invasores: protege a los novatos). */
+  minTargetLevel?: number;
   /** Solo pueden pelearlo quienes llegaron a esta misión o más allá. */
   requiresQuest?: string;
   /** Objetos que se enfrían en combate: dejan de invocar hasta que el encuentro termina o se reinicia. */
@@ -52,6 +54,8 @@ export interface EncounterDef {
 }
 
 const circle = (radius: number, windupMs: number, power: number): HazardPattern => ({ shape: 'circle', anchor: 'target', radius, windupMs, power });
+const invader = (templateId: string): EncounterDef => ({ templateId, aggroRadius: 14, cooldownMs: 6000, minTargetLevel: 10,
+  patterns: [{ shape: 'cone', anchor: 'self', radius: 8, angleDeg: 70, windupMs: 1800, power: 2.4 }, circle(5, 1600, 2.2)] });
 const heavy = (templateId: string): EncounterDef => ({ templateId, aggroRadius: 14, cooldownMs: 9000, patterns: [circle(5, 2000, 2.2)] });
 
 export const ENCOUNTERS: Record<string, EncounterDef> = {
@@ -74,6 +78,17 @@ export const ENCOUNTERS: Record<string, EncounterDef> = {
     coolObjects: FORGE_ANVILS,
     coolTexts: { success: 'Enfriaste el yunque: dejó de forjar guardianes.', tooWeak: 'El yunque no responde a tu poder actual.', idle: 'El yunque late con el pulso del dragón. Solo se enfría cuando Vharzul pelea.' },
   },
+  crimson_dragon: {
+    templateId: 'crimson_dragon', aggroRadius: 18, cooldownMs: 5000, minTargetLevel: 10,
+    patterns: [{ shape: 'cone', anchor: 'self', radius: 10, angleDeg: 80, windupMs: 1800, power: 2.6 }, circle(6, 1600, 2.2)],
+    belowHalf: { patterns: [
+      { shape: 'cone', anchor: 'self', radius: 10, angleDeg: 80, windupMs: 1800, power: 2.6 }, circle(6, 1600, 2.2),
+      { shape: 'circle', anchor: 'self', radius: 16, windupMs: 6000, power: 3.0, channel: true },
+    ] },
+  },
+  waste_herald: invader('waste_herald'),
+  veil_specter: invader('veil_specter'),
+  ember_colossus: invader('ember_colossus'),
   magma_wyrm: { templateId: 'magma_wyrm', aggroRadius: 10, cooldownMs: 8000, patterns: [circle(6, 1800, 2.6)] },
   mine_foreman: { templateId: 'mine_foreman', aggroRadius: 14, cooldownMs: 8000,
     patterns: [{ shape: 'cone', anchor: 'self', radius: 6, angleDeg: 80, windupMs: 1800, power: 2.4 }] },

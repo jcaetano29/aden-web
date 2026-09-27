@@ -2,6 +2,7 @@ import { getTemplate } from './mobs.js';
 import { getItem } from './items.js';
 import type { Rarity } from './equipment.js';
 import type { QualityOdds } from './itemOptions.js';
+import { INVADERS } from './events.js';
 
 /**
  * Botín del catálogo. Cada enemigo o cofre tiene una selección editorial corta (identidad por
@@ -114,6 +115,15 @@ const TIERED: Record<string, Record<string, { rare?: readonly string[]; uncommon
 // La agrupación sólo ordena la lectura; la rareza visible de cada pieza decide su peso.
 const LOOT_POOLS: Record<string, Record<string, readonly string[]>> = Object.fromEntries(Object.entries(TIERED).map(([mapId, sources]) =>
   [mapId, Object.fromEntries(Object.entries(sources).map(([lootId, t]) => [lootId, [...(t.rare ?? []), ...(t.uncommon ?? []), ...(t.common ?? [])]]))]));
+
+// Invasores de eventos: botín de jefe acorde a su nivel en cualquiera de sus mapas (la pieza única va aparte).
+const INVADER_LOOT: Record<string, readonly string[]> = {
+  crimson_dragon: ['aden_sable_del_astronomo', 'aden_asta_de_doble_luna', 'aden_filo_de_brasa_viva', 'aden_vara_de_la_mirada_petrea', 'aden_paves_de_la_muralla', 'aden_gema_del_pulso'],
+  waste_herald: ['aden_filo_del_verdugo', 'aden_bifaz_del_bastion', 'aden_lanza_de_sangre_antigua', 'aden_escudo_de_la_cometa_negra', 'aden_ballesta_del_sol_bajo', 'aden_cayado_del_heraldo'],
+  veil_specter: ['aden_gladio_de_las_cenizas', 'aden_hacha_de_la_estepa', 'aden_tridente_del_coloso_hundido', 'aden_arco_de_la_arboleda_velada', 'aden_vara_de_la_sierpe_sabia', 'aden_escudo_de_los_sepultados'],
+  ember_colossus: ['aden_filo_de_brasa_viva', 'aden_hacha_de_guerra_de_aden', 'aden_vara_de_la_mirada_petrea', 'aden_paves_de_la_muralla', 'aden_escudo_del_cerco_espinado', 'aden_prisma_del_caos'],
+};
+for (const inv of Object.values(INVADERS)) for (const mapId of inv.maps) (LOOT_POOLS[mapId] ??= {})[inv.templateId] = INVADER_LOOT[inv.templateId] ?? [];
 
 /** Todas las piezas posibles de una fuente. */
 export function catalogDropPool(mapId: string, lootId: string): string[] {

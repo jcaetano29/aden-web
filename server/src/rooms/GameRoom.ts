@@ -1287,7 +1287,7 @@ export class GameRoom extends Room<GameState> {
       const aiConfig = encounter ? { ...AI_CONFIG, aggroRadius: encounter.aggroRadius } : AI_CONFIG;
       const candidates=(playersByMap.get(mob.mapId) ?? []).filter(pos=>{
         const p=this.state.players.get(pos.id);
-        return p && canFightDungeonMob(p,mob.templateId);
+        return p && canFightDungeonMob(p,mob.templateId) && p.level >= (encounter?.minTargetLevel ?? 0);
       });
       const wasEngaged = mob.aiState === 'chase';
       stepMobAI(mob, candidates, aiConfig, Math.random, dtMs);

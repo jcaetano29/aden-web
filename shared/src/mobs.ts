@@ -31,6 +31,11 @@ export const MOB_TEMPLATES: Record<string, MobTemplate> = {
   primal_smelter: { id: 'primal_smelter', level: 24, rank: 'elite', name: 'Fundidor Primordial', model: 'InfernalDemon', miniBoss: true, scale: 1.5, tint: 0xff5a2a, respawnMs: 45000 },
   forged_guardian: { id: 'forged_guardian', level: 23, rank: 'normal', name: 'Guardián de Yunque', model: 'BoneWarden', tint: 0xe0a060 },
   vharzul: { id: 'vharzul', level: 25, rank: 'boss', name: 'Vharzul, Dragón de la Fragua', model: 'AncientDrake', boss: true, scale: 2.6, tint: 0xff7a3c, respawnMs: 60000 },
+  // Invasores de eventos: no reaparecen solos, el sistema de eventos los trae y los retira.
+  crimson_dragon: { id: 'crimson_dragon', level: 25, rank: 'boss', name: 'Dragón Carmesí', model: 'AncientDrake', boss: true, scale: 3.2, tint: 0xd8322a, respawnMs: 0 },
+  waste_herald: { id: 'waste_herald', level: 10, rank: 'boss', name: 'Heraldo del Yermo', model: 'InfernalDemon', boss: true, scale: 1.8, tint: 0xe0782a, respawnMs: 0 },
+  veil_specter: { id: 'veil_specter', level: 16, rank: 'boss', name: 'Espectro del Velo', model: 'DeathWraith', boss: true, scale: 1.8, tint: 0x8fd4ff, respawnMs: 0 },
+  ember_colossus: { id: 'ember_colossus', level: 26, rank: 'boss', name: 'Coloso de Brasa', model: 'ForestTroll', boss: true, scale: 2.2, tint: 0xff6a2a, respawnMs: 0 },
   magma_wyrm: { id: 'magma_wyrm', level: 30, rank: 'elite', name: 'Sierpe de Magma', model: 'AncientDrake', miniBoss: true, scale: 1.3, tint: 0x9a2a1a, respawnMs: 60000 },
   mine_digger: { id: 'mine_digger', level: 15, rank: 'normal', name: 'Excavador Hueco', model: 'BoneWarden', tint: 0x9a8f7e },
   mine_armor: { id: 'mine_armor', level: 16, rank: 'normal', name: 'Armadura Animada', model: 'DreadKnight', tint: 0x8d9399 },

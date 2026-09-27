@@ -18,6 +18,7 @@ export * from "./chapters.js";
 export * from "./questNarrative.js";
 export * from "./adventure.js";
 export * from "./lootPools.js";
+export * from "./events.js";
 export * from "./dungeon.js";
 export * from "./classes.js";
 export * from "./appearance.js";

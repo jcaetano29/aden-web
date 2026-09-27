@@ -4,7 +4,8 @@ import type { MobState } from '../state/MobState.js';
 
 const FULL_CIRCLE = Math.PI * 2;
 
-export function isEncounterEligible(def: EncounterDef, p: Pick<PlayerState, 'questId'>): boolean {
+export function isEncounterEligible(def: EncounterDef, p: Pick<PlayerState, 'questId' | 'level'>): boolean {
+  if ((p.level ?? 0) < (def.minTargetLevel ?? 0)) return false;
   return !def.requiresQuest || questReached(p.questId, def.requiresQuest);
 }
 

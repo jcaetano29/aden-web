@@ -1,8 +1,9 @@
 import { describe, it, expect, afterEach } from 'vitest';
-import { ENCOUNTERS } from '@aden/shared';
+import { ENCOUNTERS, getEncounter } from '@aden/shared';
 import { MobState } from '../state/MobState.js';
 import { PlayerState } from '../state/PlayerState.js';
-import { stepEncounter, inHazard } from './EncounterSystem.js';
+import { stepEncounter, inHazard, isEncounterEligible } from './EncounterSystem.js';
+import { canFightDungeonMob } from './AdventureSystem.js';
 
 afterEach(() => { delete ENCOUNTERS.test_cone; });
 
@@ -15,6 +16,16 @@ function setup() {
 }
 
 describe('EncounterSystem', () => {
+  it('keeps invaders away from players below level 10, who cannot fight them either', () => {
+    for (const id of ['crimson_dragon', 'waste_herald', 'veil_specter', 'ember_colossus']) {
+      const def = getEncounter(id)!;
+      expect(def.minTargetLevel, id).toBe(10);
+      expect(isEncounterEligible(def, { questId: 'q1', level: 9 })).toBe(false);
+      expect(isEncounterEligible(def, { questId: 'q1', level: 10 })).toBe(true);
+      expect(canFightDungeonMob({ questId: 'q1', mapId: 'pueblo', dead: false, dungeonStage: 0, dungeonKills: 0, level: 9 }, id)).toBe(false);
+      expect(canFightDungeonMob({ questId: 'q1', mapId: 'pueblo', dead: false, dungeonStage: 0, dungeonKills: 0, level: 25 }, id)).toBe(true);
+    }
+  });
   it('aims a cone at the target when the warning starts and keeps it fixed', () => {
     const { mob, p, players } = setup();
     stepEncounter(mob, players, 50);
