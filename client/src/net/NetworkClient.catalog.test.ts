@@ -49,4 +49,16 @@ describe("NetworkClient catalog messages", () => {
     player.dungeonStage = 5;
     expect(net.getAdventureTarget()).toBeUndefined();
   });
+
+  it("sabe si un enemigo está volviendo a su puesto (el server rechaza atacarlo)", () => {
+    const net = new NetworkClient();
+    (net as any).room = {
+      sessionId: "self",
+      state: { mobs: new Map([["back", { aiState: "return" }], ["fighting", { aiState: "chase" }]]) },
+    };
+    expect(net.isMobReturningHome("back")).toBe(true);
+    expect(net.isMobReturningHome("fighting")).toBe(false);
+    expect(net.isMobReturningHome("self")).toBe(false);
+    expect(net.isMobReturningHome("missing")).toBe(false);
+  });
 });

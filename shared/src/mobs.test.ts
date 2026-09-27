@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { MOB_TEMPLATES, getTemplate, SPAWN_ZONES, AI_CONFIG, MOB_MOVE_SPEED, isBoss, isMiniBoss, scaleForTemplate, respawnForTemplate, tintForTemplate } from "./mobs.js";
+import { MOB_TEMPLATES, getTemplate, SPAWN_ZONES, AI_CONFIG, MOB_MOVE_SPEED, RETURNING_HOME, isReturningHome, isBoss, isMiniBoss, scaleForTemplate, respawnForTemplate, tintForTemplate } from "./mobs.js";
 import { MAP_BOUNDS } from "./constants.js";
 
 describe("MOB_TEMPLATES / getTemplate", () => {
@@ -96,5 +96,11 @@ describe("config", () => {
   it("aggroRadius < leashRadius y velocidades positivas", () => {
     expect(AI_CONFIG.aggroRadius).toBeLessThan(AI_CONFIG.leashRadius);
     expect(MOB_MOVE_SPEED).toBeGreaterThan(0);
+  });
+
+  it("reconoce al mob que vuelve a su puesto", () => {
+    expect(isReturningHome({ aiState: RETURNING_HOME })).toBe(true);
+    expect(isReturningHome({ aiState: "chase" })).toBe(false);
+    expect(isReturningHome({ aiState: "wander" })).toBe(false);
   });
 });

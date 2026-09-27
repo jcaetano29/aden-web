@@ -1,4 +1,4 @@
-import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterInterruptFor, encounterCoolFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached, AMMO_SKILLS, invaderForTemplate, invasionProtected } from "@aden/shared";
+import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterLeashRadius, isReturningHome, RETURNING_HOME_TEXT, encounterInterruptFor, encounterCoolFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached, AMMO_SKILLS, invaderForTemplate, invasionProtected } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
@@ -604,6 +604,7 @@ export class GameRoom extends Room<GameState> {
         const t = p.targetId ? this.resolveTarget(p.targetId, p.mapId) : null;
         if (!t) return;
         if (t.kind === 'mob' && !canFightDungeonMob(p,t.entity.templateId)) return;
+        if (t.kind === 'mob' && isReturningHome(t.entity)) { client.send(MessageType.ItemResult, { success: false, text: RETURNING_HOME_TEXT }); return; }
         const power = t.kind === 'mob' ? pvePower(p.level, t.entity.level).outgoing : this.castle.pvpFactor(p, t.entity) ?? 1;
         if (power === 0) {
           client.send(MessageType.ItemResult, {success:false,text:'Fuera de tu alcance: necesitás acercarte a su nivel.'});
@@ -670,6 +671,7 @@ export class GameRoom extends Room<GameState> {
       } else if (skill.type === "dot") {
         const target=p.targetId?this.resolveTarget(p.targetId,p.mapId):null;
         if(!target || p.skillGcdMs > 0 || !inSkillRange(p,target.entity,skillRange(skill)))return;
+        if(target.kind==='mob' && isReturningHome(target.entity)) { client.send(MessageType.ItemResult,{success:false,text:RETURNING_HOME_TEXT}); return; }
         if(target.kind==='mob' && (!canFightDungeonMob(p,target.entity.templateId) || pvePower(p.level,target.entity.level).outgoing === 0)) { client.send(MessageType.ItemResult,{success:false,text:'Fuera de tu alcance o encuentro todavía bloqueado.'}); return; }
         if(target.kind==='player' && (!this.inPvpZone(p)||!this.inPvpZone(target.entity)||this.areAllies(p, target.entity)))return;
         spend();
@@ -941,7 +943,7 @@ export class GameRoom extends Room<GameState> {
 
   /** Being hit provokes pursuit even when the attack began outside passive aggro. */
   private engageMob(mob: MobState, attackerId: string): void {
-    if (mob.dead || mob.hp <= 0 || mob.aggroTargetId) return;
+    if (mob.dead || mob.hp <= 0 || mob.aggroTargetId || isReturningHome(mob)) return;
     mob.aggroTargetId = attackerId;
     mob.aiState = 'chase';
   }
@@ -1372,7 +1374,7 @@ export class GameRoom extends Room<GameState> {
       }
       if (mob.stunMs > 0) { mob.moving = false; return; } // Etapa 22: aturdido no actúa
       const encounter = getEncounter(mob.templateId);
-      const aiConfig = encounter ? { ...AI_CONFIG, aggroRadius: encounter.aggroRadius } : AI_CONFIG;
+      const aiConfig = encounter ? { ...AI_CONFIG, aggroRadius: encounter.aggroRadius, leashRadius: encounterLeashRadius(encounter) } : AI_CONFIG;
       const candidates=(playersByMap.get(mob.mapId) ?? []).filter(pos=>{
         const p=this.state.players.get(pos.id);
         return p && canFightDungeonMob(p,mob.templateId) && p.level >= (encounter?.minTargetLevel ?? 0);
@@ -1477,7 +1479,7 @@ export class GameRoom extends Room<GameState> {
       if (!t) { p.targetId = ""; return; }
       if (t.kind === "mob") {
         const mob = t.entity;
-        if(!canFightDungeonMob(p,mob.templateId))return;
+        if(!canFightDungeonMob(p,mob.templateId) || isReturningHome(mob))return;
         const power = pvePower(p.level, mob.level).outgoing;
         if (power === 0) { p.targetId = ''; return; }
         if (canAttack(p, mob, weaponRange(playerLoadout(p)))) {

@@ -36,7 +36,7 @@ import {
 import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
 import type { PartyInvitation, WorldEventView, CastleView } from '@aden/shared';
 import type { PartyPanelData, PartyMember } from '../render/PartyPanel.js';
-import { TRADE_RANGE, distance2D, type TradeSnapshot, type TradeOffer } from '@aden/shared';
+import { TRADE_RANGE, distance2D, isReturningHome, type TradeSnapshot, type TradeOffer } from '@aden/shared';
 import type { TradePanelData } from '../render/TradePanel.js';
 
 import { characterGender, type CharacterGender } from '@aden/shared';
@@ -451,6 +451,12 @@ export class NetworkClient {
       }
     });
     return out;
+  }
+
+  /** true si ese enemigo abandonó la pelea y vuelve a su puesto: el server rechaza atacarlo. */
+  isMobReturningHome(id: string): boolean {
+    const mob = this.room?.state.mobs.get(id);
+    return !!mob && isReturningHome(mob);
   }
 
   /** Envía la intención de viajar a un mapa (Etapa 15, menú M). El server valida el gate. */

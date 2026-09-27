@@ -31,7 +31,7 @@ describe("stepMobAI — leash", () => {
   it("suelta aggro y vuelve al home si el mob supera leashRadius del home", () => {
     const m = mob({ aiState: "chase", aggroTargetId: "p1", x: AI_CONFIG.leashRadius + 5, z: 0, homeX: 0, homeZ: 0 });
     stepMobAI(m, [{ id: "p1", x: AI_CONFIG.leashRadius + 6, z: 0 }], AI_CONFIG, () => 0.5, 16);
-    expect(m.aiState).toBe("wander");
+    expect(m.aiState).toBe("return");
     expect(m.aggroTargetId).toBe("");
     expect(m.targetX).toBeCloseTo(0); // home
   });
@@ -39,8 +39,23 @@ describe("stepMobAI — leash", () => {
   it("suelta aggro si el jugador desaparece", () => {
     const m = mob({ aiState: "chase", aggroTargetId: "p1", x: 2, z: 0 });
     stepMobAI(m, [], AI_CONFIG, () => 0.5, 16);
-    expect(m.aiState).toBe("wander");
+    expect(m.aiState).toBe("return");
     expect(m.aggroTargetId).toBe("");
+  });
+
+  it("mientras vuelve a su puesto ignora a los jugadores, aunque estén al lado", () => {
+    const m = mob({ aiState: "return", moving: true, x: 10, z: 0, targetX: 0, targetZ: 0 });
+    stepMobAI(m, [{ id: "p1", x: 11, z: 0 }], AI_CONFIG, () => 0.5, 16);
+    expect(m.aiState).toBe("return");
+    expect(m.aggroTargetId).toBe("");
+    expect(m.targetX).toBeCloseTo(0);
+  });
+
+  it("al llegar a su puesto vuelve a deambular y puede tomar aggro otra vez", () => {
+    const m = mob({ aiState: "return", moving: false, x: 0, z: 0 });
+    stepMobAI(m, [{ id: "p1", x: 3, z: 0 }], AI_CONFIG, () => 0.5, 16);
+    expect(m.aiState).toBe("chase");
+    expect(m.aggroTargetId).toBe("p1");
   });
 });
 

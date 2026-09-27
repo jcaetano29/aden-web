@@ -172,6 +172,18 @@ export const AI_CONFIG = {
 
 export type AIConfig = typeof AI_CONFIG;
 
+/**
+ * aiState de un mob que abandonó la pelea y vuelve a su puesto: no toma aggro, no se lo puede
+ * enganchar ni dañar. Si pudiera, cada golpe lo volvía a enganchar lejos de su puesto y se
+ * reiniciaba con la vida llena una y otra vez.
+ */
+export const RETURNING_HOME = 'return';
+export const RETURNING_HOME_TEXT = 'Está volviendo a su puesto: esperá a que llegue.';
+
+export function isReturningHome(mob: { aiState?: string }): boolean {
+  return mob.aiState === RETURNING_HOME;
+}
+
 export function isBoss(templateId: string): boolean {
   return getTemplate(templateId).boss === true;
 }

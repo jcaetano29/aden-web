@@ -29,7 +29,7 @@ import { MapPanel } from "./render/MapPanel.js";
 import { WorldObjectViews } from "./render/WorldObjectViews.js";
 import { SkillEffects } from "./render/SkillEffects.js";
 import { StatusEffects } from "./render/StatusEffects.js";
-import { skillRange } from "@aden/shared";
+import { skillRange, RETURNING_HOME_TEXT } from "@aden/shared";
 import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ServiceNpc } from "./render/ServiceNpc.js";
@@ -578,6 +578,7 @@ async function main() {
     if (self.mp < skill.mpCost) { hud.toast(`Sin maná (necesitás ${skill.mpCost})`, "#6ba6ff"); return; }
     const needsTarget = skill.type === "damage" || skill.type === "dot";
     if (needsTarget && !currentTargetId) { hud.toast("Necesitás un objetivo", "#ffe066"); return; }
+    if (needsTarget && currentTargetId && net.isMobReturningHome(currentTargetId)) { hud.toast(RETURNING_HOME_TEXT, "#ffe066"); return; }
     const shot = ammoSkillBlock(skillId, net.getEquipment().weapon, net.getInventory());
     if (shot) { hud.toast(shot === 'weapon' ? 'Necesitás un arco o una ballesta equipados' : 'Sin munición para tu arma', '#ffe066'); return; }
     if (needsTarget && currentTargetId) {

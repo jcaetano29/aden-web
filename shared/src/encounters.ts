@@ -37,6 +37,8 @@ export interface EncounterSummon {
 export interface EncounterDef {
   templateId: string;
   aggroRadius: number;
+  /** Distancia a su puesto a la que abandona la pelea (por defecto ENCOUNTER_LEASH_RADIUS). */
+  leashRadius?: number;
   /** Espera tras cada impacto. */
   cooldownMs: number;
   /** Se alternan según la cantidad de ataques ya lanzados. */
@@ -53,8 +55,21 @@ export interface EncounterDef {
   coolTexts?: { success: string; tooWeak: string; idle: string };
 }
 
+/**
+ * Correa de los jefes, medida desde su puesto. La genérica (16) apenas superaba su aggro (14):
+ * cada esquive del círculo los arrastra 3–5 unidades y a los cuatro o cinco esquives se reiniciaban
+ * con la vida llena en plena pelea.
+ */
+export const ENCOUNTER_LEASH_RADIUS = 40;
+/** Los invasores no salen de su área (INVASION_RADIUS = 30, centrada en su puesto). */
+const INVADER_LEASH_RADIUS = 28;
+
+export function encounterLeashRadius(def: EncounterDef): number {
+  return def.leashRadius ?? ENCOUNTER_LEASH_RADIUS;
+}
+
 const circle = (radius: number, windupMs: number, power: number): HazardPattern => ({ shape: 'circle', anchor: 'target', radius, windupMs, power });
-const invader = (templateId: string): EncounterDef => ({ templateId, aggroRadius: 14, cooldownMs: 6000, minTargetLevel: 10,
+const invader = (templateId: string): EncounterDef => ({ templateId, aggroRadius: 14, leashRadius: INVADER_LEASH_RADIUS, cooldownMs: 6000, minTargetLevel: 10,
   patterns: [{ shape: 'cone', anchor: 'self', radius: 8, angleDeg: 70, windupMs: 1800, power: 2.4 }, circle(5, 1600, 2.2)] });
 const heavy = (templateId: string): EncounterDef => ({ templateId, aggroRadius: 14, cooldownMs: 9000, patterns: [circle(5, 2000, 2.2)] });
 
@@ -79,7 +94,7 @@ export const ENCOUNTERS: Record<string, EncounterDef> = {
     coolTexts: { success: 'Enfriaste el yunque: dejó de forjar guardianes.', tooWeak: 'El yunque no responde a tu poder actual.', idle: 'El yunque late con el pulso del dragón. Solo se enfría cuando Vharzul pelea.' },
   },
   crimson_dragon: {
-    templateId: 'crimson_dragon', aggroRadius: 18, cooldownMs: 5000, minTargetLevel: 10,
+    templateId: 'crimson_dragon', aggroRadius: 18, leashRadius: INVADER_LEASH_RADIUS, cooldownMs: 5000, minTargetLevel: 10,
     patterns: [{ shape: 'cone', anchor: 'self', radius: 10, angleDeg: 80, windupMs: 1800, power: 2.6 }, circle(6, 1600, 2.2)],
     belowHalf: { patterns: [
       { shape: 'cone', anchor: 'self', radius: 10, angleDeg: 80, windupMs: 1800, power: 2.6 }, circle(6, 1600, 2.2),

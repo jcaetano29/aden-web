@@ -1,4 +1,4 @@
-import { distance2D, type AIConfig } from "@aden/shared";
+import { distance2D, isReturningHome, RETURNING_HOME, type AIConfig } from "@aden/shared";
 
 export interface AIMob {
   x: number;
@@ -50,6 +50,13 @@ export function stepMobAI(
   rng: () => number,
   dtMs: number,
 ): void {
+  if (isReturningHome(mob)) {
+    // advanceMovable apaga moving al llegar (o si el camino queda bloqueado).
+    if (mob.moving) return;
+    mob.aiState = "wander";
+    mob.wanderCooldownMs = cfg.wanderPauseMs;
+  }
+
   // 1) ¿Hay jugador dentro de aggroRadius? (el más cercano)
   let nearest: PlayerPos | null = null;
   let nearestD = Infinity;
@@ -78,13 +85,12 @@ export function stepMobAI(
       mob.moving = true;
       return;
     }
-    // soltar aggro → volver al home
-    mob.aiState = "wander";
+    // soltar aggro → volver al home (sin mirar a nadie hasta llegar)
+    mob.aiState = RETURNING_HOME;
     mob.aggroTargetId = "";
     mob.targetX = mob.homeX;
     mob.targetZ = mob.homeZ;
     mob.moving = true;
-    mob.wanderCooldownMs = 0;
     return;
   }
 
