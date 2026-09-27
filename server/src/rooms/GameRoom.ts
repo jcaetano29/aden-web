@@ -1,4 +1,4 @@
-import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterInterruptFor, encounterCoolFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached, AMMO_SKILLS, invaderForTemplate } from "@aden/shared";
+import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterInterruptFor, encounterCoolFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached, AMMO_SKILLS, invaderForTemplate, invasionProtected } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
 import { tryPickup, dropPosition, tryDropInventory } from '../systems/LootSystem.js';
@@ -283,7 +283,9 @@ export class GameRoom extends Room<GameState> {
   }
 
   /** true si el mapa actual del jugador NO es seguro (PvP/combate habilitado). */
-  private inPvpZone(p: { mapId: string }): boolean {
+  /** PvP según el mapa, salvo dentro del área de una invasión activa: ahí vale para nivel 10+. */
+  private inPvpZone(p: PlayerState): boolean {
+    if (this.events.inArea(p)) return !invasionProtected(p.level);
     return !getZone(p.mapId).safe;
   }
 
@@ -302,10 +304,13 @@ export class GameRoom extends Room<GameState> {
       victim.x=victim.targetX=arrival.x;victim.z=victim.targetZ=arrival.z;
       this.maintainDungeonRun();
     }
+    // Guerra de clanes aceptada: morir en el área de una invasión no tiene penalidad PvP.
     if (killerId) {
-      const pen = applyPvpDeathPenalty(victim.gold, victim.exp, victim.level);
-      victim.gold = pen.gold;
-      victim.exp = pen.exp;
+      if (!this.events.inArea(victim)) {
+        const pen = applyPvpDeathPenalty(victim.gold, victim.exp, victim.level);
+        victim.gold = pen.gold;
+        victim.exp = pen.exp;
+      }
       const killer = this.state.players.get(killerId);
       if (killer && !killer.dead) killer.pvpKills += 1;
     }

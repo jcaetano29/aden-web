@@ -58,6 +58,32 @@ describe('boss invasions over real connections', () => {
     expect(solo.p.gold).toBe(gold.solo);
   });
 
+  it('opens PvP between rival guilds inside the area only, protects newcomers and waives the death penalty', async () => {
+    const { room, join } = await setup();
+    const a = await join('Rojo', 'g1', 'AAA', 1), b = await join('Azul', 'g2', 'BBB', 0);
+    room.events.startNow('crimson_dragon', 'pueblo', 0); room.tick(0.05);
+    room.state.mobs.get(room.state.worldEvent.bossId)!.stunMs = 1e9; // el dragón queda quieto: sólo importa el área
+    const duel = (attacker: typeof a, victim: typeof a, x: number, z: number) => {
+      attacker.p.x = x; attacker.p.z = z; victim.p.x = x + 1; victim.p.z = z; victim.p.hp = victim.p.maxHp;
+      attacker.p.targetId = victim.id; attacker.p.attackCooldownMs = 0; attacker.p.moving = false; victim.p.moving = false;
+      room.tick(0.05);
+      return victim.p.maxHp - victim.p.hp;
+    };
+    for (const pl of [a, b]) pl.p.level = 20;
+    expect(duel(a, b, 0, -22)).toBeGreaterThan(0);        // dentro del área: PvP
+    expect(duel(a, b, 0, 14)).toBe(0);                     // en el pueblo, fuera del área: seguro
+    b.p.level = 9;
+    expect(duel(a, b, 0, -22)).toBe(0);                    // novato protegido
+    expect(duel(b, a, 0, -22)).toBe(0);                    // y no puede atacar
+    b.p.level = 20;
+    const gold = b.p.gold = 1000, exp = b.p.exp = 500;
+    b.p.x = 1; b.p.z = -22; b.p.hp = 1; a.p.x = 0; a.p.z = -22; a.p.targetId = b.id; a.p.attackCooldownMs = 0;
+    room.tick(0.05);
+    expect(b.p.dead).toBe(true);
+    expect(b.p.gold).toBe(gold); expect(b.p.exp).toBe(exp);
+    expect(a.p.pvpKills).toBe(1); // la muerte sí cuenta para el ranking PvP
+  });
+
   it('lets the invader retreat when time runs out, without loot', async () => {
     const { room, join, advance } = await setup();
     await join('Tardío', 'g1', 'AAA', 2);
