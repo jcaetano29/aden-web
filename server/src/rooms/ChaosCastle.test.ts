@@ -108,6 +108,15 @@ describe('Chaos Castle over real connections', () => {
     expect(b.p.gold).toBe(gold); expect(b.p.exp).toBe(exp);
   });
 
+  it('keeps the guards on the platform while they roam and chase', async () => {
+    const ctx = await setup();
+    const [a, b] = await match(ctx, [['Firme', 15], ['Firme2', 15]]);
+    for (const m of ctx.room.state.mobs.values()) m.stunMs = 0; // que deambulen y persigan
+    for (let i = 0; i < 600; i++) { for (const pl of [a, b]) pl.p.hp = pl.p.maxHp; ctx.advance(50); }
+    expect(ctx.room.state.castle.phase).toBe('active');
+    expect(ctx.room.state.castle.monsters).toBe(14);
+  });
+
   it('crumbles the edge when few remain and drops whoever stands on it', async () => {
     const ctx = await setup();
     const [a, b, c] = await match(ctx, [['Borde', 15], ['Medio', 15], ['Centro', 15]]);

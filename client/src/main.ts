@@ -43,6 +43,7 @@ import { ZoneIndicator } from "./render/ZoneIndicator.js";
 import { EventBanner } from "./render/EventBanner.js";
 import { CastleBanner } from "./render/CastleBanner.js";
 import { castleDialog } from "./render/castleDialog.js";
+import { npcsWithGenericView } from "./render/npcViews.js";
 import { ZoneBanner } from "./render/ZoneBanner.js";
 import { injectTheme } from "./render/theme.js";
 import { NetworkClient, isAuthError, type RoomCallbacks } from "./net/NetworkClient.js";
@@ -90,8 +91,8 @@ async function main() {
   const healer = new ServiceNpc(renderer.scene, renderer.css2d, "healer", factory);
   const smith = new ServiceNpc(renderer.scene, renderer.css2d, "smith", factory);
   const captain = new ServiceNpc(renderer.scene, renderer.css2d, "captain", factory);
-  // NPC con mapa explícito (los clásicos del pueblo tienen su propia vista).
-  const regionalNpcs = NPCS.filter(def => def.mapId !== undefined).map(def => ({ def, view: new Npc(renderer.scene, renderer.css2d, factory, def.id) }));
+  // Todos los NPC menos los servicios clásicos del pueblo, que tienen su propia vista.
+  const regionalNpcs = npcsWithGenericView(NPCS).map(def => ({ def, view: new Npc(renderer.scene, renderer.css2d, factory, def.id) }));
   const FIELD_SHOP_GREETINGS: Record<string, string> = {
     boren: 'Llegaron sin nombres, pero todavía necesitan comer. Maera busca respuestas; yo mantengo este puesto en pie. Llevá pociones y munición antes de seguir al norte.',
     tobias: 'La mina no perdona al que baja sin provisiones. Llevá pociones y munición; lo demás lo pone Brenna.',

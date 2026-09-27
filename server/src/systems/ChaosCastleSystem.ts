@@ -234,8 +234,11 @@ export class ChaosCastleSystem {
     return { x: CASTLE_CENTER.x + dx, z: CASTLE_CENTER.z + dz };
   }
 
-  /** Punto al azar sobre la plataforma. */
+  /**
+   * Punto al azar de los anillos medio y central (hasta 18 del centro): deambulando (radio 6) un guardia
+   * nunca pisa el abismo; sólo cae cuando se derrumba el anillo donde está.
+   */
   private platformSpot(): { x: number; z: number } {
-    return { x: CASTLE_CENTER.x + (this.host.rng() * 2 - 1) * 28, z: CASTLE_CENTER.z + (this.host.rng() * 2 - 1) * 28 };
+    return { x: CASTLE_CENTER.x + (this.host.rng() * 2 - 1) * 18, z: CASTLE_CENTER.z + (this.host.rng() * 2 - 1) * 18 };
   }
 }
