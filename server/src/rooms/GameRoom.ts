@@ -19,6 +19,7 @@ import { rollCatalogDrop, lootSourceFor, LOOT_QUALITY_ODDS, INVASION_RESERVE_MS,
 import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, resetDungeon } from '../systems/AdventureSystem.js';
 import { stepEncounter } from '../systems/EncounterSystem.js';
 import { EventSystem } from '../systems/EventSystem.js';
+import { ChaosCastleSystem } from '../systems/ChaosCastleSystem.js';
 const { Room } = colyseusPkg;
 import {
   MessageType,
@@ -107,7 +108,7 @@ import {
   getTemplate,
   loadoutEffects, availableSkills, weaponRange, CATALOG_ITEMS, MOVE_SPEED, skillElement,
 } from "@aden/shared";
-import { grantItem, equipItem, useInventoryItem, consumeAmmo, playerLoadout, instantiateItem } from '../systems/ItemSystem.js';
+import { grantItem, equipItem, useInventoryItem, consumeAmmo, playerLoadout, instantiateItem, removeItem } from '../systems/ItemSystem.js';
 import { GameState } from "../state/GameState.js";
 import { PlayerState } from "../state/PlayerState.js";
 import { SideChainState } from "../state/SideChainState.js";
@@ -155,6 +156,8 @@ export class GameRoom extends Room<GameState> {
   private summonSeq = 0;
   /** Invasiones y otros eventos de mundo. */
   events!: EventSystem;
+  /** Castillo del Caos: arena todos contra todos por horario. */
+  castle!: ChaosCastleSystem;
   private dungeonActive = false;
   private readonly dungeonRun = { mapId: 'cripta', dead: false, dungeonStage: 0, dungeonKills: 0 };
 
@@ -403,6 +406,32 @@ export class GameRoom extends Room<GameState> {
         if (client) this.grantExp(p, client, exp);
         if (itemId) this.addToInventory(p, itemId, 1);
         client?.send(MessageType.ItemResult, { success: true, text: `Recompensa de invasión: +${gold} oro, +${exp} EXP${itemId ? `, ${getItem(itemId).name}` : ''}.` });
+      },
+    }, { scheduled: !process.env.VITEST && process.env.ADEN_EVENTS !== 'off' });
+    this.castle = new ChaosCastleSystem({
+      state: this.state,
+      now: () => Date.now(),
+      rng: () => Math.random(),
+      announce: text => this.broadcast(MessageType.WorldAnnounce, { text }),
+      notify: (playerId, text, success = true) => this.clients.find(c => c.sessionId === playerId)?.send(MessageType.ItemResult, { success, text }),
+      isOnline: playerId => this.clients.some(c => c.sessionId === playerId),
+      teleport: (playerId, mapId, x, z) => {
+        const p = this.state.players.get(playerId);
+        if (!p) return;
+        const at = nearestWalkable(mapId, { x, z });
+        p.dead = false; p.respawnMs = 0; p.hp = p.maxHp; p.mp = p.maxMp; p.stunMs = 0; p.rootMs = 0;
+        p.mapId = mapId; p.x = p.targetX = at.x; p.z = p.targetZ = at.z; p.moving = false; p.targetId = '';
+      },
+      spawnGuard: (id, templateId, x, z) => this.spawnMob(id, templateId, x, z, CASTLE_MAP),
+      takeSeal: playerId => { const p = this.state.players.get(playerId); return !!p && removeItem(p, CHAOS_SEAL); },
+      giveItem: (playerId, itemId, qty) => { const p = this.state.players.get(playerId); if (p) this.addToInventory(p, itemId, qty); },
+      reward: (playerId, gold, exp, items) => {
+        const p = this.state.players.get(playerId);
+        if (!p) return;
+        const client = this.clients.find(c => c.sessionId === playerId);
+        p.gold += gold;
+        if (client && exp > 0) this.grantExp(p, client, exp);
+        for (const itemId of items) this.addToInventory(p, itemId, 1);
       },
     }, { scheduled: !process.env.VITEST && process.env.ADEN_EVENTS !== 'off' });
     await this.presence.subscribe(GLOBAL_CHAT_TOPIC, this.deliverGlobalChat);
@@ -665,6 +694,7 @@ export class GameRoom extends Room<GameState> {
         return;
       }
       if (npcId === "healer") { this.serveHealer(p); return; }
+      if (npcId === 'chaos_keeper') { client.send(MessageType.ItemResult, this.castle.register(client.sessionId)); return; }
       const chain = sideChainForNpc(npcId);
       if (chain) { this.serveSideChain(p, client, chain); return; }
       if (npc.role === 'elder' || campaignRoleNow(p.questId, npcId)) this.serveElder(p, client, npcId);
@@ -1653,8 +1683,9 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
-    // Eventos de mundo: fuera de los recorridos de mobs (pueden borrar al invasor).
+    // Eventos de mundo: fuera de los recorridos de mobs (pueden borrar al invasor o a los guardias).
     this.events.tick();
+    this.castle.tick();
   }
 
   /**
