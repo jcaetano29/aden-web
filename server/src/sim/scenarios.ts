@@ -1,4 +1,4 @@
-import { SPAWN_ZONES, INVASION_SPOTS, getItem, getQuest, questReward, dungeonReward, createItemInstance, CRYPT_BOSS } from '@aden/shared';
+import { SPAWN_ZONES, INVASION_SPOTS, CASTLE_CENTER, CASTLE_BRACKETS, getItem, getQuest, questReward, dungeonReward, createItemInstance, CRYPT_BOSS } from '@aden/shared';
 import type { GameRoom } from '../rooms/GameRoom.js';
 import type { Profile, Scenario } from './BalanceSimulator.js';
 
@@ -73,6 +73,15 @@ export function forgeScenarios(className: string): Scenario[] {
     scenario('Guardián', 'forge_construct', profile(className, 23, 'forge_mid')),
     scenario('Fundidor', 'primal_smelter', profile(className, 24, 'forge_mid')),
     scenario('Vharzul', 'vharzul', profile(className, 25, 'forge_late', 'f_vharzul')),
+  ];
+}
+
+/** Guardias del Castillo del Caos contra un jugador de su tramo. */
+export function castleScenarios(className: string): Scenario[] {
+  const at = (name: string, templateId: string, p: Profile): Scenario => ({ name, templateId, mapId: 'castillo', ...CASTLE_CENTER, profile: p });
+  return [
+    at('Guardia Menor', CASTLE_BRACKETS.menor.guard, profile(className, 15, 'mines')),
+    at('Guardia Mayor', CASTLE_BRACKETS.mayor.guard, profile(className, 25, 'forge_late')),
   ];
 }
 

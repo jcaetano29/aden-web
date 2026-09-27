@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { CLASS_ORDER } from '@aden/shared';
 import { BalanceSimulator, type Behavior, type FightResult } from '../src/sim/BalanceSimulator.js';
-import { baselineScenarios, forgeScenarios, invasionScenarios, manaProfile, minesScenarios, type ScenarioSet } from '../src/sim/scenarios.js';
+import { baselineScenarios, castleScenarios, forgeScenarios, invasionScenarios, manaProfile, minesScenarios, type ScenarioSet } from '../src/sim/scenarios.js';
 
 const OUT = '../artifacts/balance';
 const sim = await BalanceSimulator.start();
@@ -20,8 +20,8 @@ try {
     });
     writeFileSync(`${OUT}/invasions.json`, JSON.stringify(rows, null, 2));
     for (const r of rows) console.log(`${r.invader}: grupo ${r.group.outcome}/${r.group.seconds}s (muertes ${r.group.deaths}, objetivo ${r.target.join('–')}) · solo ${r.solo.className} ${r.solo.outcome}/${r.solo.seconds}s`);
-  } else if (process.argv.includes('--mines') || process.argv.includes('--forge')) {
-    const [file, scenarios]: [string, ScenarioSet] = process.argv.includes('--forge') ? ['forge', forgeScenarios] : ['mines', minesScenarios];
+  } else if (process.argv.includes('--mines') || process.argv.includes('--forge') || process.argv.includes('--castle')) {
+    const [file, scenarios]: [string, ScenarioSet] = process.argv.includes('--forge') ? ['forge', forgeScenarios] : process.argv.includes('--castle') ? ['castle', castleScenarios] : ['mines', minesScenarios];
     const rows: FightResult[] = [];
     for (const cls of CLASS_ORDER) for (const s of scenarios(cls)) for (const b of ['attentive', 'stationary'] as Behavior[]) rows.push(sim.fight(s, b));
     writeFileSync(`${OUT}/${file}.json`, JSON.stringify(rows, null, 2));

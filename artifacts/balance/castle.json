@@ -1,0 +1,222 @@
+[
+  {
+    "scenario": "Guardia Menor",
+    "className": "knight",
+    "behavior": "attentive",
+    "level": 15,
+    "enemyLevel": 15,
+    "outcome": "kill",
+    "seconds": 8.1,
+    "hpLostPct": 8,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Menor",
+    "className": "knight",
+    "behavior": "stationary",
+    "level": 15,
+    "enemyLevel": 15,
+    "outcome": "kill",
+    "seconds": 29.9,
+    "hpLostPct": 52,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Mayor",
+    "className": "knight",
+    "behavior": "attentive",
+    "level": 25,
+    "enemyLevel": 25,
+    "outcome": "kill",
+    "seconds": 11.6,
+    "hpLostPct": 18,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Mayor",
+    "className": "knight",
+    "behavior": "stationary",
+    "level": 25,
+    "enemyLevel": 25,
+    "outcome": "kill",
+    "seconds": 29.9,
+    "hpLostPct": 51,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Menor",
+    "className": "mage",
+    "behavior": "attentive",
+    "level": 15,
+    "enemyLevel": 15,
+    "outcome": "kill",
+    "seconds": 8.1,
+    "hpLostPct": 25,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Menor",
+    "className": "mage",
+    "behavior": "stationary",
+    "level": 15,
+    "enemyLevel": 15,
+    "outcome": "kill",
+    "seconds": 28.3,
+    "hpLostPct": 77,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Mayor",
+    "className": "mage",
+    "behavior": "attentive",
+    "level": 25,
+    "enemyLevel": 25,
+    "outcome": "kill",
+    "seconds": 7.7,
+    "hpLostPct": 31,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Mayor",
+    "className": "mage",
+    "behavior": "stationary",
+    "level": 25,
+    "enemyLevel": 25,
+    "outcome": "kill",
+    "seconds": 28.3,
+    "hpLostPct": 93,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Menor",
+    "className": "barbarian",
+    "behavior": "attentive",
+    "level": 15,
+    "enemyLevel": 15,
+    "outcome": "kill",
+    "seconds": 4.7,
+    "hpLostPct": 7,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Menor",
+    "className": "barbarian",
+    "behavior": "stationary",
+    "level": 15,
+    "enemyLevel": 15,
+    "outcome": "kill",
+    "seconds": 28.3,
+    "hpLostPct": 56,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Mayor",
+    "className": "barbarian",
+    "behavior": "attentive",
+    "level": 25,
+    "enemyLevel": 25,
+    "outcome": "kill",
+    "seconds": 4.7,
+    "hpLostPct": 7,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Mayor",
+    "className": "barbarian",
+    "behavior": "stationary",
+    "level": 25,
+    "enemyLevel": 25,
+    "outcome": "kill",
+    "seconds": 28.3,
+    "hpLostPct": 59,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Menor",
+    "className": "rogue",
+    "behavior": "attentive",
+    "level": 15,
+    "enemyLevel": 15,
+    "outcome": "kill",
+    "seconds": 7.1,
+    "hpLostPct": 16,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Menor",
+    "className": "rogue",
+    "behavior": "stationary",
+    "level": 15,
+    "enemyLevel": 15,
+    "outcome": "kill",
+    "seconds": 22.3,
+    "hpLostPct": 49,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Mayor",
+    "className": "rogue",
+    "behavior": "attentive",
+    "level": 25,
+    "enemyLevel": 25,
+    "outcome": "kill",
+    "seconds": 8.1,
+    "hpLostPct": 18,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Mayor",
+    "className": "rogue",
+    "behavior": "stationary",
+    "level": 25,
+    "enemyLevel": 25,
+    "outcome": "kill",
+    "seconds": 21.1,
+    "hpLostPct": 55,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Menor",
+    "className": "ranger",
+    "behavior": "attentive",
+    "level": 15,
+    "enemyLevel": 15,
+    "outcome": "kill",
+    "seconds": 9.5,
+    "hpLostPct": 23,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Menor",
+    "className": "ranger",
+    "behavior": "stationary",
+    "level": 15,
+    "enemyLevel": 15,
+    "outcome": "kill",
+    "seconds": 26.5,
+    "hpLostPct": 57,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Mayor",
+    "className": "ranger",
+    "behavior": "attentive",
+    "level": 25,
+    "enemyLevel": 25,
+    "outcome": "kill",
+    "seconds": 8.6,
+    "hpLostPct": 25,
+    "potions": 0
+  },
+  {
+    "scenario": "Guardia Mayor",
+    "className": "ranger",
+    "behavior": "stationary",
+    "level": 25,
+    "enemyLevel": 25,
+    "outcome": "kill",
+    "seconds": 26.5,
+    "hpLostPct": 64,
+    "potions": 0
+  }
+]

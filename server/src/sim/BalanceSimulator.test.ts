@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BalanceSimulator, balancedAttributes, seededRandom } from './BalanceSimulator.js';
-import { baselineScenarios, forgeScenarios, invasionScenarios, manaProfile, minesScenarios, type ScenarioSet } from './scenarios.js';
+import { baselineScenarios, castleScenarios, forgeScenarios, invasionScenarios, manaProfile, minesScenarios, type ScenarioSet } from './scenarios.js';
 import { CLASS_ORDER } from '@aden/shared';
 
 describe('BalanceSimulator', () => {
@@ -68,6 +68,9 @@ describe('BalanceSimulator', () => {
         expect(r.seconds, `${r.className} vs ${name}`).toBeLessThanOrEqual(limit);
       }
     }
+  });
+  it('makes the Chaos Castle guards a 6–10 s fight for their bracket (median, attentive)', () => {
+    for (const name of ['Guardia Menor', 'Guardia Mayor']) within(median(castleScenarios, name), 6, 10, name);
   });
   it('lets the intended group beat each invader in time and not even its strongest member alone', () => {
     for (const inv of invasionScenarios()) {
