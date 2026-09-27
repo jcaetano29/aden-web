@@ -1,12 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { GameState } from '../state/GameState.js';
 import { MobState } from '../state/MobState.js';
+import { PlayerState } from '../state/PlayerState.js';
 import { EventSystem, type EventHost } from './EventSystem.js';
 import { nextDailyInvasion, INVASION_WARNING_MS, INVASION_DURATION_MS } from '@aden/shared';
 
 const H = 3_600_000;
 function fakeHost(start: number, online = 3) {
-  const texts: string[] = [];
+  const texts: string[] = [], publicDrops: string[] = [];
   let clock = start;
   const host: EventHost = {
     state: new GameState(), now: () => clock, rng: () => 0, announce: t => texts.push(t), onlinePlayers: () => online,
@@ -14,9 +15,9 @@ function fakeHost(start: number, online = 3) {
       const m = new MobState(); m.templateId = templateId; m.x = x; m.z = z; m.mapId = mapId; m.hp = m.maxHp = 100;
       host.state.mobs.set(id, m); return m;
     },
-    dropReserved: () => {}, reward: () => {},
+    dropReserved: () => {}, reward: () => {}, dropPublic: (itemId, qty) => publicDrops.push(`${itemId}x${qty}`),
   };
-  return { host, texts, advance: (ms: number) => { clock += ms; } };
+  return { host, texts, publicDrops, advance: (ms: number) => { clock += ms; } };
 }
 
 describe('invasion lifecycle', () => {
@@ -46,6 +47,16 @@ describe('invasion lifecycle', () => {
     expect(quiet.host.state.worldEvent.phase).toBe('');
     expect(busy.host.state.worldEvent.phase).toBe('announced');
     expect(busy.host.state.worldEvent.invaderId).not.toBe('crimson_dragon');
+  });
+  it('drops two public Chaos Seals when the invader falls', () => {
+    const { host, publicDrops, advance } = fakeHost(Date.UTC(2026, 8, 26, 12));
+    const events = new EventSystem(host);
+    events.startNow('veil_specter', 'marismas', 0); events.tick();
+    const bossId = host.state.worldEvent.bossId;
+    const hero = new PlayerState(); hero.name = 'Héroe'; host.state.players.set('hero', hero);
+    events.recordDamage(bossId, 'hero', 500);
+    host.state.mobs.get(bossId)!.dead = true; advance(50); events.tick();
+    expect(publicDrops).toEqual(['chaos_sealx2']);
   });
   it('ends the invasion when the boss dies', () => {
     const { host, texts, advance } = fakeHost(Date.UTC(2026, 8, 26, 12));

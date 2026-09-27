@@ -15,7 +15,7 @@ import { characterGender, isCharacterGender } from '@aden/shared';
 import colyseusPkg from "colyseus";
 import type { Client } from "colyseus";
 import { randomUUID } from 'node:crypto';
-import { rollCatalogDrop, lootSourceFor, LOOT_QUALITY_ODDS, INVASION_RESERVE_MS, dungeonReward, questReward, createItemInstance } from '@aden/shared';
+import { rollCatalogDrop, lootSourceFor, LOOT_QUALITY_ODDS, INVASION_RESERVE_MS, CASTLE_MAP, CHAOS_SEAL, CHAOS_SEAL_CHANCE, dungeonReward, questReward, createItemInstance } from '@aden/shared';
 import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, resetDungeon } from '../systems/AdventureSystem.js';
 import { stepEncounter } from '../systems/EncounterSystem.js';
 import { EventSystem } from '../systems/EventSystem.js';
@@ -385,6 +385,14 @@ export class GameRoom extends Room<GameState> {
         item.pickDelayMs = PICKUP_DELAY_MS;
         item.reservedFor = owner.label; item.reservedGuildId = owner.guildId; item.reservedPlayerId = owner.playerId;
         item.reservedMs = INVASION_RESERVE_MS;
+        this.state.droppedItems.set(`invasion_${itemId}_${this.dropSeq++}`, item);
+      },
+      dropPublic: (itemId, qty, x, z, mapId) => {
+        const item = new DroppedItemState();
+        item.itemTemplateId = itemId; item.qty = qty; item.mapId = mapId;
+        const position = dropPosition(this.state, mapId, x, z, this.dropSeq);
+        item.x = position.x; item.z = position.z;
+        item.despawnMs = DROP_DESPAWN_MS; item.pickDelayMs = PICKUP_DELAY_MS;
         this.state.droppedItems.set(`invasion_${itemId}_${this.dropSeq++}`, item);
       },
       reward: (playerId, gold, exp, itemId) => {
@@ -1112,8 +1120,9 @@ export class GameRoom extends Room<GameState> {
     mob.hazardMs = 0;
     mob.channeling = false;
     mob.moving = false;
-    // Los invasores no reaparecen: el sistema de eventos los retira.
-    mob.respawnMs = invaderForTemplate(mob.templateId) ? Number.POSITIVE_INFINITY : respawnForTemplate(mob.templateId) ?? MOB_RESPAWN_MS;
+    // respawnMs 0 = no reaparece solo (invasores, Guardias del Caos): su evento lo retira.
+    const respawn = respawnForTemplate(mob.templateId);
+    mob.respawnMs = respawn === 0 ? Number.POSITIVE_INFINITY : respawn ?? MOB_RESPAWN_MS;
     this.broadcast(MessageType.Death, { entityId: mobId });
 
     const killer = killerId ? this.state.players.get(killerId) : undefined;
@@ -1280,10 +1289,13 @@ export class GameRoom extends Room<GameState> {
 
   /** Rueda una tabla de loot y deja los ítems en el piso (mobs y objetos de mundo). */
   private dropLoot(lootId: string, x: number, z: number, mapId: string, goldBonus=0): void {
+    if (mapId === CASTLE_MAP) return; // los Guardias del Caos no sueltan nada
     const drops=rollDrops(lootId, Math.random);
     // Una pieza del catálogo por muerte/cofre: la fuente decide cuán seguido y cuán buena sale.
     const chosen=lootId==='breakable'?undefined:rollCatalogDrop(mapId,lootId,Math.random);
     if(chosen)drops.push({itemTemplateId:chosen,qty:getItem(chosen).category==='municion'?30:1});
+    // Sello del Caos: tirada aparte, no le quita lugar al botín del catálogo.
+    if(lootId!=='breakable' && Math.random() < CHAOS_SEAL_CHANCE[lootSourceFor(lootId)])drops.push({itemTemplateId:CHAOS_SEAL,qty:1});
     const odds=LOOT_QUALITY_ODDS[lootSourceFor(lootId)];
     for (const [index, d] of drops.entries()) {
       const item = new DroppedItemState();

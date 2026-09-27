@@ -1,6 +1,6 @@
 import {
   INVADERS, INVASION_SPOTS, INVASION_WARNING_MS, INVASION_DURATION_MS, INVASION_RADIUS, MINOR_MIN_PLAYERS,
-  PARTICIPATION_MIN_SHARE, PARTICIPATION_GEM_CHANCE, UPGRADE_GEMS,
+  PARTICIPATION_MIN_SHARE, PARTICIPATION_GEM_CHANCE, UPGRADE_GEMS, CHAOS_SEAL,
   getInvader, getTemplate, getZone, nextDailyInvasion, nextMinorInvasion, inInvasionArea, type InvaderDef,
 } from '@aden/shared';
 import type { GameState } from '../state/GameState.js';
@@ -16,6 +16,7 @@ export interface EventHost {
   spawnInvader(id: string, templateId: string, x: number, z: number, mapId: string): MobState;
   dropReserved(itemId: string, x: number, z: number, mapId: string, owner: { guildId: string; playerId: string; label: string }): void;
   reward(playerId: string, gold: number, exp: number, itemId?: string): void;
+  dropPublic(itemId: string, qty: number, x: number, z: number, mapId: string): void;
 }
 
 interface CurrentEvent { invader: InvaderDef; mapId: string; startsAt: number; endsAt: number; bossId: string; daily: boolean }
@@ -145,6 +146,7 @@ export class EventSystem {
     const loot = unique ? [unique] : [];
     if (cur.invader.guaranteedGem || !unique) loot.push(this.pick(UPGRADE_GEMS));
     for (const id of loot) this.host.dropReserved(id, boss.x, boss.z, cur.mapId, owner);
+    this.host.dropPublic(CHAOS_SEAL, 2, boss.x, boss.z, cur.mapId); // dos Sellos del Caos para quien los alcance
     const total = [...this.damage.values()].reduce((a, b) => a + b, 0);
     for (const [playerId, dmg] of this.damage) {
       if (dmg / total < PARTICIPATION_MIN_SHARE) continue;

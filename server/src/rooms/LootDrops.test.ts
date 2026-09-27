@@ -12,6 +12,28 @@ describe('catalog drops by source', () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
   /** Mata al enemigo con un azar fijo y devuelve la pieza del catálogo que soltó. */
+  let dropRun = 0;
+  /** Mata al enemigo con un azar fijo y devuelve los ids base de todo lo que soltó. */
+  const allDrops = async (templateId: string, mapId: string, x: number, z: number, roll: number) => {
+    const room = await server.createRoom('game', {}) as GameRoom;
+    const c = await server.connectTo(room, { name: `Drop${++dropRun}` });
+    room.setSimulationInterval(() => {}, 50); room.state.mobs.clear(); room.state.droppedItems.clear();
+    const p = room.state.players.get(c.sessionId)!;
+    p.level = 25; p.mapId = mapId; p.x = x; p.z = z;
+    const mob = room.spawnMob('drop-target', templateId, x, z + 1, mapId);
+    mob.hp = 1; mob.stunMs = 10000;
+    vi.spyOn(Math, 'random').mockReturnValue(roll);
+    p.targetId = 'drop-target'; p.attackCooldownMs = 0; room.tick(0.05);
+    expect(mob.dead, templateId).toBe(true);
+    return [...room.state.droppedItems.values()].map(d => getItem(d.itemTemplateId).baseId ?? d.itemTemplateId);
+  };
+
+  it('rolls a Chaos Seal apart from the catalog piece, and nothing drops inside the castle', async () => {
+    expect(await allDrops('ember_imp', 'fragua', 1500, 470, 0.001)).toContain('chaos_seal');
+    expect(await allDrops('ember_imp', 'fragua', 1500, 470, 0.9)).not.toContain('chaos_seal');
+    expect(await allDrops('chaos_guard_minor', 'castillo', 900, 300, 0.001)).toEqual([]);
+  });
+
   const catalogDrop = async (templateId: string) => {
     const room = await server.createRoom('game', {}) as GameRoom;
     const c = await server.connectTo(room, { name: `Loot${templateId}` });
