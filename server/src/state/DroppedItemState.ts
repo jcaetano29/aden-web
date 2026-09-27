@@ -7,9 +7,14 @@ export class DroppedItemState extends Schema {
   @type("number") qty = 0;
   /** Mapa donde cayó el ítem (Etapa 15): sólo se recoge/renderiza en ese mapa. */
   @type("string") mapId = "";
+  /** Botín de invasión reservado: etiqueta visible del dueño (tag del gremio o nombre). */
+  @type("string") reservedFor = "";
 
   // Server-only (NO @type)
   droppedBy = ''; // Explicit pickup is required to recover one's own discarded item.
   despawnMs = 0;
   pickDelayMs = 0; // no pickable hasta que llegue a 0 (loot visible al caer)
+  reservedGuildId = '';
+  reservedPlayerId = '';
+  reservedMs = 0;
 }

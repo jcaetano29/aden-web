@@ -15,7 +15,7 @@ import { characterGender, isCharacterGender } from '@aden/shared';
 import colyseusPkg from "colyseus";
 import type { Client } from "colyseus";
 import { randomUUID } from 'node:crypto';
-import { rollCatalogDrop, lootSourceFor, LOOT_QUALITY_ODDS, dungeonReward, questReward, createItemInstance } from '@aden/shared';
+import { rollCatalogDrop, lootSourceFor, LOOT_QUALITY_ODDS, INVASION_RESERVE_MS, dungeonReward, questReward, createItemInstance } from '@aden/shared';
 import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, resetDungeon } from '../systems/AdventureSystem.js';
 import { stepEncounter } from '../systems/EncounterSystem.js';
 import { EventSystem } from '../systems/EventSystem.js';
@@ -369,8 +369,28 @@ export class GameRoom extends Room<GameState> {
       announce: text => this.broadcast(MessageType.WorldAnnounce, { text }),
       onlinePlayers: () => this.clients.length,
       spawnInvader: (id, templateId, x, z, mapId) => this.spawnMob(id, templateId, x, z, mapId),
-      dropReserved: () => {},
-      reward: () => {},
+      dropReserved: (itemId, x, z, mapId, owner) => {
+        const item = new DroppedItemState();
+        item.itemTemplateId = instantiateItem(itemId, true, 6, LOOT_QUALITY_ODDS.boss);
+        item.qty = 1; item.mapId = mapId;
+        const position = dropPosition(this.state, mapId, x, z, this.dropSeq);
+        item.x = position.x; item.z = position.z;
+        // Dura más que el botín común: la reserva termina y todavía se puede disputar.
+        item.despawnMs = INVASION_RESERVE_MS + 120_000;
+        item.pickDelayMs = PICKUP_DELAY_MS;
+        item.reservedFor = owner.label; item.reservedGuildId = owner.guildId; item.reservedPlayerId = owner.playerId;
+        item.reservedMs = INVASION_RESERVE_MS;
+        this.state.droppedItems.set(`invasion_${itemId}_${this.dropSeq++}`, item);
+      },
+      reward: (playerId, gold, exp, itemId) => {
+        const p = this.state.players.get(playerId);
+        if (!p) return;
+        const client = this.clients.find(c => c.sessionId === playerId);
+        p.gold += gold;
+        if (client) this.grantExp(p, client, exp);
+        if (itemId) this.addToInventory(p, itemId, 1);
+        client?.send(MessageType.ItemResult, { success: true, text: `Recompensa de invasión: +${gold} oro, +${exp} EXP${itemId ? `, ${getItem(itemId).name}` : ''}.` });
+      },
     }, { scheduled: !process.env.VITEST && process.env.ADEN_EVENTS !== 'off' });
     await this.presence.subscribe(GLOBAL_CHAT_TOPIC, this.deliverGlobalChat);
     this.onMessage(MessageType.ChatSend, async (client, payload: unknown) => {
@@ -562,7 +582,7 @@ export class GameRoom extends Room<GameState> {
         p.skillGcdMs = atkCd;
         const variance = 0.9 + Math.random() * 0.2;
         const dmg = resolveAttack(p, t.entity, (skill.factor ?? 1) * power, variance, atkCd,Math.random,skillElement(skill.id));
-        if (t.kind === 'mob' && dmg > 0) this.engageMob(t.entity, client.sessionId);
+        if (t.kind === 'mob' && dmg > 0) { this.engageMob(t.entity, client.sessionId); this.events.recordDamage(p.targetId, client.sessionId, dmg); }
         // Modificadores de counterplay sobre el objetivo.
         if (dmg > 0 && skill.stunMs) t.entity.stunMs = Math.max(t.entity.stunMs, skill.stunMs);
         if (dmg > 0 && skill.rootMs) t.entity.rootMs = Math.max(t.entity.rootMs, Math.round(skill.rootMs*(1-(t.kind==='player'&&skillElement(skill.id)==='ice'?t.entity.itemEffects.iceResist:0))));
@@ -1154,7 +1174,8 @@ export class GameRoom extends Room<GameState> {
     });
 
     // Etapa 14: evento de mundo — el jefe cae (anuncio server-wide, cualquiera lo haya matado).
-    if (isBoss(mob.templateId)) {
+    // Los invasores los anuncia el sistema de eventos junto con el gremio ganador.
+    if (isBoss(mob.templateId) && !invaderForTemplate(mob.templateId)) {
       this.broadcast(MessageType.WorldAnnounce, { text: `¡${getTemplate(mob.templateId).name} ha caído!` });
     }
 
@@ -1410,7 +1431,7 @@ export class GameRoom extends Room<GameState> {
           if(!consumeAmmo(p))return;
           const variance = 0.9 + Math.random() * 0.2;
           const dmg = resolveAttack(p, mob, power, variance, getClass(p.className).base.attackCooldownMs/(1+p.itemEffects.attackSpeed));
-          if (dmg > 0) this.engageMob(mob, sessionId);
+          if (dmg > 0) { this.engageMob(mob, sessionId); this.events.recordDamage(p.targetId, sessionId, dmg); }
           if(getItem(p.equipment.get('weapon')??'worn_sword').ammo)this.broadcast(MessageType.SkillCast,{casterId:sessionId,skillId:'aimed_shot',targetId:p.targetId});
           this.markCombat(p);
           this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
@@ -1505,6 +1526,7 @@ export class GameRoom extends Room<GameState> {
       while (mob.dotAccumMs >= 500) {
         const dmg = Math.max(1, Math.round(mob.dotDps * 0.5 * power));
         mob.hp = Math.max(0, mob.hp - dmg);
+        this.events.recordDamage(mobId, mob.dotAttackerId, dmg);
 
         this.broadcast(MessageType.Damage, {
           attackerId: mob.dotAttackerId,
@@ -1538,6 +1560,10 @@ export class GameRoom extends Room<GameState> {
     this.state.droppedItems.forEach((it, id) => {
       it.despawnMs -= dtMs;
       if (it.pickDelayMs > 0) it.pickDelayMs -= dtMs;
+      if (it.reservedMs > 0) {
+        it.reservedMs -= dtMs;
+        if (it.reservedMs <= 0) { it.reservedMs = 0; it.reservedFor = ''; it.reservedGuildId = ''; it.reservedPlayerId = ''; }
+      }
       if (it.despawnMs <= 0) despawnIds.push(id);
     });
     for (const id of despawnIds) this.state.droppedItems.delete(id);

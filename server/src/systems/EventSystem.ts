@@ -1,5 +1,6 @@
 import {
   INVADERS, INVASION_SPOTS, INVASION_WARNING_MS, INVASION_DURATION_MS, INVASION_RADIUS, MINOR_MIN_PLAYERS,
+  PARTICIPATION_MIN_SHARE, PARTICIPATION_GEM_CHANCE, UPGRADE_GEMS,
   getInvader, getTemplate, getZone, nextDailyInvasion, nextMinorInvasion, inInvasionArea, type InvaderDef,
 } from '@aden/shared';
 import type { GameState } from '../state/GameState.js';
@@ -25,6 +26,11 @@ export class EventSystem {
   private nextMinorAt: number;
   private current: CurrentEvent | null = null;
   private seq = 0;
+  /** Daño al invasor por jugador, su grupo (gremio o `solo:<id>`) y la etiqueta visible del grupo. */
+  private readonly damage = new Map<string, number>();
+  private readonly groupOf = new Map<string, string>();
+  private readonly labels = new Map<string, string>();
+  private rankedAt = 0;
 
   /** `scheduled: false` apaga la programación automática (tests y simulador); `startNow` sigue funcionando. */
   constructor(readonly host: EventHost, private readonly options: { scheduled?: boolean } = {}) {
@@ -43,9 +49,17 @@ export class EventSystem {
     }
     const boss = this.host.state.mobs.get(cur.bossId);
     if (!boss || boss.dead) {
-      this.host.announce(`⚔ ¡${getTemplate(cur.invader.templateId).name} cayó!`);
+      this.resolve(cur, boss);
       this.close(now);
-    } else if (now >= cur.endsAt) {
+      return;
+    }
+    if (now - this.rankedAt >= 1000) {
+      this.rankedAt = now;
+      const ranking = this.host.state.worldEvent.ranking;
+      ranking.clear();
+      for (const s of this.standings().slice(0, 3)) ranking.push(`${s.label} · ${Math.round(s.share * 100)}%`);
+    }
+    if (now >= cur.endsAt) {
       this.host.announce(`⚔ ${cur.invader.retreat}`);
       this.close(now);
     }
@@ -56,6 +70,20 @@ export class EventSystem {
     if (this.current) return;
     const invader = getInvader(invaderId);
     this.announce(invader, mapId, this.host.now() + leadMs, false);
+  }
+
+  /** Suma daño al invasor activo; agrupa por gremio (o jugador sin gremio). */
+  recordDamage(mobId: string, playerId: string, amount: number): void {
+    const cur = this.current;
+    if (!cur || amount <= 0 || mobId !== cur.bossId || this.host.state.worldEvent.phase !== 'active') return;
+    const p = this.host.state.players.get(playerId);
+    if (p) {
+      const key = p.guildId ? p.guildId : `solo:${playerId}`;
+      this.groupOf.set(playerId, key);
+      this.labels.set(key, p.guildTag || p.name);
+    }
+    if (!this.groupOf.has(playerId)) return;
+    this.damage.set(playerId, (this.damage.get(playerId) ?? 0) + amount);
   }
 
   inArea(p: { mapId: string; x: number; z: number }): boolean {
@@ -93,12 +121,46 @@ export class EventSystem {
     this.host.announce(`⚔ ¡${getTemplate(cur.invader.templateId).name} invade ${getZone(cur.mapId).name}! Tienen 20 minutos para derrotarlo.`);
   }
 
+  private standings(): { key: string; label: string; share: number }[] {
+    const totals = new Map<string, number>();
+    let all = 0;
+    for (const [playerId, dmg] of this.damage) {
+      const key = this.groupOf.get(playerId)!;
+      totals.set(key, (totals.get(key) ?? 0) + dmg);
+      all += dmg;
+    }
+    return [...totals.entries()]
+      .map(([key, dmg]) => ({ key, label: this.labels.get(key) ?? '?', share: all ? dmg / all : 0 }))
+      .sort((a, b) => b.share - a.share);
+  }
+
+  /** Pieza única (y gema) reservada al grupo con más daño; recompensa a quien hizo al menos 1 %. */
+  private resolve(cur: CurrentEvent, boss: MobState | undefined): void {
+    const name = getTemplate(cur.invader.templateId).name;
+    const winner = this.standings()[0];
+    if (!winner || !boss) { this.host.announce(`⚔ ¡${name} cayó!`); return; }
+    const solo = winner.key.startsWith('solo:');
+    const owner = { guildId: solo ? '' : winner.key, playerId: solo ? winner.key.slice(5) : '', label: winner.label };
+    const unique = this.host.rng() < cur.invader.uniqueChance ? this.pick(cur.invader.uniqueLoot) : undefined;
+    const loot = unique ? [unique] : [];
+    if (cur.invader.guaranteedGem || !unique) loot.push(this.pick(UPGRADE_GEMS));
+    for (const id of loot) this.host.dropReserved(id, boss.x, boss.z, cur.mapId, owner);
+    const total = [...this.damage.values()].reduce((a, b) => a + b, 0);
+    for (const [playerId, dmg] of this.damage) {
+      if (dmg / total < PARTICIPATION_MIN_SHARE) continue;
+      const gem = this.host.rng() < PARTICIPATION_GEM_CHANCE ? this.pick(UPGRADE_GEMS) : undefined;
+      this.host.reward(playerId, cur.invader.rewardGold, cur.invader.rewardExp, gem);
+    }
+    this.host.announce(`⚔ ¡${name} cayó! El botín es de ${winner.label}.`);
+  }
+
   private close(now: number): void {
     const cur = this.current!;
     this.host.state.mobs.delete(cur.bossId);
     const ev = this.host.state.worldEvent;
     ev.id = ''; ev.invaderId = ''; ev.phase = ''; ev.mapId = ''; ev.bossId = ''; ev.radius = 0; ev.startsAt = 0; ev.endsAt = 0;
     ev.ranking.clear();
+    this.damage.clear(); this.groupOf.clear(); this.labels.clear(); this.rankedAt = 0;
     if (cur.daily) this.nextDailyAt = nextDailyInvasion(now);
     this.nextMinorAt = nextMinorInvasion(now, () => this.host.rng());
     this.current = null;
