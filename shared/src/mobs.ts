@@ -31,6 +31,9 @@ export const MOB_TEMPLATES: Record<string, MobTemplate> = {
   primal_smelter: { id: 'primal_smelter', level: 24, rank: 'elite', name: 'Fundidor Primordial', model: 'InfernalDemon', miniBoss: true, scale: 1.5, tint: 0xff5a2a, respawnMs: 45000 },
   forged_guardian: { id: 'forged_guardian', level: 23, rank: 'normal', name: 'Guardián de Yunque', model: 'BoneWarden', tint: 0xe0a060 },
   vharzul: { id: 'vharzul', level: 25, rank: 'boss', name: 'Vharzul, Dragón de la Fragua', model: 'AncientDrake', boss: true, scale: 2.6, tint: 0xff7a3c, respawnMs: 60000 },
+  // Guardias del Castillo del Caos: el evento los crea y los retira; no dan botín ni EXP.
+  chaos_guard_minor: { id: 'chaos_guard_minor', level: 15, rank: 'normal', name: 'Guardia del Caos', model: 'DreadKnight', scale: 1.1, tint: 0x8a2a2a, respawnMs: 0 },
+  chaos_guard_major: { id: 'chaos_guard_major', level: 25, rank: 'normal', name: 'Guardia del Caos', model: 'DreadKnight', scale: 1.2, tint: 0x5a1a1a, respawnMs: 0 },
   // Invasores de eventos: no reaparecen solos, el sistema de eventos los trae y los retira.
   crimson_dragon: { id: 'crimson_dragon', level: 25, rank: 'boss', name: 'Dragón Carmesí', model: 'AncientDrake', boss: true, scale: 3.2, tint: 0xd8322a, respawnMs: 0 },
   waste_herald: { id: 'waste_herald', level: 10, rank: 'boss', name: 'Heraldo del Yermo', model: 'InfernalDemon', boss: true, scale: 1.8, tint: 0xe0782a, respawnMs: 0 },

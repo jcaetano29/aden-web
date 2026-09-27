@@ -21,6 +21,17 @@ export const SOUNDTRACKS: Record<string, Soundtrack> = {
       [[0, 4, 2], [3, 2, 1], [5, 1, 1], [7, 0, 1]],
     ], reverb: 3.8, wind: .18, windHz: 420, percussion: .1,
   },
+  castillo: {
+    id: 'castillo', title: 'Sólo puede quedar uno', description: 'Tambores de guerra y trompas sobre el abismo',
+    bpm: 112, meter: 4, tonic: 45, scale: [0, 2, 3, 5, 7, 8, 10],
+    chords: [0, 5, 3, 4, 0, 5, 6, 4], lead: 'horn', pad: 'choir', pluck: 'bell',
+    motifs: [
+      [[0, 0, .5], [.5, 0, .5], [1, 3, 1], [2, 4, .5], [2.5, 3, .5], [3, 0, 1]],
+      [[0, 7, 1], [1, 5, .5], [1.5, 4, .5], [2, 3, 2]],
+      [[0, 0, .5], [1, 5, .5], [2, 4, 1], [3, 7, 1]],
+      [[0, 3, 1], [1, 2, 1], [2, 0, 2]],
+    ], reverb: 2.2, wind: .3, windHz: 420, percussion: .55,
+  },
   fragua: {
     id: 'fragua', title: 'El corazón de la Fragua', description: 'Tambores, trompas y coro sobre la lava',
     bpm: 76, meter: 4, tonic: 41, scale: [0, 1, 4, 5, 7, 8, 10],

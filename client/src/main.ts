@@ -88,7 +88,8 @@ async function main() {
   const healer = new ServiceNpc(renderer.scene, renderer.css2d, "healer", factory);
   const smith = new ServiceNpc(renderer.scene, renderer.css2d, "smith", factory);
   const captain = new ServiceNpc(renderer.scene, renderer.css2d, "captain", factory);
-  const regionalNpcs = NPCS.filter(def => def.mapId !== 'pueblo').map(def => ({ def, view: new Npc(renderer.scene, renderer.css2d, factory, def.id) }));
+  // NPC con mapa explícito (los clásicos del pueblo tienen su propia vista).
+  const regionalNpcs = NPCS.filter(def => def.mapId !== undefined).map(def => ({ def, view: new Npc(renderer.scene, renderer.css2d, factory, def.id) }));
   const FIELD_SHOP_GREETINGS: Record<string, string> = {
     boren: 'Llegaron sin nombres, pero todavía necesitan comer. Maera busca respuestas; yo mantengo este puesto en pie. Llevá pociones y munición antes de seguir al norte.',
     tobias: 'La mina no perdona al que baja sin provisiones. Llevá pociones y munición; lo demás lo pone Brenna.',

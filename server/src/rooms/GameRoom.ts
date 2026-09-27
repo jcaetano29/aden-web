@@ -797,6 +797,7 @@ export class GameRoom extends Room<GameState> {
       if (!p || p.dead) return;
       let zone;
       try { zone = getZone(msg?.mapId ?? ""); } catch { return; }
+      if (zone.hidden) return; // sólo se entra por su evento
       if (zone.id === p.mapId) return; // ya estás ahí
       const lock = travelLockRemainingMs(p.msSinceCombat);
       if (lock > 0) { client.send(MessageType.ItemResult, { success: false, text: travelLockText(lock) }); return; }
@@ -1754,7 +1755,7 @@ export class GameRoom extends Room<GameState> {
       player.mp = st.maxMp;
       // Etapa 15: restaurar el mapa (si es válido) y aterrizar en su punto de spawn.
       let loadedMap = save.mapId ?? TOWN_ZONE_ID;
-      try { getZone(loadedMap); } catch { loadedMap = TOWN_ZONE_ID; }
+      try { if (getZone(loadedMap).hidden) loadedMap = TOWN_ZONE_ID; } catch { loadedMap = TOWN_ZONE_ID; } // un mapa de evento no se retoma
       if(loadedMap==='cripta' && this.dungeonRun.dungeonStage===5)loadedMap=TOWN_ZONE_ID;
       player.mapId = loadedMap;
       const sp = nearestWalkable(loadedMap, getZone(loadedMap).spawn);

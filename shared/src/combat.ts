@@ -24,6 +24,8 @@ export const MOB_COMBAT: Record<string, CombatStats> = {
   primal_smelter: { maxHp: 4250, pAtk: 138, pDef: 70, attackCooldownMs: 2600 },
   forged_guardian: { maxHp: 900, pAtk: 110, pDef: 62, attackCooldownMs: 2600 },
   vharzul: { maxHp: 12650, pAtk: 150, pDef: 76, attackCooldownMs: 2400 },
+  chaos_guard_minor: { maxHp: 1400, pAtk: 95, pDef: 50, attackCooldownMs: 2400 },
+  chaos_guard_major: { maxHp: 1600, pAtk: 125, pDef: 66, attackCooldownMs: 2400 },
   crimson_dragon: { maxHp: 221000, pAtk: 190, pDef: 80, attackCooldownMs: 2200 },
   waste_herald: { maxHp: 38700, pAtk: 70, pDef: 30, attackCooldownMs: 2200 },
   veil_specter: { maxHp: 53400, pAtk: 110, pDef: 50, attackCooldownMs: 2200 },

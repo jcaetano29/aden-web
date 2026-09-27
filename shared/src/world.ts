@@ -45,6 +45,8 @@ export interface Zone {
   levelMax: number;
   /** Mapa seguro (pueblo): sin combate ni PvP, los mobs no aparecen acá. */
   safe: boolean;
+  /** Sólo se entra por un evento (Castillo del Caos): no se lista ni se puede viajar. */
+  hidden?: boolean;
   biome: ZoneBiome;
 }
 
@@ -148,6 +150,12 @@ export const ZONES: Zone[] = [
     center: { x: 900, z: -40 }, bounds: CRYPT_BOUNDS,
     spawn: CRYPT_SPAWN, levelReq: 5, levelMin: 5, levelMax: 7, safe: false,
     biome: { ground: 0x302a3c, fog: 0x181423, fogNear: 25, fogFar: 90, accent: 0xe8a85b },
+  },
+  {
+    id: "castillo", name: "Castillo del Caos", subtitle: "Sólo puede quedar uno",
+    center: { x: 900, z: 300 }, bounds: { minX: 835, maxX: 965, minZ: 235, maxZ: 365 },
+    spawn: { x: 900, z: 300 }, levelReq: 10, levelMin: 10, levelMax: 40, safe: false, hidden: true,
+    biome: { ground: 0x2b2530, fog: 0x0d0a12, fogNear: 30, fogFar: 110, accent: 0xc0392b },
   },
 ];
 

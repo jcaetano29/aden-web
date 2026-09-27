@@ -12,7 +12,7 @@ export const RARITY_VISUALS: Record<Rarity, {color:string; glow:number; halo:num
   excellent:{color:RARITY_COLORS.excellent,glow:.22,halo:.25},
 };
 const weapons:Record<string,ItemFamily>={espada:'sword',hacha:'axe',maza:'mace',lanza:'spear',baston:'staff',arco:'bow',ballesta:'crossbow'};
-const legacy:Record<string,ItemFamily>={gold:'coins',bone:'bone',health_potion:'potion',greater_potion:'potion',ancient_relic:'relic',ember_core:'core',worn_sword:'sword',iron_sword:'sword',bone_blade:'sword',crown_blade:'sword',ember_axe:'axe',leather_vest:'armor',iron_mail:'armor',crypt_plate:'armor',ash_guard:'armor',nihil_aegis:'armor',hunter_charm:'pendant',crypt_ring:'ring',ember_band:'ring',skull_crown:'crown'};
+const legacy:Record<string,ItemFamily>={gold:'coins',bone:'bone',chaos_seal:'relic',health_potion:'potion',greater_potion:'potion',ancient_relic:'relic',ember_core:'core',worn_sword:'sword',iron_sword:'sword',bone_blade:'sword',crown_blade:'sword',ember_axe:'axe',leather_vest:'armor',iron_mail:'armor',crypt_plate:'armor',ash_guard:'armor',nihil_aegis:'armor',hunter_charm:'pendant',crypt_ring:'ring',ember_band:'ring',skull_crown:'crown'};
 export function itemVisual(item:ItemTemplate) {
   let family:ItemFamily|undefined=legacy[item.baseId??item.id];
   if(!family) {

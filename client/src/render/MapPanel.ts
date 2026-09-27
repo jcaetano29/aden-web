@@ -58,7 +58,7 @@ export class MapPanel {
 
   private render(level: number, currentMapId: string, eventMapId: string): void {
     this.list.innerHTML = "";
-    for (const z of ZONES) {
+    for (const z of ZONES.filter(zn => !zn.hidden)) {
       this.list.appendChild(this.row(z, level, currentMapId, z.id === eventMapId));
     }
   }

@@ -36,6 +36,7 @@ export const NPCS: NpcDef[] = [
   { id: 'tobias', name: 'Intendente Tobías', role: 'merchant', appearance: 'merchant', mapId: 'minas', x: 1506, z: 194, shop: true },
   { id: 'ysolde', name: 'Guardiana Ysolde', role: 'elder', appearance: 'healer', appearanceModel: 'Rogue_Female', mapId: 'fragua', x: 1494, z: 494 },
   { id: 'halden_npc', name: 'Maestro Halden', role: 'smith', appearance: 'smith', appearanceModel: 'Knight', mapId: 'fragua', x: 1506, z: 494 },
+  { id: 'chaos_keeper', name: 'Custodio del Caos', role: 'elder', appearance: 'smith', appearanceModel: 'Knight', mapId: 'pueblo', x: -8, z: -6 },
   { id: 'iria', name: 'Archivista Iria', role: 'elder', appearance: 'healer', appearanceModel: 'Mage_Female', mapId: 'monasterio', x: 1195, z: 495 },
 ];
 for (const npc of NPCS) npc.mapId ??= 'pueblo';

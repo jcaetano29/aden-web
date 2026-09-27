@@ -26,6 +26,7 @@ describe("MapPanel (viaje entre mapas)", () => {
     const rows = [...document.querySelectorAll("div")].filter((d) => (d.textContent ?? "").startsWith("Marismas del Velo"));
     expect(rows.some((r) => (r.textContent ?? "").includes("⚔ Invasión"))).toBe(true);
     expect(document.body.textContent?.match(/⚔ Invasión/g)).toHaveLength(1);
+    expect(document.body.textContent).not.toContain("Castillo del Caos"); // se entra sólo por el evento
   });
 
   it("un mapa por encima del nivel aparece bloqueado", () => {
