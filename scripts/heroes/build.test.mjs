@@ -26,3 +26,6 @@ test('clips a neck boundary exactly while preserving interpolated UVs and skin w
  const g={positions:[0,0,0,1,2,0,-1,2,0],indices:[0,1,2],uvs:[.5,0,1,1,0,1],joints:[0,0,0,0,1,0,0,0,1,0,0,0],weights:[1,0,0,0,1,0,0,0,1,0,0,0],colors:[]};
  const cut=clipGeometryAtY(g,1);assert.equal(cut.indices.length,6);assert.ok(cut.positions.filter((_,i)=>i%3===1).every(y=>y>=1));for(let i=0;i<cut.weights.length;i+=4)assert.ok(Math.abs(cut.weights.slice(i,i+4).reduce((a,b)=>a+b,0)-1)<1e-6);assert.ok(cut.weights.includes(.5));assert.equal(g.positions[1],0);
 });
+
+test('deduplicates identical texture payloads in a GLB',()=>{const b=new Builder();const bytes=Buffer.from([1,2,3]);expectNever();function expectNever(){assert.equal(b.image(bytes,'one'),b.image(bytes,'two'));assert.equal(b.json.images.length,1);}});
+test('reuses identical accessors without aliasing different component types',()=>{const b=new Builder();const a=b.accessor([0,1,2],3);assert.equal(b.accessor([0,1,2],3),a);assert.notEqual(b.accessor([0,1,2],3,5123),a);});

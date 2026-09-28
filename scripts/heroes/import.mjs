@@ -4,8 +4,8 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {Matrix4,Color} from 'three';
 import {readGltf,inspectGltf} from './gltf.mjs';
-import {Builder,hierarchy,extract,headVariant,addAnimations,emptyGeometry,appendGeometry,clipGeometryAtY} from './build.mjs';
-import {armor,staff} from './wardrobe.mjs';
+import {Builder,hierarchy,extract,headVariant,addAnimations,emptyGeometry,appendGeometry,clipGeometryAtY,addRangedPoses} from './build.mjs';
+import {armor,staff,weaponGeometry} from './wardrobe.mjs';
 const args=process.argv.slice(2),option=(key,fallback)=>args.includes(key)?args[args.indexOf(key)+1]:fallback;
 const selection=JSON.parse((await readFile(option('--selection','scripts/heroes/source-selection.json'),'utf8')).replace(/^\uFEFF/,''));
 const out=option('--out','client/public/models/heroes');await mkdir(out,{recursive:true});const cache='artifacts/source-models/heroes/texture-cache';await mkdir(cache,{recursive:true});
@@ -38,29 +38,39 @@ for(const gender of ['male','female']){
  const skinMat=await material(b,gender,2,'skin','skin');const eyeMat=await material(b,gender,1,'eyes','eye');const browMat=await material(b,gender,0,'hair','hair');
  for(let i=0;i<base.json.nodes.length;i++){const node=base.json.nodes[i];if(node.mesh===undefined)continue;const prim=base.json.meshes[node.mesh].primitives[0];
  if(/Eyes|Eyebrows/.test(node.name))b.mesh(node.name==='Eyes'?'hero_eyes':'hero_brows',extract(base,i,prim,()=>true,p=>p,names),node.name==='Eyes'?eyeMat:browMat,0);
- else for(const variant of ['soft','angular'])b.mesh('face_'+variant,clipGeometryAtY(extract(base,i,prim,tri=>tri.some(v=>v[1]>(gender==='male'?1.56:1.50)),p=>headVariant(p,gender,variant),names),gender==='male'?1.56:1.50),skinMat,0);
+ else for(const variant of ['soft','angular','noble','broad'])b.mesh('face_'+variant,clipGeometryAtY(extract(base,i,prim,tri=>tri.some(v=>v[1]>(gender==='male'?1.56:1.50)),p=>headVariant(p,gender,variant),names),gender==='male'?1.56:1.50),skinMat,0);
  }
- for(const hairId of gender==='male'?['parted','buzzed']:['long','buns']){
- const h=doc(hairId),mat=await material(b,hairId,0,'hair','hair');for(let i=0;i<h.json.nodes.length;i++){const n=h.json.nodes[i];if(n.mesh===undefined)continue;const data=extract(h,i,h.json.meshes[n.mesh].primitives[0]);for(let v=0;v<data.positions.length/3;v++){data.joints.push(names.indexOf('Head'),0,0,0);data.weights.push(1,0,0,0);}b.mesh('hair_'+hairId,data,mat,0);}}
- for(const family of ['knight','mage']){
- const clothingId=gender+(family==='knight'?'-ranger':'-peasant'),c=doc(clothingId);
- const clothMat=await material(b,clothingId,0,'cloth_'+family,'cloth',family==='knight'?0x4b6278:0x615675,0,.8);
- const skinIndex=c.json.materials.findIndex(m=>m.name.includes('Regular'));const handsMat=await material(b,clothingId,Math.max(0,skinIndex),'skin_hands','skin');const cloth=emptyGeometry(),hands=emptyGeometry();
+ const hairstyles=gender==='male'?[['parted','parted'],['buzzed','buzzed'],['swept','parted'],['mane','long'],['topknot','buns']]:[['long','long'],['buns','buns'],['cropped','cropped'],['bob','long'],['ponytail','long']];
+ for(const [hairId,source] of hairstyles){const h=doc(source),mat=await material(b,source,0,'hair','hair');for(let i=0;i<h.json.nodes.length;i++){const n=h.json.nodes[i];if(n.mesh===undefined)continue;
+  const data=extract(h,i,h.json.meshes[n.mesh].primitives[0],tri=>hairId!=='bob'||tri.some(v=>v[1]>1.55),([x,y,z])=>{
+   if(gender==='male'&&['long','buns'].includes(source))y+=.045;
+   if(hairId==='swept'){x+=Math.max(0,y-1.73)*.48;y+=Math.max(0,y-1.72)*.4;z-=Math.max(0,y-1.72)*.15;}
+   if(hairId==='topknot'){x*=.65;y=1.75+(y-1.75)*1.3;z-=.025;}
+   if(hairId==='ponytail'&&y<1.70){x*=.30;z=Math.min(z,-.09);}
+   return [x,y,z];});
+  for(let v=0;v<data.positions.length/3;v++){data.joints.push(names.indexOf('Head'),0,0,0);data.weights.push(1,0,0,0);}b.mesh('hair_'+hairId,data,mat,0);
+ }}
+ if(gender==='male'){const h=doc('beard'),mat=await material(b,'beard',0,'hair','hair');for(const variant of ['full','goatee','mustache'])for(let i=0;i<h.json.nodes.length;i++){const n=h.json.nodes[i];if(n.mesh===undefined)continue;const data=extract(h,i,h.json.meshes[n.mesh].primitives[0],tri=>variant==='full'||tri.every(p=>Math.abs(p[0])<(variant==='goatee'?.035:.057)&&(variant!=='mustache'||p[1]>1.625)),p=>p);for(let v=0;v<data.positions.length/3;v++){data.joints.push(names.indexOf('Head'),0,0,0);data.weights.push(1,0,0,0);}b.mesh('beard_'+variant,data,mat,0);}}
+ for(const family of ['knight','mage','barbarian','rogue','ranger']){
+ const clothingId=gender+(family==='mage'?'-peasant':'-ranger'),c=doc(clothingId);
+ const clothMat=await material(b,clothingId,0,'cloth_'+family,'cloth',({knight:0x4b6278,mage:0x615675,barbarian:0x754635,rogue:0x353647,ranger:0x425c3c})[family],0,.8);
+ const skinIndex=c.json.materials.findIndex(m=>m.name.includes('Regular'));const handsMat=await material(b,clothingId,Math.max(0,skinIndex),'skin_hands','skin');const cloth=emptyGeometry(),hands=emptyGeometry(),slots={armor:emptyGeometry(),pants:emptyGeometry(),gloves:emptyGeometry(),boots:emptyGeometry()};
  for(let i=0;i<c.json.nodes.length;i++){const n=c.json.nodes[i];if(n.mesh===undefined||/Hood|Pauldron|Bracer/.test(n.name)||(family==='mage'&&/Body/.test(n.name)))continue;
  // Boots from the peasant pack avoid the ranger boot's 9k hidden triangles.
  if(family==='knight'&&/Feet/.test(n.name))continue;
  for(const p of c.json.meshes[n.mesh].primitives){const isSkin=c.json.materials[p.material].name.includes('Regular');if(isSkin){appendGeometry(hands,extract(c,i,p,()=>true,p=>p,names));continue;}
  const arm=/Arms$/.test(n.name),limit=gender==='female'?.69:.74;
- appendGeometry(cloth,extract(c,i,p,tri=>!(arm&&tri.every(v=>Math.abs(v[0])>limit))&&(!/Body/.test(n.name)||tri.every(v=>v[1]<1.12)),p=>{if(family==='mage'&&/Legs/.test(n.name)){const center=(p[0]>=0?1:-1)*(gender==='female'?.11:.09);p[0]=center+(p[0]-center)*.86;p[2]*=.86;}return p;},names));
+ appendGeometry(slots[/Feet/.test(n.name)?'boots':/Legs/.test(n.name)?'pants':/Arms/.test(n.name)?'gloves':'armor'],extract(c,i,p,tri=>!(arm&&tri.every(v=>Math.abs(v[0])>limit))&&(!['knight','mage'].includes(family)||!/Body/.test(n.name)||tri.every(v=>v[1]<1.12)),p=>{if(family==='mage'&&/Legs/.test(n.name)){const center=(p[0]>=0?1:-1)*(gender==='female'?.11:.09);p[0]=center+(p[0]-center)*.86;p[2]*=.86;}return p;},names));
  if(arm&&family==='mage')appendGeometry(hands,extract(c,i,p,tri=>tri.every(v=>Math.abs(v[0])>limit),p=>p,names));}}
- if(family==='knight'){for(let i=0;i<canon.json.nodes.length;i++){const n=canon.json.nodes[i];if(n.mesh!==undefined&&/Feet/.test(n.name))for(const p of canon.json.meshes[n.mesh].primitives)appendGeometry(cloth,extract(canon,i,p,()=>true,p=>p,names));}}
- b.mesh('outfit_'+family+'_cloth',cloth,clothMat,0);if(hands.indices.length)b.mesh('outfit_'+family+'_hands',hands,handsMat,0);
+ if(family==='knight'){for(let i=0;i<canon.json.nodes.length;i++){const n=canon.json.nodes[i];if(n.mesh!==undefined&&/Feet/.test(n.name))for(const p of canon.json.meshes[n.mesh].primitives)appendGeometry(slots.boots,extract(canon,i,p,()=>true,p=>p,names));}}
+ for(const [slot,data] of Object.entries(slots)){const m=b.json.materials.length;b.json.materials.push({...structuredClone(b.json.materials[clothMat]),name:'cloth_'+family+'_'+slot});b.mesh('outfit_'+family+'_cloth_'+slot,data,m,0);}if(hands.indices.length)b.mesh('outfit_'+family+'_hands',hands,handsMat,0);
  }
  const pieces=armor(gender,names),steel=plain(b,'armor_steel',0x677e91,.72,.31),gold=plain(b,'armor_gold',0xd8b878,.7,.32),robe=plain(b,'robe',0x252c58,.02,.83,{doubleSided:true});
  b.json.materials[steel].pbrMetallicRoughness.baseColorTexture={index:await projectTexture(b,'metal_atlas')};b.json.materials[robe].pbrMetallicRoughness.baseColorTexture={index:await projectTexture(b,'cloth_atlas')};b.mesh('hero_helmet',pieces.helmet,steel,0);b.mesh('outfit_knight_steel',pieces.steel,steel,0);b.mesh('outfit_knight_gold',pieces.gold,gold,0);b.mesh('outfit_mage_robe',pieces.robe,robe,0);b.mesh('outfit_mage_mantle',pieces.mantle,robe,0);b.mesh('outfit_mage_gold',pieces.mageGold,gold,0);
- addAnimations(b,doc('animations'),canonical,selection.clips);await save(b,'hero-'+gender);
+ addAnimations(b,doc('animations'),canonical,selection.clips);addRangedPoses(b,canonical);await save(b,'hero-'+gender);
 }
-for(const family of ['sword','shield']){const b=new Builder(),d=doc(family);const mats=[];for(let i=0;i<d.json.materials.length;i++)mats.push(await material(b,family,i,'weapon_'+i,'raw',0xffffff,.65,.38));for(let i=0;i<d.json.nodes.length;i++){const n=d.json.nodes[i];if(n.mesh===undefined)continue;for(const [k,p]of d.json.meshes[n.mesh].primitives.entries())b.mesh(family+'_'+k,extract(d,i,p),mats[p.material]);}await save(b,family);}
+for(const family of ['sword','shield','axe']){const b=new Builder(),d=doc(family);const mats=[];for(let i=0;i<d.json.materials.length;i++)mats.push(await material(b,family,i,'weapon_'+i,'raw',0xffffff,.65,.38));for(let i=0;i<d.json.nodes.length;i++){const n=d.json.nodes[i];if(n.mesh===undefined)continue;for(const [k,p]of d.json.meshes[n.mesh].primitives.entries())b.mesh(family+'_'+k,extract(d,i,p),mats[p.material]);}await save(b,family);}
 {const b=new Builder(),s=staff();b.mesh('staff_shaft',s.wood,plain(b,'wood',0x282f38,.15,.65));b.mesh('staff_inlay',s.metal,plain(b,'metal',0xc6a16e,.75,.3));b.mesh('staff_crystal',s.gem,plain(b,'crystal',0x79bdce,.25,.22,{emissiveFactor:new Color(0x1e6680).toArray()}));await save(b,'staff');}
+for(const family of ['dagger','mace','spear','bow','crossbow']){const b=new Builder(),parts=weaponGeometry(family);for(const [kind,data] of Object.entries(parts))b.mesh(family+'_'+kind,data,plain(b,kind,kind==='metal'?0xb7c4ce:kind==='gold'?0xc4a060:0x493128,kind==='wood'?.05:.7,kind==='wood'?.75:.3));await save(b,family);}
 await writeFile(out+'/provenance.json',JSON.stringify({version:1,license:'CC0-1.0 (source assets); project license (authored adaptations)',selection:'scripts/heroes/source-selection.json',recipes:['scripts/heroes/import.mjs','scripts/heroes/build.mjs','scripts/heroes/wardrobe.mjs','scripts/heroes/texture.py'],sources:selection.entries.map(({files,inventory,...e})=>e),outputs},null,2)+'\n');
 console.log('Total GLB bytes',outputs.reduce((a,o)=>a+o.bytes,0));

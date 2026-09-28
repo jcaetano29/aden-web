@@ -1,0 +1,11 @@
+import {it,expect,vi} from 'vitest';
+import {getItem,itemVisual,defaultAppearance} from '@aden/shared';
+import * as T from 'three';
+import {WeaponModels,weaponVisualFamily,weaponIconUrl} from './WeaponModels.js';
+import {configureWeaponModels,createItemModel,disposeItemModels} from './ItemModels.js';
+import {ModularHeroFactory} from './ModularHeroFactory.js';
+import {loadHeroFixture} from './fixtures/modularHero.js';
+it.each(['worn_sword','iron_sword','ember_axe'])('uses catalog family and model icon for %s',id=>{expect(weaponVisualFamily(getItem(id))).toBe(itemVisual(getItem(id)).family);expect(weaponIconUrl(getItem(id))).toMatch(/^\/textures\/weapons\/.+\.png$/);});
+it('rarity and class never turn an equipped sword into a dagger',()=>expect(weaponVisualFamily({...getItem('iron_sword'),rarity:'legendary'},'rogue')).toBe('sword'));
+it('ground copies do not own the repository geometry or equipped materials',async()=>{const repo=new WeaponModels(loadHeroFixture);await repo.preload();configureWeaponModels(repo);const ground=createItemModel('iron_sword'),copy=createItemModel('iron_sword'),equipped=repo.create('sword');const geometry=(ground.children[0] as T.Mesh).geometry;const release=vi.spyOn(geometry,'dispose');expect((copy.children[0] as T.Mesh).geometry).toBe(geometry);ground.removeFromParent();disposeItemModels();expect(release).not.toHaveBeenCalled();expect((equipped.children[0] as T.Mesh).geometry.attributes.position.count).toBeGreaterThan(0);repo.release(equipped);repo.dispose();expect(release).toHaveBeenCalledOnce();});
+it.each(['knight','mage','barbarian','rogue','ranger'])('builds both bodies for %s',async cls=>{const f=new ModularHeroFactory(loadHeroFixture);await f.preload();for(const gender of ['male','female'] as const){const h=f.create(cls,defaultAppearance(cls,gender));expect(h.root.getObjectByName('equipped_weapon')).toBeTruthy();h.equipment?.dispose();h.dispose?.();}f.dispose();});

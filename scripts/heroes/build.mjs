@@ -1,10 +1,11 @@
+import {createHash} from 'node:crypto';
 import * as T from 'three';
 import {accessorValues,encodeGlb} from './gltf.mjs';
 export class Builder {
- constructor(){this.json={asset:{version:'2.0',generator:'Aden modular hero importer 1'},scene:0,scenes:[{nodes:[]}],nodes:[],meshes:[],skins:[],materials:[],textures:[],images:[],samplers:[{magFilter:9729,minFilter:9987,wrapS:10497,wrapT:10497}],accessors:[],bufferViews:[],animations:[]};this.chunks=[];this.length=0;}
+ constructor(){this.json={asset:{version:'2.0',generator:'Aden modular hero importer 1'},scene:0,scenes:[{nodes:[]}],nodes:[],meshes:[],skins:[],materials:[],textures:[],images:[],samplers:[{magFilter:9729,minFilter:9987,wrapS:10497,wrapT:10497}],accessors:[],bufferViews:[],animations:[]};this.accessorHashes=new Map();this.imageHashes=new Map();this.chunks=[];this.length=0;}
  bytes(bytes){const padding=(4-this.length%4)%4;if(padding){this.chunks.push(Buffer.alloc(padding));this.length+=padding;}const i=this.json.bufferViews.length;this.json.bufferViews.push({buffer:0,byteOffset:this.length,byteLength:bytes.length});this.chunks.push(bytes);this.length+=bytes.length;return i;}
- accessor(values,width=3,componentType=5126,type){const C=componentType===5126?Float32Array:componentType===5123?Uint16Array:Uint32Array;const data=new C(values);const i=this.json.accessors.length;const a={bufferView:this.bytes(Buffer.from(data.buffer)),componentType,count:values.length/width,type:type??({1:'SCALAR',2:'VEC2',3:'VEC3',4:'VEC4',16:'MAT4'}[width])};if(width===3){a.min=[Infinity,Infinity,Infinity];a.max=[-Infinity,-Infinity,-Infinity];for(let k=0;k<values.length;k++){a.min[k%3]=Math.min(a.min[k%3],values[k]);a.max[k%3]=Math.max(a.max[k%3],values[k]);}}this.json.accessors.push(a);return i;}
- image(bytes,name){const i=this.json.images.length;this.json.images.push({bufferView:this.bytes(bytes),mimeType:'image/jpeg',name});this.json.textures.push({source:i,sampler:0});return i;}
+ accessor(values,width=3,componentType=5126,type){const C=componentType===5126?Float32Array:componentType===5123?Uint16Array:Uint32Array;const data=new C(values);const hash=componentType+':'+width+':'+type+':'+createHash('sha256').update(Buffer.from(data.buffer)).digest('hex');if(this.accessorHashes.has(hash))return this.accessorHashes.get(hash);const i=this.json.accessors.length;const a={bufferView:this.bytes(Buffer.from(data.buffer)),componentType,count:values.length/width,type:type??({1:'SCALAR',2:'VEC2',3:'VEC3',4:'VEC4',16:'MAT4'}[width])};if(width===3){a.min=[Infinity,Infinity,Infinity];a.max=[-Infinity,-Infinity,-Infinity];for(let k=0;k<values.length;k++){a.min[k%3]=Math.min(a.min[k%3],values[k]);a.max[k%3]=Math.max(a.max[k%3],values[k]);}}this.json.accessors.push(a);this.accessorHashes.set(hash,i);return i;}
+ image(bytes,name){const hash=createHash('sha256').update(bytes).digest('hex');if(this.imageHashes.has(hash))return this.imageHashes.get(hash);const i=this.json.images.length;this.json.images.push({bufferView:this.bytes(bytes),mimeType:'image/jpeg',name});this.json.textures.push({source:i,sampler:0});this.imageHashes.set(hash,i);return i;}
  mesh(name,data,material,skin){if(!data.indices.length)return;const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(data.positions,3));g.setIndex(data.indices);g.computeVertexNormals();const attributes={POSITION:this.accessor(data.positions),NORMAL:this.accessor([...g.attributes.normal.array])};if(data.uvs?.length)attributes.TEXCOORD_0=this.accessor(data.uvs,2);if(data.colors?.length)attributes.COLOR_0=this.accessor(data.colors,3);if(skin!==undefined){attributes.JOINTS_0=this.accessor(data.joints,4,5123);attributes.WEIGHTS_0=this.accessor(data.weights,4);}const node={name,mesh:this.json.meshes.length};if(skin!==undefined)node.skin=skin;this.json.meshes.push({name,primitives:[{attributes,indices:this.accessor(data.indices,1,5125),material}]});this.json.scenes[0].nodes.push(this.json.nodes.length);this.json.nodes.push(node);g.dispose();}
  finish(){return encodeGlb(this.json,Buffer.concat(this.chunks));}
 }
@@ -25,7 +26,7 @@ export function extract(doc,nodeIndex,primitive,keep=()=>true,modify=p=>p,jointN
  result.indices.push(remap.get(id));}}
  return result;
 }
-export function headVariant([x,y,z],gender,variant){const offset=gender==='female'?-.045:0;const jaw=Math.max(0,1-Math.abs(y-(1.625+offset))/.055)*Math.min(1,Math.max(0,z+.015)/.065);const nose=(Math.abs(x)>.028?0:1)*Math.exp(-((x/.022)**2+((y-(1.668+offset))/.024)**2))*Math.max(0,Math.min(1,(z-.07)/.045));return [x*(1+jaw*(variant==='angular'?.2:-.12)),y,z+nose*(variant==='angular'?.018:-.005)];}
+export function headVariant([x,y,z],gender,variant){const offset=gender==='female'?-.045:0;const jaw=Math.max(0,1-Math.abs(y-(1.625+offset))/.055)*Math.min(1,Math.max(0,z+.015)/.065);const nose=(Math.abs(x)>.028?0:1)*Math.exp(-((x/.022)**2+((y-(1.668+offset))/.024)**2))*Math.max(0,Math.min(1,(z-.07)/.045));return [x*(1+jaw*({angular:.2,soft:-.12,noble:-.24,broad:.38}[variant]??0)),y+(variant==='noble'?jaw*.01:variant==='broad'?-jaw*.006:0),z+nose*({angular:.018,soft:-.005,noble:.027,broad:.004}[variant]??0)];}
 export function retargetRotation(animatedWorld,sourceRestWorld,targetRestWorld,parentTargetWorld){return parentTargetWorld.clone().invert().multiply(animatedWorld).multiply(sourceRestWorld.clone().invert()).multiply(targetRestWorld).normalize();}
 export function addAnimations(builder,source,targetJson,aliases){
  const srcRest=hierarchy(source.json),targetRest=hierarchy(targetJson);const targetByName=new Map(targetJson.nodes.map((n,i)=>[n.name,i]));const dstNodes=builder.json.nodes;
@@ -54,4 +55,32 @@ export function clipGeometryAtY(source,cut){
  function add(v){if(!cache.has(v.key)){cache.set(v.key,out.positions.length/3);out.positions.push(...v.position);out.uvs.push(...v.uv);out.joints.push(...v.joints);out.weights.push(...v.weights);}return cache.get(v.key);}
  for(let i=0;i<source.indices.length;i+=3){const tri=source.indices.slice(i,i+3).map(original),poly=[];for(let k=0;k<3;k++){const a=tri[k],b=tri[(k+1)%3],inside=a.position[1]>=cut,next=b.position[1]>=cut;if(inside)poly.push(a);if(inside!==next)poly.push(cross(a,b));}for(let k=1;k<poly.length-1;k++)out.indices.push(add(poly[0]),add(poly[k]),add(poly[k+1]));}
  return out;
+}
+/** Authored ranged poses: forward bow arm, drawing arm and supported crossbow. */
+export function addRangedPoses(builder,canonical){
+ const rest=hierarchy(canonical),byName=new Map(rest.map(n=>[n.name,n]));
+ for(const name of ['Bow_Attack','Crossbow_Attack']){
+  builder.json.animations=builder.json.animations.filter(a=>a.name!==name);
+  const times=[0,.2,.45,.62,.85],samples=new Map();
+  for(const time of times){const pose=hierarchy(canonical),nodes=new Map(pose.map(n=>[n.name,n]));
+   for(const side of ['l','r']){const cross=name==='Crossbow_Attack',sign=side==='l'?1:-1,recoil=Math.sin(time/.85*Math.PI)*.055;
+    const elbow=new T.Vector3(cross?sign*.25:side==='l'?.22:-.42,1.42,side==='l'?.20:-.03);
+    const hand=new T.Vector3(cross?sign*.065:side==='l'?.16:-.075,1.43,cross?(side==='l'?.42:.20-recoil):side==='l'?.48:.11+recoil);
+    for(const [bone,child,end] of [['upperarm_'+side,'lowerarm_'+side,elbow],['lowerarm_'+side,'hand_'+side,hand]]){
+     const n=nodes.get(bone),r=byName.get(bone),c=byName.get(child);pose.filter(n=>!n.parent).forEach(n=>n.updateMatrixWorld(true));
+     const from=c.getWorldPosition(new T.Vector3()).sub(r.getWorldPosition(new T.Vector3())).normalize();
+     const to=end.clone().sub(n.getWorldPosition(new T.Vector3())).normalize();
+     const world=new T.Quaternion().setFromUnitVectors(from,to).multiply(r.getWorldQuaternion(new T.Quaternion()));
+     n.quaternion.copy(n.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(world));n.updateMatrixWorld(true);
+    }
+    const h=nodes.get('hand_'+side),weapon=new T.Quaternion().setFromEuler(new T.Euler(cross?Math.PI/2:0,0,0));
+    const grip=new T.Quaternion().setFromEuler(new T.Euler(0,cross?Math.PI/2:0,Math.PI/2));
+    h.quaternion.copy(h.parent.getWorldQuaternion(new T.Quaternion()).invert().multiply(weapon).multiply(grip.invert()));
+   }
+   for(const joint of canonical.skins[0].joints){const n=pose[joint];if(!samples.has(n.name))samples.set(n.name,[]);samples.get(n.name).push(...n.quaternion.toArray());}
+  }
+  const input=builder.accessor(times,1),anim={name,channels:[],samplers:[]};
+  for(const [bone,values] of samples){anim.channels.push({sampler:anim.samplers.length,target:{node:builder.json.nodes.findIndex(n=>n.name===bone),path:'rotation'}});anim.samplers.push({input,output:builder.accessor(values,4),interpolation:'LINEAR'});}
+  builder.json.animations.push(anim);
+ }
 }

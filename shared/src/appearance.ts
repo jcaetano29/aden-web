@@ -35,13 +35,13 @@ const option=(id:string,label:string,genders=both,hex?:string):AppearanceOption=
 const palette=(values:readonly (readonly [string,string,string])[])=>values.map(([id,label,hex])=>option(id,label,both,hex));
 /** Only cosmetic options backed by a prepared mesh or material are exposed. */
 export const APPEARANCE_CATALOG = {
-  faceId:[option('soft','Suave'),option('angular','Anguloso')],
+  faceId:[option('soft','Suave'),option('angular','Anguloso'),option('noble','Alargado'),option('broad','Ancho')],
   skinToneId:palette([['ivory','Marfil','#f1d0b7'],['peach','Melocotón','#dfa98a'],['sand','Arena','#c9956c'],['olive','Oliva','#b99570'],['bronze','Bronce','#9e6946'],['umber','Tierra','#805134'],['sienna','Siena','#68422f'],['ebony','Ébano','#482f27']]),
-  hairStyleId:[option('none','Sin cabello'),option('parted','Raya lateral',['male']),option('buzzed','Corto',['male']),option('long','Largo',['female']),option('buns','Recogido',['female'])],
+  hairStyleId:[option('none','Sin cabello'),option('parted','Raya lateral',['male']),option('buzzed','Corto',['male']),option('long','Largo',['female']),option('buns','Recogido',['female']),option('swept','Despeinado',['male']),option('mane','Melena',['male']),option('topknot','Moño alto',['male']),option('cropped','Corto',['female']),option('bob','Media melena',['female']),option('ponytail','Cola alta',['female'])],
   hairColorId:palette([['raven','Negro','#241c1c'],['brown','Castaño','#52382b'],['chestnut','Avellana','#865638'],['copper','Cobrizo','#ac6037'],['gold','Dorado','#cfa86b'],['silver','Plata','#c4cbd1'],['white','Blanco','#e9e5dc'],['ash','Ceniza','#766e63']]),
   eyeColorId:palette([['hazel','Avellana','#a3804f'],['blue','Azul','#598fb9'],['green','Verde','#6c9666'],['gray','Gris','#98a9b4'],['brown','Marrón','#815236'],['amber','Ámbar','#cda15c']]),
-  facialHairId:[option('none','Sin barba')],
-  markingId:[option('none','Sin marcas')],
+  facialHairId:[option('none','Sin barba'),option('full','Completa',['male']),option('goatee','Perilla',['male']),option('mustache','Bigote',['male'])],
+  markingId:[option('none','Sin marcas'),option('scar','Cicatriz'),option('paint','Pintura de guerra'),option('freckles','Pecas')],
 } satisfies Record<string,readonly AppearanceOption[]>;
 export type AppearanceField=keyof typeof APPEARANCE_CATALOG;
 export const APPEARANCE_FIELDS=Object.keys(APPEARANCE_CATALOG) as AppearanceField[];

@@ -41,3 +41,22 @@ export function staff(){const metal=emptyGeometry(),wood=emptyGeometry(),gem=emp
  for(const y of [-.31,-.19,.11,.15,.70,1.1])add(metal,new T.TorusGeometry(.022,.007,6,16),[0,y,0],[1,1,1],[Math.PI/2,0,0]);
  for(const side of [-1,1]){const curve=new T.CatmullRomCurve3([new T.Vector3(0,1.08,0),new T.Vector3(side*.115,1.19,0),new T.Vector3(side*.135,1.34,0),new T.Vector3(side*.068,1.45,0)]);add(metal,new T.TubeGeometry(curve,18,.014,6,false),[0,0,0]);}
  add(gem,new T.OctahedronGeometry(.095,0),[0,1.335,0],[.72,1.65,.72]);return {metal,wood,gem};}
+/** Indexed fantasy weapon families authored around the hand pivot. */
+export function weaponGeometry(family){
+ const metal=emptyGeometry(),wood=emptyGeometry(),gold=emptyGeometry();
+ const add=(bucket,g,pos=[0,0,0],scale=[1,1,1],rot=[0,0,0])=>{const d=authoredGeometry(g,'root',['root'],matrix(pos,scale,rot));d.joints=[];d.weights=[];appendGeometry(bucket,d);};
+ const blade=(y,w,h)=>{const shape=new T.Shape();shape.moveTo(-w*.5,-h*.5);shape.lineTo(w*.5,-h*.5);shape.lineTo(w*.40,h*.22);shape.lineTo(0,h*.5);shape.lineTo(-w*.40,h*.22);shape.closePath();add(metal,new T.ExtrudeGeometry(shape,{depth:.018,bevelEnabled:true,bevelSize:.008,bevelThickness:.006,bevelSegments:1,steps:1}),[0,y,-.009]);};
+ const rod=(bucket,y,r,h)=>add(bucket,new T.CylinderGeometry(r,r,h,12),[0,y,0]);
+ const trim=y=>add(gold,new T.TorusGeometry(.033,.008,6,16),[0,y,0],[1,1,1],[Math.PI/2,0,0]);
+ if(family==='dagger'){rod(wood,0,.027,.18);blade(.27,.095,.37);add(gold,new T.CapsuleGeometry(.017,.18,4,8),[0,.09,0],[1,1,1],[0,0,Math.PI/2]);add(gold,new T.OctahedronGeometry(.038),[0,-.1,0]);}
+ if(family==='mace'){rod(wood,.15,.027,.6);rod(metal,.5,.058,.22);for(let i=0;i<6;i++)add(metal,new T.CapsuleGeometry(.018,.17,4,8),[Math.cos(i*Math.PI/3)*.10,.52,Math.sin(i*Math.PI/3)*.10]);for(const y of [-.16,.35,.65])trim(y);add(gold,new T.OctahedronGeometry(.075),[0,.54,0]);}
+ if(family==='spear'){rod(wood,.28,.018,1.75);blade(1.25,.10,.35);for(const y of [-.55,.13,.2,1.08])trim(y);}
+ if(family==='bow'||family==='crossbow'){
+  const bow=new T.CatmullRomCurve3([new T.Vector3(0,-.66,0),new T.Vector3(.17,-.47,0),new T.Vector3(.24,-.23,0),new T.Vector3(.12,0,0),new T.Vector3(.24,.23,0),new T.Vector3(.17,.47,0),new T.Vector3(0,.66,0)]);
+  const g=new T.TubeGeometry(bow,36,.023,8,false);if(family==='crossbow'){g.rotateZ(Math.PI/2);g.scale(.7,.7,1);g.translate(0,.35,0);}add(wood,g);
+  if(family==='bow'){rod(gold,0,.002,1.32);add(wood,new T.CapsuleGeometry(.027,.14,4,10),[.12,0,0]);}
+  else {add(wood,new T.CapsuleGeometry(.046,.62,4,12),[0,.15,0],[1,1,.6]);add(metal,new T.CylinderGeometry(.003,.003,.925,6),[0,.35,0],[1,1,1],[0,0,Math.PI/2]);add(gold,new T.TorusGeometry(.032,.009,6,12),[0,-.12,-.025]);rod(metal,.4,.007,.5);}
+ }
+ if(family==='bow')for(const data of [metal,wood,gold])for(let i=0;i<data.positions.length;i+=3)data.positions[i]-=.12;
+ return {metal,wood,gold};
+}

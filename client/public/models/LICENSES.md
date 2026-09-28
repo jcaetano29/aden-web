@@ -43,3 +43,5 @@ CC0 no exige atribución; se incluye por buena práctica y trazabilidad.
 - Dos variantes de rostro por cuerpo se derivan de las mallas originales; no se escalan cabezas completas. Texturas de piel/cabello neutralizadas para tintes. Detalle de metal y tela: atlas generado existente del proyecto (`textures/hero-material-atlas.png`), sin nueva dependencia externa.
 - Inventario con hashes de todos los archivos originales, correcciones de URI y licencias: `scripts/heroes/source-selection.json`. Exports y hashes: `heroes/provenance.json`. Originales descargados en `artifacts/source-models/heroes/` (ignorado por Git).
 - No se incluyen ni se requieren archivos Pro o Source de pago.
+
+The full modular catalog additionally uses Quaternius Standard Hair_Beard, Hair_BuzzedFemale and Axe_Bronze, audited in source-selection.json. Additional face/hair adaptations, blended face marks, dagger/mace/spear/bow/crossbow geometry and ranged poses are project-authored. Weapon PNGs are rendered from these models by weapon-icon-export.html; all seven rarity finishes are included.

@@ -191,6 +191,36 @@
       "pack": "base"
     },
     {
+      "id": "cropped",
+      "sourcePath": "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/Hair_BuzzedFemale.gltf",
+      "sourceUrl": "https://quaternius.itch.io/universal-base-characters",
+      "edition": "Standard",
+      "license": "CC0-1.0",
+      "role": "hair",
+      "gender": "female",
+      "sourceSha256": "3f30e5a7b0fc6d04d2980a4e937cc5e4b03ca923c9247869168ef13e1b40b747",
+      "uriRemaps": {},
+      "sourceNodes": [
+        "Hair_BuzzedFemale"
+      ],
+      "pack": "base"
+    },
+    {
+      "id": "beard",
+      "sourcePath": "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/Hair_Beard.gltf",
+      "sourceUrl": "https://quaternius.itch.io/universal-base-characters",
+      "edition": "Standard",
+      "license": "CC0-1.0",
+      "role": "hair",
+      "gender": "male",
+      "sourceSha256": "c91ef54606aad25a9d1191deaba90cb411c0067d8cef262b2f4819f242e5b365",
+      "uriRemaps": {},
+      "sourceNodes": [
+        "Hair_Beard"
+      ],
+      "pack": "base"
+    },
+    {
       "id": "animations",
       "sourcePath": "artifacts/source-models/heroes/animations/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
       "sourceUrl": "https://quaternius.itch.io/universal-animation-library",
@@ -234,26 +264,71 @@
         "Shield_Wooden"
       ],
       "pack": "props"
+    },
+    {
+      "id": "axe",
+      "sourcePath": "artifacts/source-models/heroes/props/Exports/glTF/Axe_Bronze.gltf",
+      "sourceUrl": "https://quaternius.itch.io/fantasy-props-megakit",
+      "edition": "Standard",
+      "license": "CC0-1.0",
+      "role": "weapon",
+      "gender": null,
+      "sourceSha256": "338ce6e6947b8849774aac2deb9d2bf3a1cb14dc869effb7be0a91053e67b64f",
+      "uriRemaps": {},
+      "sourceNodes": [
+        "Axe_Bronze"
+      ],
+      "pack": "props"
     }
   ],
   "outputs": [
     {
       "file": "hero-male.glb",
-      "bytes": 5161388,
-      "sha256": "bc1bb3daccb18ddaf57a91f225f6f49e700c28bfa9b1de2c46afc5f0edec295d",
-      "meshes": 16,
-      "skinnedMeshes": 16,
-      "triangles": 31942,
+      "bytes": 6165644,
+      "sha256": "aac4ce3d82f3b3707d282a1e595ec86b553358549ba749b9d4bafa1bce5f86bb",
+      "meshes": 44,
+      "skinnedMeshes": 44,
+      "triangles": 102721,
       "materials": [
         "skin",
         "eyes",
         "hair",
         "hair",
         "hair",
+        "hair",
+        "hair",
+        "hair",
+        "hair",
         "cloth_knight",
         "skin_hands",
+        "cloth_knight_armor",
+        "cloth_knight_pants",
+        "cloth_knight_gloves",
+        "cloth_knight_boots",
         "cloth_mage",
         "skin_hands",
+        "cloth_mage_armor",
+        "cloth_mage_pants",
+        "cloth_mage_gloves",
+        "cloth_mage_boots",
+        "cloth_barbarian",
+        "skin_hands",
+        "cloth_barbarian_armor",
+        "cloth_barbarian_pants",
+        "cloth_barbarian_gloves",
+        "cloth_barbarian_boots",
+        "cloth_rogue",
+        "skin_hands",
+        "cloth_rogue_armor",
+        "cloth_rogue_pants",
+        "cloth_rogue_gloves",
+        "cloth_rogue_boots",
+        "cloth_ranger",
+        "skin_hands",
+        "cloth_ranger_armor",
+        "cloth_ranger_pants",
+        "cloth_ranger_gloves",
+        "cloth_ranger_boots",
         "armor_steel",
         "armor_gold",
         "robe"
@@ -330,27 +405,60 @@
         "Walk",
         "Sword_Attack",
         "Spell_Attack",
+        "Heavy_Attack",
+        "Dagger_Attack",
         "Hit",
-        "Death"
+        "Death",
+        "Bow_Attack",
+        "Crossbow_Attack"
       ]
     },
     {
       "file": "hero-female.glb",
-      "bytes": 6078424,
-      "sha256": "bdb7a7dedbd010d4990ff8199c8a246e4aac889e4c806f03ab1f06fc4998f89f",
-      "meshes": 16,
-      "skinnedMeshes": 16,
-      "triangles": 39689,
+      "bytes": 6553700,
+      "sha256": "64bb08646fd57ccea54c1cdb7d8affd55e80c562a22b62da892030fd00c05d20",
+      "meshes": 41,
+      "skinnedMeshes": 41,
+      "triangles": 108957,
       "materials": [
         "skin",
         "eyes",
         "hair",
         "hair",
         "hair",
+        "hair",
+        "hair",
+        "hair",
         "cloth_knight",
         "skin_hands",
+        "cloth_knight_armor",
+        "cloth_knight_pants",
+        "cloth_knight_gloves",
+        "cloth_knight_boots",
         "cloth_mage",
         "skin_hands",
+        "cloth_mage_armor",
+        "cloth_mage_pants",
+        "cloth_mage_gloves",
+        "cloth_mage_boots",
+        "cloth_barbarian",
+        "skin_hands",
+        "cloth_barbarian_armor",
+        "cloth_barbarian_pants",
+        "cloth_barbarian_gloves",
+        "cloth_barbarian_boots",
+        "cloth_rogue",
+        "skin_hands",
+        "cloth_rogue_armor",
+        "cloth_rogue_pants",
+        "cloth_rogue_gloves",
+        "cloth_rogue_boots",
+        "cloth_ranger",
+        "skin_hands",
+        "cloth_ranger_armor",
+        "cloth_ranger_pants",
+        "cloth_ranger_gloves",
+        "cloth_ranger_boots",
         "armor_steel",
         "armor_gold",
         "robe"
@@ -427,8 +535,12 @@
         "Walk",
         "Sword_Attack",
         "Spell_Attack",
+        "Heavy_Attack",
+        "Dagger_Attack",
         "Hit",
-        "Death"
+        "Death",
+        "Bow_Attack",
+        "Crossbow_Attack"
       ]
     },
     {
@@ -460,6 +572,19 @@
       "clips": []
     },
     {
+      "file": "axe.glb",
+      "bytes": 576040,
+      "sha256": "8f26490243ed5784c4d28a814576c3fa5d6a4fc46db616cb0ae6e1a88d74bafe",
+      "meshes": 1,
+      "skinnedMeshes": 0,
+      "triangles": 826,
+      "materials": [
+        "weapon_0"
+      ],
+      "joints": [],
+      "clips": []
+    },
+    {
       "file": "staff.glb",
       "bytes": 57712,
       "sha256": "fe60adf5591da68b53e049327b49f98728e4513b66fc06a8fb485b0c68bc3789",
@@ -470,6 +595,81 @@
         "wood",
         "metal",
         "crystal"
+      ],
+      "joints": [],
+      "clips": []
+    },
+    {
+      "file": "dagger.glb",
+      "bytes": 19580,
+      "sha256": "9f1d6a2c1f8c916947fc536f7b6267f8def98208a69747a640926e8b9f9f0b16",
+      "meshes": 3,
+      "skinnedMeshes": 0,
+      "triangles": 364,
+      "materials": [
+        "metal",
+        "wood",
+        "gold"
+      ],
+      "joints": [],
+      "clips": []
+    },
+    {
+      "file": "mace.glb",
+      "bytes": 79244,
+      "sha256": "ce48177a116c8c0ecf51d71a98eff08da9e2398c0c7b1c9d734f6df63bb87f3c",
+      "meshes": 3,
+      "skinnedMeshes": 0,
+      "triangles": 2312,
+      "materials": [
+        "metal",
+        "wood",
+        "gold"
+      ],
+      "joints": [],
+      "clips": []
+    },
+    {
+      "file": "spear.glb",
+      "bytes": 34672,
+      "sha256": "87698bc55397784bdfdb7fb1a74300ee6514620726753b1c99e7c1ec245acbd5",
+      "meshes": 3,
+      "skinnedMeshes": 0,
+      "triangles": 852,
+      "materials": [
+        "metal",
+        "wood",
+        "gold"
+      ],
+      "joints": [],
+      "clips": []
+    },
+    {
+      "file": "bow.glb",
+      "bytes": 33488,
+      "sha256": "078d34da734e7c3cab8bb82403f5c4e7ef7659569b5148758b23138de6c65141",
+      "meshes": 2,
+      "skinnedMeshes": 0,
+      "triangles": 964,
+      "materials": [
+        "metal",
+        "wood",
+        "gold"
+      ],
+      "joints": [],
+      "clips": []
+    },
+    {
+      "file": "crossbow.glb",
+      "bytes": 42488,
+      "sha256": "c176d3ceb802dbd8532f99de3530760e54f92fde399e778999362169d63d7331",
+      "meshes": 3,
+      "skinnedMeshes": 0,
+      "triangles": 1200,
+      "materials": [
+        "metal",
+        "wood",
+        "gold"
       ],
       "joints": [],
       "clips": []

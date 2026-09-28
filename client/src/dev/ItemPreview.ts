@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { ITEM_TEMPLATES,getItem,itemVisual,createItemInstance } from '@aden/shared';
-import {createItemModel,itemIcon,disposeItemModels} from '../render/ItemModels.js';
+import {createItemModel,itemIcon,disposeItemModels,configureWeaponModels} from '../render/ItemModels.js';
 import {preloadMaterialAtlas} from '../render/materialAtlas.js';
 import {GroundItems} from '../render/GroundItems.js';
 import {CharacterFactory} from '../render/CharacterFactory.js';
 import {EquipmentViews} from '../render/EquipmentViews.js';
 
-await preloadMaterialAtlas();
+const weaponFactory=new CharacterFactory();
+await Promise.all([preloadMaterialAtlas(),weaponFactory.preloadHeroes()]);configureWeaponModels(weaponFactory.weaponModels);
 const scene=new THREE.Scene();scene.background=new THREE.Color('#17212b');
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,560);document.querySelector('#stage')!.append(renderer.domElement);
 const camera=new THREE.PerspectiveCamera(42,innerWidth/560,.1,100);camera.position.set(0,12,17);camera.lookAt(0,0,0);
@@ -44,4 +45,4 @@ let last=performance.now(),report=last,frames=0;
 renderer.setAnimationLoop(()=>{const now=performance.now();drops.update((now-last)/1000,camera);last=now;renderer.render(scene,camera);frames++;
   if(now-report>1000){document.querySelector('#status')!.textContent=`${bases.length} bases · ${families.length} familias · ${ids.length} drops · ${renderer.info.render.calls} draw calls · ${renderer.info.memory.geometries} geometrías · ${Math.round(frames*1000/(now-report))} FPS`;report=now;frames=0;}
 });
-window.addEventListener('pagehide',()=>{renderer.setAnimationLoop(null);drops.dispose();disposeItemModels();renderer.dispose();});
+window.addEventListener('pagehide',()=>{renderer.setAnimationLoop(null);drops.dispose();disposeItemModels();weaponFactory.disposeHeroes();renderer.dispose();});

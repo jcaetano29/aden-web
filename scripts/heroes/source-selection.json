@@ -791,6 +791,68 @@
       "pack": "base"
     },
     {
+      "id": "cropped",
+      "sourcePath": "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/Hair_BuzzedFemale.gltf",
+      "sourceUrl": "https://quaternius.itch.io/universal-base-characters",
+      "edition": "Standard",
+      "license": "CC0-1.0",
+      "role": "hair",
+      "gender": "female",
+      "sourceSha256": "3f30e5a7b0fc6d04d2980a4e937cc5e4b03ca923c9247869168ef13e1b40b747",
+      "files": {
+        "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/Hair_BuzzedFemale.gltf": "3f30e5a7b0fc6d04d2980a4e937cc5e4b03ca923c9247869168ef13e1b40b747",
+        "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/Hair_BuzzedFemale.bin": "6f1ab9bc997b01311dc0635ee165edfe27bd9715222718bc4cf4265e10b933af",
+        "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/T_Hair_1_Normal.png": "57fd0ad8c96a4d01b38769637e066cecaa285b456f6e48ce00863754a457affb",
+        "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/T_Hair_1_BaseColor.png": "bc7aa863bd22ab0a995cd838cceb4d3a5186ee54ee2fb0108fad85d20c057e6e"
+      },
+      "uriRemaps": {},
+      "sourceNodes": [
+        "Hair_BuzzedFemale"
+      ],
+      "inventory": {
+        "meshes": 1,
+        "skinnedMeshes": 0,
+        "triangles": 830,
+        "materials": [
+          "MI_Hair_1"
+        ],
+        "joints": [],
+        "clips": []
+      },
+      "pack": "base"
+    },
+    {
+      "id": "beard",
+      "sourcePath": "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/Hair_Beard.gltf",
+      "sourceUrl": "https://quaternius.itch.io/universal-base-characters",
+      "edition": "Standard",
+      "license": "CC0-1.0",
+      "role": "hair",
+      "gender": "male",
+      "sourceSha256": "c91ef54606aad25a9d1191deaba90cb411c0067d8cef262b2f4819f242e5b365",
+      "files": {
+        "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/Hair_Beard.gltf": "c91ef54606aad25a9d1191deaba90cb411c0067d8cef262b2f4819f242e5b365",
+        "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/Hair_Beard.bin": "781cf9b719d75a9f8d73881d2ca0713fe580d774edc96adaded392aad37a72b7",
+        "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/T_Hair_1_Normal.png": "57fd0ad8c96a4d01b38769637e066cecaa285b456f6e48ce00863754a457affb",
+        "artifacts/source-models/heroes/base/Universal Base Characters[Standard]/Hairstyles/Origin at 0/glTF (Godot)/T_Hair_1_BaseColor.png": "bc7aa863bd22ab0a995cd838cceb4d3a5186ee54ee2fb0108fad85d20c057e6e"
+      },
+      "uriRemaps": {},
+      "sourceNodes": [
+        "Hair_Beard"
+      ],
+      "inventory": {
+        "meshes": 1,
+        "skinnedMeshes": 0,
+        "triangles": 1034,
+        "materials": [
+          "MI_Hair_1"
+        ],
+        "joints": [],
+        "clips": []
+      },
+      "pack": "base"
+    },
+    {
       "id": "animations",
       "sourcePath": "artifacts/source-models/heroes/animations/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb",
       "sourceUrl": "https://quaternius.itch.io/universal-animation-library",
@@ -1000,22 +1062,40 @@
         "clips": []
       },
       "pack": "props"
+    },
+    {
+      "id": "axe",
+      "sourcePath": "artifacts/source-models/heroes/props/Exports/glTF/Axe_Bronze.gltf",
+      "sourceUrl": "https://quaternius.itch.io/fantasy-props-megakit",
+      "edition": "Standard",
+      "license": "CC0-1.0",
+      "role": "weapon",
+      "gender": null,
+      "sourceSha256": "338ce6e6947b8849774aac2deb9d2bf3a1cb14dc869effb7be0a91053e67b64f",
+      "files": {
+        "artifacts/source-models/heroes/props/Exports/glTF/Axe_Bronze.gltf": "338ce6e6947b8849774aac2deb9d2bf3a1cb14dc869effb7be0a91053e67b64f",
+        "artifacts/source-models/heroes/props/Exports/glTF/Axe_Bronze.bin": "d608e8dea796ae8a200cd78bb1836d2705944f628abb6ac2e03c76e6637187b2",
+        "artifacts/source-models/heroes/props/Exports/glTF/T_Trim_Props_Normal.png": "c4b28a8ba8efe3108cd11356ecab67e8bf75a10cebf29c78ee7724552c305a3e",
+        "artifacts/source-models/heroes/props/Exports/glTF/T_Trim_Props_BaseColor.png": "75225a4ccfd8cc358c871de7a7a3cab7118ef197419a88464e807b81716215c8",
+        "artifacts/source-models/heroes/props/Exports/glTF/T_Trim_Props_ORM.png": "2d83d8df79aca2c8f630d389b43f09113afee98e746dfd42ddc3ce3302a136a2"
+      },
+      "uriRemaps": {},
+      "sourceNodes": [
+        "Axe_Bronze"
+      ],
+      "inventory": {
+        "meshes": 1,
+        "skinnedMeshes": 0,
+        "triangles": 826,
+        "materials": [
+          "MI_Trim_Props_Vertex"
+        ],
+        "joints": [],
+        "clips": []
+      },
+      "pack": "props"
     }
   ],
-  "authored": [
-    "plate cuirass, pauldrons, greaves and bracers",
-    "split mage robe with trim",
-    "crystal staff",
-    "regional face morphs"
-  ],
-  "clips": {
-    "Idle": "Idle_Loop",
-    "Walk": "Walk_Loop",
-    "Sword_Attack": "Sword_Attack",
-    "Spell_Attack": "Spell_Simple_Shoot",
-    "Hit": "Hit_Chest",
-    "Death": "Death01"
-  },
   "projectTextures": [
     {
       "sourcePath": "client/public/textures/hero-material-atlas.png",
@@ -1023,5 +1103,26 @@
       "license": "Existing project-generated artwork",
       "role": "engraved metal and woven cloth swatches"
     }
-  ]
+  ],
+  "authored": [
+    "plate cuirass, pauldrons, greaves and bracers",
+    "split mage robe with trim",
+    "crystal staff",
+    "four regional face morphs",
+    "adapted hair and beard silhouettes",
+    "dagger, mace, spear, bow and crossbow",
+    "archery animation poses"
+  ],
+  "clips": {
+    "Idle": "Idle_Loop",
+    "Walk": "Walk_Loop",
+    "Sword_Attack": "Sword_Attack",
+    "Spell_Attack": "Spell_Simple_Shoot",
+    "Heavy_Attack": "Sword_Attack",
+    "Dagger_Attack": "Sword_Attack",
+    "Bow_Attack": "Pistol_Shoot",
+    "Crossbow_Attack": "Pistol_Shoot",
+    "Hit": "Hit_Chest",
+    "Death": "Death01"
+  }
 }

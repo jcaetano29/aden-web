@@ -10,7 +10,7 @@ describe('catalog models',()=>{
       expect((a.children[0] as THREE.Mesh).geometry).toBe((b.children[0] as THREE.Mesh).geometry);
       expect(new THREE.Box3().setFromObject(a).isEmpty(),id).toBe(false);
       a.traverse(o=>expect(o instanceof THREE.Light).toBe(false));
-      expect(itemIconUrl(id)).toContain('data:image/svg+xml');
+      expect(itemIconUrl(id)).toMatch(/^(data:image\/svg\+xml|\/textures\/weapons\/.+\.png$)/);
     }
     disposeItemModels();
   });

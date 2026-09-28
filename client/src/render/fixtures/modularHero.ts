@@ -8,6 +8,6 @@ export function makeModularHeroFixture(){
  const material=new THREE.MeshStandardMaterial({name:name.startsWith('face')?'skin':name.includes('hair')||name.includes('brows')?'hair':name==='hero_eyes'?'eyes':name.includes('steel')?'armor_steel':name.includes('gold')?'armor_gold':'cloth_knight'});
  const mesh=new THREE.SkinnedMesh(geometry,material);mesh.name=name;scene.add(mesh);mesh.bind(skeleton);
  }
- const animations=['Idle','Walk','Sword_Attack','Spell_Attack','Hit','Death'].map(name=>new THREE.AnimationClip(name,1,[new THREE.VectorKeyframeTrack(HERO_ANCHORS.rightHand+'.position',[0,1],[0,0,0,0,1,0])]));return {scene,animations};
+ const animations=['Idle','Walk','Sword_Attack','Spell_Attack','Heavy_Attack','Dagger_Attack','Bow_Attack','Crossbow_Attack','Hit','Death'].map(name=>new THREE.AnimationClip(name,1,[new THREE.VectorKeyframeTrack(HERO_ANCHORS.rightHand+'.position',[0,1],[0,0,0,0,1,0])]));return {scene,animations};
 }
 export async function loadHeroFixture(url:string){if(url.includes('hero-'))return makeModularHeroFixture();const scene=new THREE.Group();scene.add(new THREE.Mesh(new THREE.BoxGeometry(.1,.5,.1),new THREE.MeshStandardMaterial({name:'metal'})));return {scene,animations:[]};}

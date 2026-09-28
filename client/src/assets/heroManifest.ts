@@ -3,4 +3,6 @@ export const HERO_ANCHORS = {head:'Head',torso:'spine_03',pelvis:'pelvis',rightH
 export type HeroAnchor=keyof typeof HERO_ANCHORS;
 export const HERO_MANIFEST:Record<CharacterGender,{url:string;height:number}>={male:{url:'/models/heroes/hero-male.glb',height:2.5},female:{url:'/models/heroes/hero-female.glb',height:2.5}};
 export const HERO_CLIPS={Idle:'Idle',Walk:'Walk',Primary_Attack:'Sword_Attack',Hit:'Hit',Death:'Death'} as const;
-export const SAMPLE_HERO_CLASSES=['knight','mage'] as const;
+export const SAMPLE_HERO_CLASSES=['knight','mage','barbarian','rogue','ranger'] as const;
+
+export const CLASS_ATTACK:Record<string,string>={knight:'Sword_Attack',mage:'Spell_Attack',barbarian:'Heavy_Attack',rogue:'Dagger_Attack',ranger:'Bow_Attack'};

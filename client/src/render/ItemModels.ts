@@ -1,13 +1,19 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { getItem, itemVisual } from '@aden/shared';
+import {WeaponModels,weaponVisualFamily,weaponIconUrl} from './WeaponModels.js';
 import { surfaceMaps, type SurfaceKind } from './materialAtlas.js';
 
 // Finite cache by base visual and rarity, never by unique instance id.
+let weaponRepository:WeaponModels|undefined;
+const weaponPrototypes=new Set<THREE.Group>();
+export function configureWeaponModels(repository:WeaponModels){if(weaponRepository===repository)return;disposeItemModels();weaponRepository=repository;}
 const models=new Map<string,THREE.Group>();
 export function createItemModel(id:string, side?:-1|1):THREE.Group {
   const item=getItem(id), v=itemVisual(item);
-  const key=JSON.stringify(v);
+  const family=weaponVisualFamily(item);
+  const key=JSON.stringify([v,family]);
+  if(weaponRepository&&family){if(!models.has(key)){const model=weaponRepository.create(family,v);model.name=`item_${family}`;models.set(key,model);weaponPrototypes.add(model);}return models.get(key)!.clone(true);}
   if(side) {
     const partKey=key+side;
     if(!models.has(partKey)) {
@@ -90,13 +96,14 @@ export function createItemModel(id:string, side?:-1|1):THREE.Group {
 /** Shared atlas textures belong to materialAtlas; never dispose them here. */
 export function disposeItemModels() {
   const geometries=new Set<THREE.BufferGeometry>(),materials=new Set<THREE.Material>();
-  for(const root of models.values())root.traverse(o=>{if(o instanceof THREE.Mesh){geometries.add(o.geometry);materials.add(o.material as THREE.Material);}});
-  geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());models.clear();icons.clear();
+  for(const root of models.values()){if(weaponPrototypes.has(root)){weaponRepository?.release(root);continue;}root.traverse(o=>{if(o instanceof THREE.Mesh){geometries.add(o.geometry);for(const m of Array.isArray(o.material)?o.material:[o.material])materials.add(m);}});}
+  geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());models.clear();icons.clear();weaponPrototypes.clear();weaponRepository=undefined;
 }
 
 const icons=new Map<string,string>();
 /** Project the same mesh into a small SVG: no second renderer or icon asset download. */
 export function itemIconUrl(id:string):string {
+  const asset=weaponIconUrl(getItem(id));if(asset)return asset;
   const v=itemVisual(getItem(id)),key=JSON.stringify(v);
   if(icons.has(key))return icons.get(key)!;
   const root=createItemModel(id);root.rotation.y+=.35;root.rotation.x=.18;root.updateMatrixWorld(true);
