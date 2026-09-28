@@ -49,6 +49,9 @@ describe('boss invasions over real connections', () => {
     expect(tryPickup(room.state, b.id, firstId)).toBe(false);
     a.p.x = first.x; a.p.z = first.z;
     expect(tryPickup(room.state, a.id, firstId)).toBe(true);
+    // Random drop positions can place the second item inside auto-pickup range.
+    // Keep players away while testing the reservation timer itself.
+    for (const player of [a, b, solo]) { player.p.x = 100; player.p.z = 100; player.p.targetId = ''; }
     for (let s = 0; s < 61; s++) room.tick(1);
     expect(second.reservedFor).toBe('');
     b.p.x = second.x; b.p.z = second.z; b.p.dead = false;
