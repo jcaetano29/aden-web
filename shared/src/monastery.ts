@@ -33,7 +33,7 @@ export const MONASTERY_QUESTS: Record<string, Quest> = {
   a2_anchor_2: mission('a2_anchor_2','El pulso del campanario · este','interact','monastery_anchor_2',
     'Activá el anclaje oriental (1212, 407) y volvé con Iria. Al nivel 15 aprendés una habilidad nueva de movilidad.',
     'El vínculo está expuesto. Durante la canalización del Prior, activá cualquiera de los dos anclajes para interrumpirlo. Aprovechá su recuperación; también podés escapar del círculo grande caminando.',3000),
-  a2_prior: { ...mission('a2_prior','El Prior sin Nombre','kill','memory_prior',
-    'Enfrentá al Prior, nivel 15, en el campanario (1200, 401). Evitá los círculos. Bajo media vida canaliza un área mayor: escapá o activá un anclaje para interrumpirlo.',
+  a2_prior: { ...mission('a2_prior','El Prior Malrec','kill','memory_prior',
+    'Enfrentá al Prior Malrec, nivel 15, en el campanario (1200, 401). Evitá los círculos. Bajo media vida canaliza un área mayor: escapá o activá un anclaje para interrumpirlo.',
     'La Memoria vuelve a pertenecer a quienes la vivieron. Maera se reúne con su hermano y los cautivos emprenden el regreso. Yo llevaré estos testimonios a Aden. Conservá este relicario: recordar también es elegir qué no debemos repetir.',2500), rewardItemId:'memory_locket' },
 };

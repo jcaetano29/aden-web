@@ -1,4 +1,4 @@
-import { getQuest, nextQuestId, isChapterComplete, getEncounter, questReached, CRYPT_WAVE_SIZE, CRYPT_WAVE_TEMPLATES } from '@aden/shared';
+import { getQuest, getNpc, getTemplate, nextQuestId, isChapterComplete, getEncounter, questReached, CRYPT_WAVE_SIZE, CRYPT_WAVE_TEMPLATES } from '@aden/shared';
 import type { PlayerState } from '../state/PlayerState.js';
 
 export type DungeonProgress = Pick<PlayerState,'mapId'|'dead'|'dungeonStage'|'dungeonKills'> & { questId?: string; level?: number };
@@ -18,6 +18,20 @@ export function canFightDungeonMob(p: DungeonProgress, templateId: string): bool
     if(templates.includes(templateId))return p.mapId==='cripta' && p.dungeonStage===Number(stage);
   }
   return true;
+}
+
+/** Explain the pending campaign step when an encounter rejects an attack. */
+export function encounterQuestLockText(p: Pick<PlayerState, 'questId' | 'questProgress'>, templateId: string): string | null {
+  const gate = getEncounter(templateId)?.requiresQuest;
+  if (!gate || questReached(p.questId, gate)) return null;
+  let hint = `Seguí la campaña hasta la misión "${getQuest(gate).title}".`;
+  try {
+    const quest = getQuest(p.questId);
+    hint = p.questProgress >= quest.amount
+      ? `Volvé con ${getNpc(quest.returnNpcId ?? 'elder').name} para entregar la misión.`
+      : quest.hint ?? quest.intro;
+  } catch { /* A new character has no active quest yet. */ }
+  return `${getTemplate(templateId).name}: encuentro bloqueado. ${hint}`;
 }
 
 export function advanceDungeonKill(p: DungeonProgress, templateId: string): boolean {

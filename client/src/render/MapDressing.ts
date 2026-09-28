@@ -70,12 +70,12 @@ function trails(scene: THREE.Scene, zone: Zone): void {
   }
   feather(material);
   const northSouth=new THREE.Mesh(new THREE.PlaneGeometry(6,114),material);
-  northSouth.rotation.x=-Math.PI/2;northSouth.position.set(zone.center.x,0.035,zone.center.z);
+  northSouth.rotation.x=-Math.PI/2;northSouth.position.set(zone.center.x,0.04,zone.center.z);
   northSouth.receiveShadow=true;northSouth.userData.ground=true;scene.add(northSouth);
   const crossMaterial=texturedMaterial("gravel",{color:0x8f8678,tint:zone.id==="bosque"?0x8d795c:0xffffff,repeat:[16,1],roughness:1,bumpScale:0.035});
   feather(crossMaterial,true);
   const eastWest=new THREE.Mesh(new THREE.PlaneGeometry(100,4),crossMaterial);
-  eastWest.rotation.x=-Math.PI/2;eastWest.position.set(zone.center.x,0.034,zone.center.z);
+  eastWest.rotation.x=-Math.PI/2;eastWest.position.set(zone.center.x,0.065,zone.center.z);
   eastWest.receiveShadow=true;eastWest.userData.ground=true;scene.add(eastWest);
 }
 

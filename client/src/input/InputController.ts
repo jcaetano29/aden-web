@@ -57,25 +57,20 @@ export class InputController {
         }
       }
 
-      const mobId = this.renderer.pickMobs(ndcX, ndcY, this.views.raycastTargets());
-      if (mobId) {
-        this.onPickMob(mobId);
-        return;
-      }
-
-      // Raycast a otros jugadores (targeting PvP) — mismo mecanismo que mobs.
-      const playerId = this.renderer.pickMobs(ndcX, ndcY, this.views.raycastPlayerTargets());
-      if (playerId) {
-        this.onPickPlayer(playerId);
-        return;
-      }
-
-      // Raycast a objetos de mundo (cofres/barriles/santuarios) — antes que el suelo.
+      // Resolve depth across entities and objects so a boss behind an anchor cannot steal its click.
+      const targets = [
+        { ...this.views.raycastTargets(), pick: this.onPickMob },
+        { ...this.views.raycastPlayerTargets(), pick: this.onPickPlayer },
+      ];
       if (this.onPickObject && this.objectTargets) {
-        const objId = this.renderer.pickMobs(ndcX, ndcY, this.objectTargets());
-        if (objId) {
-          this.onPickObject(objId);
-          return;
+        targets.push({ ...this.objectTargets(), pick: this.onPickObject });
+      }
+      this.renderer.raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), this.renderer.camera);
+      const hits = this.renderer.raycaster.intersectObjects(targets.flatMap(target => target.objects), true);
+      for (const hit of hits) {
+        for (const target of targets) {
+          const id = target.idOf(hit.object);
+          if (id) { target.pick(id); return; }
         }
       }
 

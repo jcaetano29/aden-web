@@ -12,9 +12,10 @@ export function addMonasteryEnvironment(scene: THREE.Scene): void {
     wall.userData.structureId=p.id; root.add(wall);
   }
   const paving=stoneMat(0xb1ac98,[14,14]);
-  for (const [x,z,w,d] of [[1200,450,9,102],[1200,460,65,9],[1180,434,36,7],[1200,401,36,23]]) {
+  // Crossings sit above the main path, below the combat warnings at y=.12.
+  for (const [x,z,w,d,y] of [[1200,450,9,102,.045],[1200,460,65,9,.075],[1180,434,36,7,.075],[1200,401,36,23,.075]]) {
     const path=new THREE.Mesh(new THREE.PlaneGeometry(w,d),paving);
-    path.rotation.x=-Math.PI/2; path.position.set(x,.045,z); path.receiveShadow=true; root.add(path);
+    path.rotation.x=-Math.PI/2; path.position.set(x,y,z); path.receiveShadow=true; path.userData.ground=true; root.add(path);
   }
   const iron=metalMat(0x555e59), wood=woodMat(0x786f59,[1,2]);
   // Bars sit against the rear wall, leaving every cell accessible from the courtyard.

@@ -49,7 +49,7 @@ export const MOB_TEMPLATES: Record<string, MobTemplate> = {
   iron_colossus: { id: 'iron_colossus', level: 24, rank: 'elite', name: 'Coloso de Hierro Negro', model: 'ForestTroll', miniBoss: true, scale: 1.6, tint: 0x4d5358, respawnMs: 60000 },
   memory_guard: { id:'memory_guard', level:13, rank:'normal', name:'Guardia de la Vigilia', model:'BoneWarden', tint:0xb6c9bd },
   memory_jailer: { id:'memory_jailer', level:14, rank:'elite', name:'Carcelero de la Vigilia', model:'DreadKnight', miniBoss:true, tint:0xa5b3c0, scale:1.4, respawnMs:45000 },
-  memory_prior: { id:'memory_prior', level:15, rank:'boss', name:'Prior sin Nombre', model:'DeathWraith', boss:true, tint:0xe3d09c, scale:1.8, respawnMs:60000 },
+  memory_prior: { id:'memory_prior', level:15, rank:'boss', name:'Prior Malrec', model:'DeathWraith', boss:true, tint:0xe3d09c, scale:1.8, respawnMs:60000 },
   veil_raider: { id: 'veil_raider', level: 10, rank: 'normal', name: 'Saqueador del Velo', model: 'OrcBrute', tint: 0x90c2ba },
   veil_guardian: { id: 'veil_guardian', level: 12, rank: 'elite', name: 'Guardián del Velo', model: 'ForestTroll', miniBoss: true, scale: 1.45, tint: 0x73b7ad, respawnMs: 60000 },
   umbra_alpha: { id: "umbra_alpha", level: 4, rank: "elite", name: "Alfa de Umbra", model: "ForestTroll", miniBoss: true, scale: 1.35, respawnMs: 45000, tint: 0x91b969 },

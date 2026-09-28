@@ -30,7 +30,7 @@ export function addWilderness(scene: THREE.Scene): void {
     }
     WILDERNESS_CAMPS.filter(c=>c.mapId===mapId).forEach(camp=>{
       const trail=new THREE.Mesh(new THREE.PlaneGeometry(Math.abs(camp.centerX-zone.center.x),3),terrainMat('ruinas',[18,1]));
-      trail.rotation.x=-Math.PI/2;trail.position.set((camp.centerX+zone.center.x)/2,.032,camp.centerZ);trail.userData.ground=true;group.add(trail);
+      trail.rotation.x=-Math.PI/2;trail.position.set((camp.centerX+zone.center.x)/2,.055,camp.centerZ);trail.userData.ground=true;group.add(trail);
     });
     scene.add(group);
   }

@@ -17,7 +17,7 @@ import colyseusPkg from "colyseus";
 import type { Client } from "colyseus";
 import { randomUUID } from 'node:crypto';
 import { rollCatalogDrop, lootSourceFor, LOOT_QUALITY_ODDS, INVASION_RESERVE_MS, CASTLE_MAP, CHAOS_SEAL, CHAOS_SEAL_CHANCE, dungeonReward, questReward, createItemInstance } from '@aden/shared';
-import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, resetDungeon } from '../systems/AdventureSystem.js';
+import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, encounterQuestLockText, resetDungeon } from '../systems/AdventureSystem.js';
 import { stepEncounter } from '../systems/EncounterSystem.js';
 import { EventSystem } from '../systems/EventSystem.js';
 import { ChaosCastleSystem } from '../systems/ChaosCastleSystem.js';
@@ -565,6 +565,10 @@ export class GameRoom extends Room<GameState> {
       const other = this.state.players.get(msg.targetId);
       const playerOk = msg.targetId !== client.sessionId && !!other && !other.dead && other.mapId === player.mapId;
       if (mobOk || playerOk) player.targetId = msg.targetId;
+      if (mobOk) {
+        const text = encounterQuestLockText(player, mob.templateId);
+        if (text) client.send(MessageType.ItemResult, { success: false, text });
+      }
     });
 
     this.onMessage(MessageType.UseSkill, (client, msg: UseSkillMessage) => {
@@ -604,7 +608,10 @@ export class GameRoom extends Room<GameState> {
       if (skill.type === "damage") {
         const t = p.targetId ? this.resolveTarget(p.targetId, p.mapId) : null;
         if (!t) return;
-        if (t.kind === 'mob' && !canFightDungeonMob(p,t.entity.templateId)) return;
+        if (t.kind === 'mob' && !canFightDungeonMob(p,t.entity.templateId)) {
+          client.send(MessageType.ItemResult, { success: false, text: encounterQuestLockText(p, t.entity.templateId) ?? 'Encuentro todavía bloqueado.' });
+          return;
+        }
         if (t.kind === 'mob' && isReturningHome(t.entity)) { client.send(MessageType.ItemResult, { success: false, text: RETURNING_HOME_TEXT }); return; }
         const power = t.kind === 'mob' ? pvePower(p.level, t.entity.level).outgoing : this.castle.pvpFactor(p, t.entity) ?? 1;
         if (power === 0) {
@@ -882,6 +889,7 @@ export class GameRoom extends Room<GameState> {
         client.send(MessageType.ItemResult,{success,text:success?'Sello roto para la expedición. Seguí hacia la próxima ala.':'Primero despejá el ala: derrotá a sus seis criaturas.'});
         return;
       }
+      const previousQuest = p.questId, previousProgress = p.questProgress;
       advanceQuest(p,'interact',o.id);
       this.creditSideChains(p, 'interact', o.id, client);
       const cooling = encounterCoolFor(o.id);
@@ -900,6 +908,18 @@ export class GameRoom extends Room<GameState> {
       }
       const interrupt = encounterInterruptFor(o.id);
       if (interrupt) {
+        const lockText = encounterQuestLockText(p, interrupt.templateId);
+        if (lockText) {
+          const advanced = previousQuest !== p.questId || previousProgress !== p.questProgress;
+          let completed = false;
+          try {
+            const quest = getQuest(p.questId);
+            completed = quest.targetId === o.id && p.questProgress >= quest.amount;
+          } catch { /* No active quest: return the campaign guidance below. */ }
+          client.send(MessageType.ItemResult, { success: advanced || completed,
+            text: `${advanced || completed ? 'Anclaje activado. ' : ''}${lockText}` });
+          return;
+        }
         const texts = interrupt.pattern.interruptTexts;
         const boss = [...this.state.mobs.values()].find(m => m.templateId === interrupt.templateId && !m.dead && m.channeling && m.mapId === p.mapId && distance2D(p.x, p.z, m.x, m.z) <= 25);
         if (boss && canFightDungeonMob(p, boss.templateId) && pvePower(p.level, boss.level).outgoing > 0) {

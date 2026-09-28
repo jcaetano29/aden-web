@@ -11,6 +11,70 @@ describe('Monastery campaign', () => {
   afterAll(async () => { await server.shutdown(); });
   beforeEach(async () => { await server.cleanup(); });
 
+  it.each(['', 'a2_anchor_1'])('does not activate the eastern anchor out of order from quest %s', async questId => {
+    const room = await server.createRoom('game', {}) as GameRoom;
+    const c = await server.connectTo(room, { name: 'AnchorOrder' });
+    room.setSimulationInterval(() => {}, 50); room.state.mobs.clear();
+    const p = room.state.players.get(c.sessionId)!;
+    p.mapId = 'monasterio'; p.questId = questId; p.level = 15; p.x = 1212; p.z = 407;
+    const replies: any[] = []; c.onMessage(MessageType.ItemResult, message => replies.push(message));
+    c.send(MessageType.InteractObject, { objectId: 'monastery_anchor_2' });
+    await vi.waitFor(() => expect(replies).toHaveLength(1));
+    expect(replies[0].success).toBe(false);
+    expect(p.questId).toBe(questId); expect(p.questProgress).toBe(0);
+    expect(room.state.worldObjects.get('monastery_anchor_2')!.active).toBe(true);
+  });
+
+  it('guides anchor activation through the quest hand-in and unlocks damage against the Prior', async () => {
+    const room = await server.createRoom('game', {}) as GameRoom;
+    const c = await server.connectTo(room, { name: 'PriorExplorer', className: 'knight' });
+    room.setSimulationInterval(() => {}, 50); room.state.mobs.clear();
+    const p = room.state.players.get(c.sessionId)!;
+    p.mapId = 'monasterio'; p.questId = 'a2_anchor_1'; p.level = 15;
+    p.x = 1200; p.z = 402; p.moving = false; p.mp = p.maxMp = 100;
+    const boss = room.spawnMob('prior', 'memory_prior', 1200, 401, 'monasterio');
+    const replies: { success: boolean; text: string }[] = [];
+    c.onMessage(MessageType.ItemResult, message => replies.push(message));
+    c.send(MessageType.SetTarget, { targetId: 'prior' });
+    await vi.waitFor(() => expect(p.targetId).toBe('prior'));
+    await vi.waitFor(() => expect(replies).toHaveLength(1));
+    expect(replies[0].success).toBe(false);
+    expect(replies[0].text).toContain('occidental');
+    room.tick(.05);
+    expect(boss.hp).toBe(boss.maxHp);
+    c.send(MessageType.UseSkill, { skillId: 'shield_bash' });
+    await vi.waitFor(() => expect(replies).toHaveLength(2));
+    expect(replies[1].success).toBe(false);
+    expect(p.mp).toBe(100);
+    replies.length = 0;
+    for (const [index, id] of ['monastery_anchor_1', 'monastery_anchor_2'].entries()) {
+      const anchor = getWorldObject(id); p.x = anchor.x; p.z = anchor.z;
+      c.send(MessageType.InteractObject, { objectId: id });
+      await vi.waitFor(() => expect(replies).toHaveLength(index + 1));
+      expect(replies[index].success).toBe(true);
+      expect(replies[index].text).toContain(index === 0 ? 'oriental' : 'Iria');
+      expect(room.state.worldObjects.get(id)!.active).toBe(true);
+    }
+    expect(p.questId).toBe('a2_anchor_2'); expect(p.questProgress).toBe(1);
+    const iria = getNpc('iria'); p.x = iria.x; p.z = iria.z;
+    c.send(MessageType.InteractNpc, { npcId: 'iria' });
+    await vi.waitFor(() => expect(p.questId).toBe('a2_prior'));
+    p.x = 1200; p.z = 402; p.attackCooldownMs = 0;
+    room.tick(.05);
+    expect(boss.hp).toBeLessThan(boss.maxHp);
+    expect(boss.aggroTargetId).toBe(c.sessionId);
+    expect(boss.hazardMs).toBeGreaterThan(0);
+    const hp = boss.hp;
+    c.send(MessageType.UseSkill, { skillId: 'shield_bash' });
+    await vi.waitFor(() => expect(boss.hp).toBeLessThan(hp));
+    boss.hp = 1; p.attackCooldownMs = 0;
+    room.tick(.05);
+    expect(boss.dead).toBe(true);
+    expect(p.bossKills).toBe(1);
+    expect(p.questId).toBe('a2_prior');
+    expect(p.questProgress).toBe(1);
+  });
+
   it('validates the route, advances distinct clues in order and rewards the finale once', async () => {
     const room = await server.createRoom('game', {}) as GameRoom;
     const c = await server.connectTo(room, { name: 'MemoryTraveler' });

@@ -10,6 +10,7 @@ export function addVeilEnvironment(scene: THREE.Scene): void {
   for (const pool of VEIL_POOLS) {
     const surface = new THREE.Mesh(new THREE.PlaneGeometry(pool.width, pool.depth), water);
     surface.rotation.x = -Math.PI / 2; surface.position.set(pool.x, .045, pool.z);
+    surface.userData.ground = true;
     root.add(surface);
     const reeds = new THREE.InstancedMesh(new THREE.CylinderGeometry(.03, .07, 1, 4), reed, 64);
     const pose = new THREE.Object3D();

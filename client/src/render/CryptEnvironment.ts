@@ -22,7 +22,8 @@ export function addCryptEnvironment(scene: THREE.Scene): THREE.Group {
   };
   for (let i = 1; i < CRYPT_ROUTE.length; i++) {
     const a = CRYPT_ROUTE[i - 1], b = CRYPT_ROUTE[i];
-    strip(a, b, 12, .045, path).name = `crypt-passage-${i}`;
+    // Alternating depths separate overlapping corners between route segments.
+    strip(a, b, 12, i % 2 ? .035 : .055, path).name = `crypt-passage-${i}`;
     const length = Math.hypot(b.x - a.x, b.z - a.z);
     for (let d = 2; d + 1.6 < length; d += 6) {
       const point = (distance: number) => ({ x: a.x + (b.x - a.x) * distance / length, z: a.z + (b.z - a.z) * distance / length });
@@ -37,8 +38,8 @@ export function addCryptEnvironment(scene: THREE.Scene): THREE.Group {
       const x = room.x + side * (room.width / 2 - 5), z = room.z + offset * room.depth;
       const slab = box(x, .09, z, 2.5, .01, 4.2, index === 2 ? ash : stone);
       slab.name = "crypt-burial-inlay"; slab.userData.ground = true;
-      strip({ x: x - .7, z }, { x: x + .7, z }, .15, .099, index === 2 ? gold : blue);
-      strip({ x, z: z - 1.2 }, { x, z: z + 1.2 }, .15, .099, index === 2 ? gold : blue);
+      strip({ x: x - .7, z }, { x: x + .7, z }, .15, .094, index === 2 ? gold : blue);
+      strip({ x, z: z - 1.2 }, { x, z: z + 1.2 }, .15, .102, index === 2 ? gold : blue);
     }
   });
   const materials = { stone, gold, blue };
