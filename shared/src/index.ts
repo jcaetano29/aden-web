@@ -1,5 +1,6 @@
 export * from "./constants.js";
 export * from "./world.js";
+export * from './wilderness.js';
 export * from "./protocol.js";
 export * from "./math.js";
 export * from "./mobs.js";
@@ -19,6 +20,7 @@ export * from "./questNarrative.js";
 export * from "./adventure.js";
 export * from "./lootPools.js";
 export * from "./events.js";
+export * from './invasionSpawn.js';
 export * from "./chaosCastle.js";
 export * from "./dungeon.js";
 export * from "./classes.js";

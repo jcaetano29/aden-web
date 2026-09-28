@@ -6,8 +6,8 @@ export const MOVE_SPEED = 5; // unidades por segundo
 // clampea a los bounds del MAPA ACTUAL del jugador, no a esto; esto sólo dimensiona el
 // suelo base y sirve de fallback.
 export const MAP_BOUNDS = {
-  minX: -80,
-  maxX: 1600,
+  minX: -140,
+  maxX: 1640,
   minZ: -200,
-  maxZ: 540,
+  maxZ: 590,
 } as const;

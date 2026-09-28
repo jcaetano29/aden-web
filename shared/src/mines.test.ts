@@ -44,7 +44,7 @@ describe('Minas de Hierro Negro: mapa y enemigos', () => {
   it('places every spawn on reachable ground from the arrival point', () => {
     const zone = getZone('minas');
     const spawns = SPAWN_ZONES.filter(s => s.mapId === 'minas');
-    expect(spawns.map(s => s.templateId).sort()).toEqual(['cave_troll', 'cave_troll', 'halden', 'iron_colossus', 'mine_armor', 'mine_armor', 'mine_digger', 'mine_digger', 'mine_foreman']);
+    expect(spawns.filter(s=>!s.id.includes('_outskirts_')).map(s => s.templateId).sort()).toEqual(['cave_troll', 'cave_troll', 'halden', 'iron_colossus', 'mine_armor', 'mine_armor', 'mine_digger', 'mine_digger', 'mine_foreman']);
     for (const s of spawns) {
       const at = { x: s.centerX, z: s.centerZ };
       expect(isWalkable(zone.id, at), s.id).toBe(true);

@@ -52,7 +52,7 @@ export const INVADERS: Record<string, InvaderDef> = {
   },
 };
 
-/** Claros abiertos por mapa, a más de 30 unidades del punto de reaparición. */
+/** Fixed fixtures for deterministic balance simulations. Live events use chooseInvasionSpawn. */
 export const INVASION_SPOTS: Record<string, { x: number; z: number }> = {
   pueblo: { x: 0, z: -24 }, bosque: { x: 300, z: 0 }, ruinas: { x: 0, z: 300 }, yermo: { x: 300, z: 300 },
   marismas: { x: 1200, z: 150 }, monasterio: { x: 1200, z: 450 }, minas: { x: 1500, z: 150 }, fragua: { x: 1500, z: 450 },

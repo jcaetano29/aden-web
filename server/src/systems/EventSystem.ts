@@ -1,5 +1,5 @@
 import {
-  INVADERS, INVASION_SPOTS, INVASION_WARNING_MS, INVASION_DURATION_MS, INVASION_RADIUS, MINOR_MIN_PLAYERS,
+  INVADERS, chooseInvasionSpawn, INVASION_WARNING_MS, INVASION_DURATION_MS, INVASION_RADIUS, MINOR_MIN_PLAYERS,
   PARTICIPATION_MIN_SHARE, PARTICIPATION_GEM_CHANCE, UPGRADE_GEMS, CHAOS_SEAL,
   getInvader, getTemplate, getZone, nextDailyInvasion, nextMinorInvasion, inInvasionArea, type InvaderDef,
 } from '@aden/shared';
@@ -104,7 +104,8 @@ export class EventSystem {
   }
 
   private announce(invader: InvaderDef, mapId: string, startsAt: number, daily: boolean): void {
-    const spot = INVASION_SPOTS[mapId];
+    if (!invader.maps.includes(mapId)) throw new Error(`Mapa no permitido para ${invader.id}: ${mapId}`);
+    const spot = chooseInvasionSpawn(mapId, () => this.host.rng());
     this.current = { invader, mapId, startsAt, endsAt: startsAt + INVASION_DURATION_MS, bossId: `event_${invader.id}_${++this.seq}`, daily };
     const ev = this.host.state.worldEvent;
     ev.id = `${invader.id}_${startsAt}`; ev.invaderId = invader.id; ev.phase = 'announced'; ev.mapId = mapId;
@@ -115,7 +116,7 @@ export class EventSystem {
   }
 
   private spawn(cur: CurrentEvent): void {
-    const spot = INVASION_SPOTS[cur.mapId];
+    const spot = this.host.state.worldEvent;
     const boss = this.host.spawnInvader(cur.bossId, cur.invader.templateId, spot.x, spot.z, cur.mapId);
     const ev = this.host.state.worldEvent;
     ev.phase = 'active'; ev.bossId = cur.bossId; ev.x = boss.x; ev.z = boss.z;

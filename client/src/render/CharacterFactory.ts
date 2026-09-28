@@ -1,4 +1,5 @@
 import { ModularHeroFactory } from './ModularHeroFactory.js';
+import {createBossCharacter} from './BossFactory.js';
 import type { CharacterAppearanceV1 } from '@aden/shared';
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -36,6 +37,7 @@ export class CharacterFactory {
   private readonly heroes=new ModularHeroFactory();
   preloadHeroes(){return this.heroes.preload();}
   createHero(className:string,appearance:CharacterAppearanceV1){return this.heroes.create(className,appearance);}
+  createMob(modelName:string,templateId:string){return createBossCharacter(templateId,this.heroes)??this.create(modelName);}
   disposeHeroes(){this.heroes.dispose();}
   get weaponModels(){return this.heroes.weaponModels;}
   private readonly loader = new GLTFLoader();

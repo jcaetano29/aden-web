@@ -1,6 +1,7 @@
 import { TOWN } from "./combat.js";
 import { VEIL_POOLS } from './veil.js';
 import { ZONES, type Zone } from "./world.js";
+import { WILDERNESS_LANDMARKS } from './wilderness.js';
 import { WORLD_OBJECTS } from "./worldobjects.js";
 import { CRYPT_ROOMS } from './dungeon.js';
 import { MINES_PITS, MINES_LIFT, MINES_GATE } from './mines.js';
@@ -220,6 +221,7 @@ export function dressingLayout(zone: Zone): Placement[] {
 }
 const obstacles: StructureObstacle[] = authored.flatMap(p => p.kind === 'arch' ? [-1, 1].map(side => ({ ...p, id: `${p.id}-pier-${side}`, x: p.x + Math.cos(p.rotation) * side * S.archPierOffset * p.scale, z: p.z - Math.sin(p.rotation) * side * S.archPierOffset * p.scale })) : [p]);
 obstacles.push(...boxes.filter(p => p.solid));
+obstacles.push(...WILDERNESS_LANDMARKS);
 for (const zone of ZONES.filter(z => z.id === 'ruinas' || z.id === 'trono'))
     dressingLayout(zone).filter(p => p.kind === 'tree').forEach((p, i) => obstacles.push({ id: zone.id + '-grove-column-' + i, mapId: zone.id, x: p.x, z: p.z, width: S.dressingColumnRadius * 2 * p.scale, depth: S.dressingColumnRadius * 2 * p.scale, rotation: p.yaw }));
 for (const [i, pool] of VEIL_POOLS.entries()) obstacles.push({ ...pool, id: `veil-water-${i}`, mapId: 'marismas', rotation: 0 });

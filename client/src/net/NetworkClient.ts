@@ -29,6 +29,7 @@ import {
   type InteractObjectMessage,
   type SkillCastEvent,
   isBoss,
+  invaderForTemplate,
   getTemplate,
   getQuest,
   CRYPT_WAVE_TEMPLATES,
@@ -590,11 +591,10 @@ export class NetworkClient {
     });
     this.room.state.mobs.forEach((m: any) => {
       if (m.dead || (m.mapId ?? "") !== myMap) return;
+      if (invaderForTemplate(m.templateId)) return;
       out.push({ x: m.x, z: m.z, kind: isBoss(m.templateId) ? "boss" : "mob" });
     });
-    // Invasión anunciada en este mapa: marcar dónde va a aparecer el jefe.
-    const ev: any = this.room.state.worldEvent;
-    if (ev?.phase === "announced" && ev.mapId === myMap) out.push({ x: ev.x, z: ev.z, kind: "boss" });
+    // The announcement identifies the map; the invader must be found in-world.
     return out;
   }
 

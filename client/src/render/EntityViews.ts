@@ -190,13 +190,13 @@ export class EntityViews {
   }
 
   addMob(id: string, modelName: string, templateId: string, snap: MobSnapshot) {
-    const view = new CharacterView(this.factory.create(modelName));
+    const view = new CharacterView(this.factory.createMob(modelName,templateId));
     view.snapTo(snap.x, snap.z);
     view.setServerState(snap);
     view.object.scale.setScalar(scaleForTemplate(templateId));
     // Etapa 11: tinte por variante de zona (musgoso/cripta/ceniza) sobre el modelo base.
     const tint = tintForTemplate(templateId);
-    if (tint !== undefined) applyTint(view.object, tint);
+    if (tint !== undefined && !isBoss(templateId)) applyTint(view.object, tint);
     this.scene.add(view.object);
     this.mobViews.set(id, view);
     this.mobRootToId.set(view.object, id);

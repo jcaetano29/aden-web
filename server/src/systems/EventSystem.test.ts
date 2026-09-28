@@ -21,6 +21,19 @@ function fakeHost(start: number, online = 3) {
 }
 
 describe('invasion lifecycle', () => {
+  it('uses a different reachable spawn for different random draws instead of the map center', () => {
+    const points: Array<{x:number;z:number}> = [];
+    for (const roll of [0.1, 0.9]) {
+      const {host} = fakeHost(Date.UTC(2026, 8, 26, 12));
+      host.rng = () => roll;
+      const events = new EventSystem(host, {scheduled:false});
+      events.startNow('waste_herald', 'bosque', 0); events.tick();
+      const boss = host.state.mobs.get(host.state.worldEvent.bossId)!;
+      points.push({x:boss.x,z:boss.z});
+      expect(events.inArea(boss)).toBe(true);
+    }
+    expect(Math.hypot(points[0].x-points[1].x,points[0].z-points[1].z)).toBeGreaterThan(100);
+  });
   it('announces 5 minutes early, spawns at start and retreats after 20 minutes', () => {
     const daily = nextDailyInvasion(Date.UTC(2026, 8, 26, 12));
     const { host, texts, advance } = fakeHost(daily - INVASION_WARNING_MS - 1000, 0);

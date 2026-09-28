@@ -7,6 +7,7 @@ import { addFraguaEnvironment } from './FraguaEnvironment.js';
 import { addCastilloEnvironment } from './CastilloEnvironment.js';
 import * as THREE from "three";
 import { addMapDressing } from "./MapDressing.js";
+import { addWilderness } from './WildernessEnvironment.js';
 import { ZONES, WORLD_OBJECTS, getZone, zoneAt, TOWN, SAFE_RADIUS, distance2D, type Zone } from "@aden/shared";
 import { stoneMat, woodMat, roofMat, thatchMat, plasterMat, cobbleMat, clothMat, crackedStoneMat, terrainMat, metalMat, foliageMat, boneMat, texturedMaterial } from "./textures.js";
 
@@ -68,8 +69,11 @@ export class Environment {
   private curFogNear: number;
   private curFogFar: number;
   private curSun: number;
+  private readonly mapScenery: Array<{ object: THREE.Object3D; mapId: string }> = [];
+  private visibleMap = '';
 
   constructor(private readonly scene: THREE.Scene) {
+    const existing = new Set(scene.children);
     const pueblo = getZone("pueblo").biome;
     this.addSky();
     // Luz de relleno hemisférica: cielo cálido dorado arriba, rebote tierra abajo.
@@ -105,6 +109,17 @@ export class Environment {
     this.populate();
     addMapDressing(this.scene);
     addCryptEnvironment(this.scene);
+    addWilderness(this.scene);
+    // Expanded regions are only 44 units apart. Explicitly hide other maps;
+    // fog alone no longer prevents neighboring terrain from showing at the edge.
+    scene.updateMatrixWorld(true);
+    for (const object of scene.children) {
+      if(existing.has(object) || object===this.skyMesh || object instanceof THREE.Light || object===this.sunTarget)continue;
+      const box=new THREE.Box3().setFromObject(object);
+      if(box.isEmpty())continue;
+      const center=box.getCenter(new THREE.Vector3());
+      this.mapScenery.push({object,mapId:zoneAt(center.x,center.z).id});
+    }
     this.addMotes();
     this.enableShadows();
   }
@@ -966,6 +981,10 @@ export class Environment {
     this.sunTarget.updateMatrixWorld();
 
     const zone = zoneAt(x, z);
+    if(this.visibleMap!==zone.id) {
+      this.visibleMap=zone.id;
+      for(const entry of this.mapScenery)entry.object.visible=entry.mapId===zone.id;
+    }
     const b = zone.biome;
     const k = Math.min(1, dt * 1.5); // rapidez de transición
 

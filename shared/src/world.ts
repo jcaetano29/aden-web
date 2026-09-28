@@ -50,9 +50,9 @@ export interface Zone {
   biome: ZoneBiome;
 }
 
-const HALF = 65; // semilado de cada mapa (mapas de 130x130, ~8x el área anterior)
-function boundsAround(cx: number, cz: number): MapBounds {
-  return { minX: cx - HALF, maxX: cx + HALF, minZ: cz - HALF, maxZ: cz + HALF };
+// 256-coordinate hunting grounds; town and authored arenas retain their layout.
+function boundsAround(cx: number, cz: number, half = 128): MapBounds {
+  return { minX: cx - half, maxX: cx + half, minZ: cz - half, maxZ: cz + half };
 }
 
 export const ZONES: Zone[] = [
@@ -61,7 +61,7 @@ export const ZONES: Zone[] = [
     name: "Pueblo de Aden",
     subtitle: "Refugio de los vivos",
     center: { x: 0, z: 0 },
-    bounds: boundsAround(0, 0),
+    bounds: boundsAround(0, 0, 65),
     spawn: { x: 0, z: 14 },
     levelReq: 0,
     levelMin: 0,
@@ -113,7 +113,7 @@ export const ZONES: Zone[] = [
     name: "Trono del Rey Nihil",
     subtitle: "El corazón de la maldición",
     center: { x: 600, z: 150 },
-    bounds: boundsAround(600, 150),
+    bounds: boundsAround(600, 150, 65),
     spawn: { x: 600, z: 200 },
     levelReq: 9,
     levelMin: 9,

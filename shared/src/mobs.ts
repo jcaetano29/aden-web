@@ -1,4 +1,5 @@
 import { CRYPT_BOSS } from './dungeon.js';
+import { WILDERNESS_CAMPS } from './wilderness.js';
 export const MOB_MOVE_SPEED = 3.5; // unidades/seg (más lento que el jugador)
 
 export interface MobTemplate {
@@ -161,6 +162,7 @@ export const SPAWN_ZONES: SpawnZone[] = [
   { id: "yermo_verdugos_2", mapId: "yermo", templateId: "ash_warrior", centerX: 320, centerZ: 325, radius: 12, count: 4 },
   // ── Trono del Rey Nihil (mapa center 600,150) — jefe ──
   { id: "trono_rey", mapId: "trono", templateId: "skeleton_king", centerX: 600, centerZ: 130, radius: 3, count: 1 },
+  ...WILDERNESS_CAMPS,
 ];
 
 export const AI_CONFIG = {
