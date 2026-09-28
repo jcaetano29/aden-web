@@ -172,7 +172,7 @@ export class EntityViews {
     const wasTarget = id === this.currentTargetId;
     const identity=this.playerIdentity.get(id)!;
     const next=new CharacterView(state.appearanceModel?this.factory.create(state.appearanceModel):this.factory.createHero(identity.className,identity.appearance));
-    next.initializeState(state,previous.object.rotation);next.setEquipment(state.equipment??{});
+    next.initializeState(state,previous.object.rotation,previous.elapsedDeathTime);next.setEquipment(state.equipment??{});
     this.nameplates.remove(id);
     this.scene.remove(previous.object);
     this.playerRootToId.delete(previous.object);

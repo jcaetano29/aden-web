@@ -60,9 +60,11 @@ export class CharacterView {
     this.state.z = z;
   }
 
-  initializeState(state:ServerState&{dead?:boolean},orientation?:THREE.Euler){
+  get elapsedDeathTime():number {return this.dead ? this.deathTime : 0;}
+
+  initializeState(state:ServerState&{dead?:boolean},orientation?:THREE.Euler,deathElapsed=0){
     this.snapTo(state.x,state.z);this.setServerState(state);if(orientation)this.character.root.rotation.copy(orientation);
-    if(state.dead)this.playOnce('death');else this.resetAnimation();
+    if(state.dead){this.playOnce('death');if(deathElapsed>0)this.update(deathElapsed);}else this.resetAnimation();
   }
   setServerState(s: ServerState) {
     this.state = s;
