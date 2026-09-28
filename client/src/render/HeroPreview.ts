@@ -1,6 +1,5 @@
 import * as THREE from 'three';
-import type { CharacterGender } from '@aden/shared';
-import { modelForClass } from '../assets/manifest.js';
+import type { CharacterAppearanceV1 } from '@aden/shared';
 import { CharacterFactory, type Character } from './CharacterFactory.js';
 import { selectClip } from './animation.js';
 
@@ -16,6 +15,8 @@ export class HeroPreview {
   private visible = false;
   private dragX?: number;
   private yaw = -.2;
+  private framing:'body'|'face'='body';
+  private distance=6.1;
   private readonly reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   constructor(private readonly host: HTMLElement, private readonly factory: CharacterFactory) {
@@ -39,6 +40,7 @@ export class HeroPreview {
     canvas.addEventListener('pointermove', this.pointerMove);
     canvas.addEventListener('pointerup', this.pointerUp);
     canvas.addEventListener('pointercancel', this.pointerUp);
+    canvas.addEventListener('wheel',this.wheel,{passive:false});canvas.addEventListener('keydown',this.keyDown);canvas.tabIndex=0;
     this.observer = new ResizeObserver(() => this.resize()); this.observer.observe(host);
   }
   private pointerDown = (e: PointerEvent) => { this.dragX = e.clientX; this.renderer.domElement.setPointerCapture(e.pointerId); };
@@ -49,15 +51,19 @@ export class HeroPreview {
     if (!width || !height) return;
     this.renderer.setSize(width, height, false); this.camera.aspect = width / height; this.camera.updateProjectionMatrix();
   }
-  show(classId: string, gender: CharacterGender) {
-    if (this.character) { this.scene.remove(this.character.root); this.character.mixer.stopAllAction(); this.character.mixer.uncacheRoot(this.character.root); }
-    this.character = this.factory.create(modelForClass(classId, gender));
-    this.character.root.rotation.y = this.yaw;
-    const idle = selectClip(this.character.clipNames, 'idle'); if (idle) this.character.play(idle, true);
-    this.scene.add(this.character.root);
-    this.host.dataset.model = modelForClass(classId, gender);
-    this.renderer.domElement.setAttribute('aria-label', `Vista previa 3D: ${classId}, ${gender === 'female' ? 'femenino' : 'masculino'}`);
+  show(classId: string, appearance:CharacterAppearanceV1) {
+    const next=this.factory.createHero(classId,appearance);
+    this.character?.equipment?.dispose();this.character?.dispose?.();this.character?.root.removeFromParent();
+    this.character=next;next.root.rotation.y=this.yaw;next.play('Idle',true);this.scene.add(next.root);
+    this.host.dataset.model=`${classId}:${appearance.gender}`;
+    this.renderer.domElement.setAttribute('aria-label',`Vista previa 3D: ${classId}, ${appearance.gender==='female'?'femenino':'masculino'}`);
+    this.focus(this.framing);
   }
+  focus(mode:'body'|'face'){this.framing=mode;const height=this.character?.root.userData.visualHeight??2.5;this.distance=height*(mode==='face'?.65:2.44);this.frameCamera();}
+  zoom(delta:number){this.distance=Math.max(.65,Math.min(10,this.distance*Math.exp(delta*.001)));this.frameCamera();}
+  private frameCamera(){const height=this.character?.root.userData.visualHeight??2.5,target=height*(this.framing==='face'?.89:.52);this.camera.position.set(0,target+.08,this.distance);this.camera.lookAt(0,target,0);this.camera.updateProjectionMatrix();}
+  private wheel=(e:WheelEvent)=>{e.preventDefault();this.zoom(e.deltaY);};
+  private keyDown=(e:KeyboardEvent)=>{if(['ArrowLeft','ArrowRight','+','-','='].includes(e.key)){e.preventDefault();if(e.key==='ArrowLeft'||e.key==='ArrowRight')this.rotate(e.key==='ArrowLeft'?-.2:.2);else this.zoom(e.key==='-'?100:-100);}};
   rotate(delta: number) { this.yaw += delta; if (this.character) this.character.root.rotation.y = this.yaw; }
   setVisible(visible: boolean) {
     if (this.visible === visible) return;
@@ -72,11 +78,11 @@ export class HeroPreview {
   };
   dispose() {
     this.visible = false; cancelAnimationFrame(this.frame); this.observer.disconnect();
-    if (this.character) { this.character.mixer.stopAllAction(); this.character.mixer.uncacheRoot(this.character.root); this.scene.remove(this.character.root); }
+    this.character?.equipment?.dispose();this.character?.dispose?.();this.character?.root.removeFromParent();this.character=undefined;
     this.scene.traverse(o => { if (o instanceof THREE.Mesh) { o.geometry.dispose(); (o.material as THREE.Material).dispose(); } });
     const canvas = this.renderer.domElement;
     canvas.removeEventListener('pointerdown', this.pointerDown); canvas.removeEventListener('pointermove', this.pointerMove);
     canvas.removeEventListener('pointerup', this.pointerUp); canvas.removeEventListener('pointercancel', this.pointerUp);
-    this.renderer.dispose(); canvas.remove();
+    canvas.removeEventListener('wheel',this.wheel);canvas.removeEventListener('keydown',this.keyDown);this.renderer.dispose(); canvas.remove();
   }
 }

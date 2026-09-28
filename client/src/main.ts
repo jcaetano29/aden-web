@@ -11,7 +11,7 @@ import { AmbientLife } from "./render/AmbientLife.js";
 import { EntityViews } from "./render/EntityViews.js";
 import { MovementPredictor, predictorStateFromSnapshot } from "./net/MovementPredictor.js";
 import { GroundItems } from "./render/GroundItems.js";
-import { disposeItemModels } from './render/ItemModels.js';
+import { disposeItemModels,configureWeaponModels } from './render/ItemModels.js';
 import { CharacterFactory } from "./render/CharacterFactory.js";
 import { Nameplates } from "./render/Nameplates.js";
 import { DamageNumbers } from "./render/DamageNumbers.js";
@@ -59,20 +59,22 @@ import { availableSkills, getItem, getQuest, TOWN, distance2D, getClass, getSkil
 
 async function main() {
   injectTheme(); // sistema de diseño (fuentes, tokens, clases) — antes de crear cualquier panel
-  await preloadMaterialAtlas();
+  const factory=new CharacterFactory();
+  const classSelect=new ClassSelect(document.body,factory,{loadAssets:async()=>{await Promise.all([preloadMaterialAtlas(),factory.preloadHeroes(),factory.preload([...MODEL_NAMES,...MOB_MODEL_NAMES])]);configureWeaponModels(factory.weaponModels);}});
+  const firstLogin=classSelect.create();
+  await classSelect.ready;
   const app = document.getElementById("app")!;
   const renderer = new Renderer(app);
   const environment = new Environment(renderer.scene); // biomas por zona, niebla dinámica, props
 
-  const factory = new CharacterFactory();
-  await factory.preload([...MODEL_NAMES, ...MOB_MODEL_NAMES]);
+
   const ambient = new AmbientLife(renderer.scene, factory);
 
   const nameplates = new Nameplates();
   const views = new EntityViews(renderer.scene, factory, nameplates);
   const damageNumbers = new DamageNumbers(renderer.scene);
   const groundItems = new GroundItems(renderer.scene);
-  window.addEventListener('pagehide',()=>{groundItems.dispose();disposeItemModels();},{once:true});
+  window.addEventListener('pagehide',()=>{groundItems.dispose();disposeItemModels();factory.disposeHeroes();},{once:true});
   const worldObjects = new WorldObjectViews(renderer.scene);
   const skillEffects = new SkillEffects(renderer.scene);
   const statusEffects = new StatusEffects(renderer.scene);
@@ -146,7 +148,7 @@ async function main() {
   const bossBar = new BossBar();
   // Tiempo de reaparición del jefe (config compartida) para el contador de la barra.
   const bossRespawnMs = respawnForTemplate("skeleton_king") ?? 60000;
-  const classSelect = new ClassSelect(document.body, factory);
+
   const storyCard = new StoryCard();
   const dialog = new DialogPanel();
   const zoneIndicator = new ZoneIndicator();
@@ -342,11 +344,13 @@ async function main() {
   // Pantalla de creación + login con reintento ante contraseña incorrecta.
   let connected = false;
   let loginError = "";
+  let initialLogin=true;
   while (!connected) {
-    const creds = await classSelect.create(loginError);
+    const creds = await (initialLogin?firstLogin:classSelect.create(loginError));
+    initialLogin=false;
     className = creds.className;
     try {
-      await net.connect(creds.name, creds.password, creds.className, netCallbacks, creds.mode, creds.gender);
+      await net.connect(creds.name, creds.password, creds.className, netCallbacks, creds.mode, creds.gender,creds.appearance);
       connected = true;
     } catch (err) {
       if (isAuthError(err)) {

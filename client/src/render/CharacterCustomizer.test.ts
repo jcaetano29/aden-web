@@ -1,0 +1,7 @@
+// @vitest-environment jsdom
+import {afterEach,it,expect,vi} from 'vitest';
+import {defaultAppearance,validateAppearance} from '@aden/shared';
+import {CharacterCustomizer} from './CharacterCustomizer.js';
+afterEach(()=>{document.body.replaceChildren();vi.restoreAllMocks();});
+it('preserves identity when changing class and rebases incompatible body choices',()=>{const initial={...defaultAppearance('knight','male'),facialHairId:'full',skinToneId:'ebony'};const control=new CharacterCustomizer(document.body,initial,vi.fn());control.setClass('mage');expect(control.value).toEqual(initial);control.setGender('female');expect(control.value.facialHairId).toBe('none');expect(control.value.skinToneId).toBe('ebony');expect(validateAppearance(control.value)).toEqual(control.value);control.dispose();});
+it('updates visible selection, randomizes valid choices and restores defaults',()=>{const initial=defaultAppearance('knight','male'),change=vi.fn();const control=new CharacterCustomizer(document.body,initial,change);const face=document.querySelector<HTMLSelectElement>('[aria-label="Rostro"]')!;face.value='broad';face.dispatchEvent(new Event('change'));expect(control.value.faceId).toBe('broad');expect(change).toHaveBeenLastCalledWith(control.value);vi.spyOn(Math,'random').mockReturnValue(.8);document.querySelector<HTMLButtonElement>('[data-action="random"]')!.click();expect(validateAppearance(control.value)).toEqual(control.value);control.reset();expect(control.value).toEqual(initial);control.dispose();expect(document.body.children).toHaveLength(0);});

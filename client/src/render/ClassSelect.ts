@@ -1,4 +1,5 @@
-import { CLASSES, CLASS_ORDER, feminineClassName, type CharacterGender } from '@aden/shared';
+import {CharacterCustomizer} from './CharacterCustomizer.js';
+import { CLASSES, CLASS_ORDER, feminineClassName, defaultAppearance, type CharacterAppearanceV1, type CharacterGender } from '@aden/shared';
 import type { CharacterFactory } from './CharacterFactory.js';
 import { HeroPreview } from './HeroPreview.js';
 import './ClassSelect.css';
@@ -12,8 +13,10 @@ const ROLES: Record<string, string> = {
 };
 const GLYPHS: Record<string, string> = { knight: '♜', mage: '✧', barbarian: '⚔', rogue: '◆', ranger: '➶' };
 export type LoginMode = 'login' | 'create';
-export interface LoginResult { name: string; className: string; password: string; mode: LoginMode; gender: CharacterGender }
+export interface LoginResult { name: string; className: string; password: string; mode: LoginMode; gender: CharacterGender; appearance?:CharacterAppearanceV1 }
 
+export type CharacterPreview=Pick<HeroPreview,'show'|'rotate'|'zoom'|'focus'|'setVisible'|'dispose'>;
+export interface ClassSelectOptions {loadAssets?:()=>Promise<void>;createPreview?:(host:HTMLElement,factory:CharacterFactory)=>CharacterPreview}
 export class ClassSelect {
   private readonly root = document.createElement('div');
   private resolver: ((v: LoginResult) => void) | null = null;
@@ -27,10 +30,16 @@ export class ClassSelect {
   private readonly creation: HTMLElement;
   private readonly caption: HTMLElement;
   private readonly cards = new Map<string, HTMLButtonElement>();
-  private readonly preview?: HeroPreview;
+  private preview?:CharacterPreview;
+  private readonly customizer:CharacterCustomizer;
+  private readonly assetStatus:HTMLElement;
+  private readonly retry:HTMLButtonElement;
+  private assetsReady=false;private loading=false;private removed=false;
+  private assetsResolved!:()=>void;
+  readonly ready=new Promise<void>(resolve=>{this.assetsResolved=resolve;});
   private focusTimer?: ReturnType<typeof setTimeout>;
 
-  constructor(parent: HTMLElement = document.body, factory?: CharacterFactory) {
+  constructor(parent: HTMLElement = document.body, private readonly factory?:CharacterFactory, private readonly options:ClassSelectOptions={}) {
     this.root.className = 'character-select aden-scroll';
     this.root.hidden = true;
     this.root.innerHTML = `
@@ -49,15 +58,15 @@ export class ClassSelect {
             <label><input type="radio" name="character-gender" value="male" checked> Masculino</label>
             <label><input type="radio" name="character-gender" value="female"> Femenino</label>
           </fieldset>
-          <p class="character-hint">Mismas habilidades y atributos en ambas apariencias.</p>
+          <div class="character-camera" aria-label="Encuadre"><button type="button" data-focus="body" aria-pressed="true">Cuerpo</button><button type="button" data-focus="face" aria-pressed="false">Rostro</button><button type="button" data-zoom="-180" aria-label="Acercar">+</button><button type="button" data-zoom="180" aria-label="Alejar">−</button></div><p class="character-hint">Mismas habilidades y atributos en ambas apariencias.</p>
         </section>
         <form class="character-form">
-          <div class="character-class-picker"><h2>Elegí tu clase</h2><div class="character-classes" role="group" aria-label="Clase"></div></div>
+          <div class="character-class-picker"><h2>Elegí tu clase</h2><div class="character-classes" role="group" aria-label="Clase"></div><div class="character-cosmetics"></div></div>
           <div class="character-credentials">
             <label>Nombre del personaje<input type="text" maxlength="16" autocomplete="username" placeholder="Tu nombre en Aden" required></label>
             <label>Contraseña<input type="password" minlength="4" maxlength="40" autocomplete="current-password" placeholder="Al menos 4 caracteres" required></label>
           </div>
-          <div class="character-error" role="alert"></div>
+          <p class="character-assets" role="status">Cargando personajes…</p><button class="character-retry" type="button" hidden>Reintentar carga</button><div class="character-error" role="alert"></div>
           <button type="submit" class="character-enter">Entrar a Aden</button>
         </form>
       </div>
@@ -108,11 +117,13 @@ export class ClassSelect {
     this.passwordInput = this.root.querySelector('input[type="password"]')!;
     this.errorDiv = this.root.querySelector('.character-error')!;
     this.enterBtn = this.root.querySelector('.character-enter')!;
+    this.assetStatus=this.root.querySelector('.character-assets')!;this.retry=this.root.querySelector('.character-retry')!;this.retry.addEventListener('click',()=>void this.loadAssets());
+    this.customizer=new CharacterCustomizer(this.root.querySelector('.character-cosmetics')!,defaultAppearance('knight','male'),()=>this.refreshAppearance());
     for (const id of CLASS_ORDER) {
       const button = document.createElement('button');
       button.type = 'button'; button.dataset.class = id;
       button.innerHTML = `<span class="character-glyph" aria-hidden="true">${GLYPHS[id]}</span><span><strong></strong><small>${ROLES[id]}</small></span>`;
-      button.addEventListener('click', () => { this.selected = id; this.refreshAppearance(); });
+      button.addEventListener('click', () => { this.selected = id; this.customizer.setClass(id);this.refreshAppearance(); });
       this.cards.set(id, button);
       this.root.querySelector('.character-classes')!.append(button);
     }
@@ -120,20 +131,18 @@ export class ClassSelect {
       button.addEventListener('click', () => this.setMode(button.dataset.mode as LoginMode));
     });
     this.root.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(input => {
-      input.addEventListener('change', () => { this.gender = input.value as CharacterGender; this.refreshAppearance(); });
+      input.addEventListener('change', () => { this.gender = input.value as CharacterGender;this.customizer.setGender(this.gender); this.refreshAppearance(); });
     });
     this.root.querySelector('form')!.addEventListener('submit', event => { event.preventDefault(); this.confirm(); });
     this.nameInput.addEventListener('input', () => this.refreshButton());
     this.passwordInput.addEventListener('input', () => this.refreshButton());
     parent.append(this.root);
-    if (factory) {
-      try { this.preview = new HeroPreview(this.root.querySelector('.character-canvas')!, factory); }
-      catch { this.root.querySelector('.character-canvas')!.textContent = 'Vista previa 3D no disponible.'; }
-    }
     this.root.querySelectorAll<HTMLButtonElement>('.character-rotate button').forEach((button, i) => {
       button.addEventListener('click', () => this.preview?.rotate(i === 0 ? -Math.PI / 4 : Math.PI / 4));
     });
-    this.refreshAppearance(); this.setMode('login');
+    this.root.querySelectorAll<HTMLButtonElement>('[data-focus]').forEach(b=>b.addEventListener('click',()=>{this.preview?.focus(b.dataset.focus as 'body'|'face');this.root.querySelectorAll('[data-focus]').forEach(el=>el.setAttribute('aria-pressed',String(el===b)));}));
+    this.root.querySelectorAll<HTMLButtonElement>('[data-zoom]').forEach(b=>b.addEventListener('click',()=>this.preview?.zoom(Number(b.dataset.zoom))));
+    this.refreshAppearance(); this.setMode('login');void this.loadAssets();
   }
 
   private setMode(mode: LoginMode) {
@@ -153,19 +162,20 @@ export class ClassSelect {
       button.querySelector('strong')!.textContent = this.gender === 'female' ? feminineClassName(id, CLASSES[id].name) : CLASSES[id].name;
     }
     this.caption.textContent = this.cards.get(this.selected)!.querySelector('strong')!.textContent;
-    this.preview?.show(this.selected, this.gender);
+    if(this.assetsReady&&this.preview){try{this.preview.show(this.selected,this.customizer.value);}catch(error){this.assetsReady=false;this.assetStatus.textContent=error instanceof Error?error.message:'No se pudo mostrar el personaje.';this.retry.hidden=false;}}
+    this.refreshButton();
   }
 
   private refreshButton() {
     this.enterBtn.textContent = this.mode === 'login' ? 'Entrar a Aden' : 'Crear personaje';
-    this.enterBtn.disabled = !this.nameInput.value.trim() || this.passwordInput.value.length < 4;
+    this.enterBtn.disabled = !this.nameInput.value.trim() || this.passwordInput.value.length < 4 || !this.assetsReady || (this.mode==='create'&&!this.preview);
   }
 
   private confirm() {
-    if (!this.resolver) return;
+    if (!this.resolver||!this.assetsReady||(this.mode==='create'&&!this.preview)) return;
     const name = this.nameInput.value.trim(), password = this.passwordInput.value;
     if (!name || password.length < 4) return;
-    this.resolver({ name, password, mode: this.mode, className: this.mode === 'create' ? this.selected : '', gender: this.gender });
+    this.resolver({ name, password, mode: this.mode, className: this.mode === 'create' ? this.selected : '', gender: this.gender, ...(this.mode==='create'?{appearance:this.customizer.value}:{}) });
     this.root.hidden = true; this.preview?.setVisible(false); this.resolver = null;
   }
 
@@ -178,5 +188,16 @@ export class ClassSelect {
     });
   }
 
-  remove() { clearTimeout(this.focusTimer); this.preview?.dispose(); this.root.remove(); }
+  private async loadAssets(){
+    if(this.loading||this.removed)return;this.loading=true;this.assetsReady=false;this.retry.hidden=true;this.assetStatus.textContent='Cargando personajes y mundo…';this.refreshButton();
+    try {
+      if(!this.factory)throw Error('No se pudieron preparar los personajes.');
+      await (this.options.loadAssets?.()??this.factory.preloadHeroes());if(this.removed)return;
+      if(!this.preview)this.preview=(this.options.createPreview??((host,factory)=>new HeroPreview(host,factory)))(this.root.querySelector('.character-canvas')!,this.factory);
+      this.assetsReady=true;this.refreshAppearance();if(!this.assetsReady)throw Error(this.assetStatus.textContent??'Error de vista previa');
+      this.preview.setVisible(this.mode==='create'&&!this.root.hidden);this.assetStatus.textContent='Personajes listos';this.retry.hidden=true;this.assetsResolved();
+    }catch(error){if(this.removed)return;this.assetsReady=false;this.assetStatus.textContent=error instanceof Error?error.message:'No se pudieron cargar los personajes.';this.retry.hidden=false;}
+    finally{this.loading=false;if(!this.removed)this.refreshButton();}
+  }
+  remove() {this.removed=true;this.customizer.dispose(); clearTimeout(this.focusTimer); this.preview?.dispose(); this.root.remove(); }
 }

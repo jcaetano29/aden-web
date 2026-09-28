@@ -1,12 +1,13 @@
 // @vitest-environment jsdom
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ClassSelect } from "./ClassSelect.js";
 
 afterEach(() => { document.body.innerHTML = ""; });
 
 describe("ClassSelect", () => {
   it.each(['knight', 'mage', 'barbarian', 'rogue', 'ranger'])("envía la apariencia femenina al crear %s", async (classId) => {
-    const select = new ClassSelect(document.body);
+    const select = new ClassSelect(document.body,{preloadHeroes:async()=>{}} as any,{createPreview:()=>({show:vi.fn(),rotate:vi.fn(),zoom:vi.fn(),focus:vi.fn(),setVisible:vi.fn(),dispose:vi.fn()})});
+    await select.ready;
     const result = select.create();
     [...document.querySelectorAll('button')].find(b => b.textContent === 'Crear personaje')!.click();
     const female = document.querySelector<HTMLInputElement>('input[value="female"]');
@@ -22,7 +23,7 @@ describe("ClassSelect", () => {
     select.remove();
   });
   it("presenta Explorador como clase arquera al crear personaje", () => {
-    const select = new ClassSelect(document.body);
+    const select = new ClassSelect(document.body,{preloadHeroes:async()=>{}} as any,{createPreview:()=>({show:vi.fn(),rotate:vi.fn(),zoom:vi.fn(),focus:vi.fn(),setVisible:vi.fn(),dispose:vi.fn()})});
     [...document.querySelectorAll("button")].find((button) => button.textContent === "Crear personaje")!.click();
 
     expect(document.body.textContent).toContain("Explorador");
