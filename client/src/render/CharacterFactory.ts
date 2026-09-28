@@ -1,3 +1,5 @@
+import { ModularHeroFactory } from './ModularHeroFactory.js';
+import type { CharacterAppearanceV1 } from '@aden/shared';
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkeleton } from "three/examples/jsm/utils/SkeletonUtils.js";
@@ -13,7 +15,10 @@ interface LoadedModel {
   animations: THREE.AnimationClip[];
 }
 
+export interface CharacterEquipment { update(equipment:Record<string,string>):void; dispose():void; }
 export interface Character {
+  equipment?: CharacterEquipment;
+  dispose?(): void;
   root: THREE.Object3D;
   mixer: THREE.AnimationMixer;
   clipNames: string[];
@@ -28,6 +33,11 @@ export interface Character {
 }
 
 export class CharacterFactory {
+  private readonly heroes=new ModularHeroFactory();
+  preloadHeroes(){return this.heroes.preload();}
+  createHero(className:string,appearance:CharacterAppearanceV1){return this.heroes.create(className,appearance);}
+  disposeHeroes(){this.heroes.dispose();}
+  get weaponModels(){return this.heroes.weaponModels;}
   private readonly loader = new GLTFLoader();
   private readonly loaded = new Map<string, LoadedModel>();
 
@@ -180,3 +190,5 @@ export class CharacterFactory {
     };
   }
 }
+
+

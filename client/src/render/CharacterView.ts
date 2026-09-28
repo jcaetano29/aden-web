@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { EquipmentViews } from './EquipmentViews.js';
-import type { Character } from "./CharacterFactory.js";
+import type { Character, CharacterEquipment } from "./CharacterFactory.js";
 import { selectClip } from "./animation.js";
 import { smoothTowards, headingFromDelta, smoothAngle } from "./motion.js";
 
@@ -27,7 +27,7 @@ export interface ServerState {
 }
 
 export class CharacterView {
-  private readonly equipment:EquipmentViews;
+  private readonly equipment:CharacterEquipment;
   private state: ServerState = { x: 0, z: 0, targetX: 0, targetZ: 0, moving: false };
   private desiredYaw: number | null = null;
   private lastMoving: boolean | null = null;
@@ -40,7 +40,7 @@ export class CharacterView {
   private deathTime = 0;
 
   constructor(private readonly character: Character) {
-    this.equipment=new EquipmentViews(character.root);
+    this.equipment=character.equipment ?? new EquipmentViews(character.root);
     this.idleClip = selectClip(character.clipNames, "idle");
     this.walkClip = selectClip(character.clipNames, "walk");
   }
@@ -215,7 +215,9 @@ export class CharacterView {
 
   dispose() {
     this.equipment.dispose();
+    this.character.dispose?.();
     this.removeTargetRing();
     this.character.mixer.stopAllAction();
   }
 }
+

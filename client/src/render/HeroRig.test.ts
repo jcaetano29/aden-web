@@ -1,0 +1,2 @@
+import {it,expect} from 'vitest';import {Group,Bone} from 'three';import {resolveHeroAnchors} from './HeroRig.js';import {HERO_ANCHORS} from '../assets/heroManifest.js';
+it('requires every semantic anchor',()=>{const root=new Group();expect(()=>resolveHeroAnchors(root,HERO_ANCHORS)).toThrow(/Head/);for(const name of Object.values(HERO_ANCHORS)){const bone=new Bone();bone.name=name;root.add(bone);}expect(resolveHeroAnchors(root,HERO_ANCHORS).head.name).toBe('Head');});
