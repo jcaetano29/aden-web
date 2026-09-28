@@ -162,7 +162,7 @@ export class ClassSelect {
       button.querySelector('strong')!.textContent = this.gender === 'female' ? feminineClassName(id, CLASSES[id].name) : CLASSES[id].name;
     }
     this.caption.textContent = this.cards.get(this.selected)!.querySelector('strong')!.textContent;
-    if(this.assetsReady&&this.preview){try{this.preview.show(this.selected,this.customizer.value);}catch(error){this.assetsReady=false;this.assetStatus.textContent=error instanceof Error?error.message:'No se pudo mostrar el personaje.';this.retry.hidden=false;}}
+    if(this.assetsReady&&this.preview){try{this.preview.show(this.selected,this.customizer.value);}catch(error){this.assetsReady=false;this.assetStatus.textContent='No se pudo mostrar el personaje. Reintentá la carga.';this.retry.hidden=false;}}
     this.refreshButton();
   }
 
@@ -196,7 +196,7 @@ export class ClassSelect {
       if(!this.preview)this.preview=(this.options.createPreview??((host,factory)=>new HeroPreview(host,factory)))(this.root.querySelector('.character-canvas')!,this.factory);
       this.assetsReady=true;this.refreshAppearance();if(!this.assetsReady)throw Error(this.assetStatus.textContent??'Error de vista previa');
       this.preview.setVisible(this.mode==='create'&&!this.root.hidden);this.assetStatus.textContent='Personajes listos';this.retry.hidden=true;this.assetsResolved();
-    }catch(error){if(this.removed)return;this.assetsReady=false;this.assetStatus.textContent=error instanceof Error?error.message:'No se pudieron cargar los personajes.';this.retry.hidden=false;}
+    }catch(error){if(this.removed)return;this.assetsReady=false;this.assetStatus.textContent='No se pudieron cargar los personajes. Revisá la conexión y reintentá.';this.retry.hidden=false;}
     finally{this.loading=false;if(!this.removed)this.refreshButton();}
   }
   remove() {this.removed=true;this.customizer.dispose(); clearTimeout(this.focusTimer); this.preview?.dispose(); this.root.remove(); }

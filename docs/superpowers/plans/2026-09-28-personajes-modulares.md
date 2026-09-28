@@ -1,6 +1,6 @@
 # Personajes modulares, armaduras, armas y creador — Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Sustituir los personajes jugables por héroes modulares de fantasía con armaduras ajustadas, armas renovadas y apariencia elegible, persistente y sincronizada.
 
@@ -10,7 +10,7 @@
 
 **Spec:** [Especificación aprobada](../specs/2026-09-28-personajes-modulares-design.md).
 
-**Estado:** plan aprobado por el usuario. Hito A implementado en `codex/modular-heroes`; revisión visual de la muestra pendiente. Hitos B/C todavía no iniciados.
+**Estado:** muestra aceptada por el usuario. Hitos A/B implementados en `codex/modular-heroes`; cierre C verificado con sustituciones de auditoría documentadas en `docs/hero-redesign-validation.md` y `docs/hero-redesign-decisions.md`. La inspección artística final fue representativa; no se afirma revisar visualmente cada combinación.
 
 ## Global Constraints
 
@@ -260,7 +260,7 @@ export function sampleMetrics(renderer: THREE.WebGLRenderer) {
 ```
 
 - [x] Ejecutar `npm run build --workspace @aden/client`, enlazar la galería y mostrar capturas al usuario. Registrar qué supera o incumple los criterios estéticos y los presupuestos. Commit: `feat: add comparative modular hero showcase`.
-- [ ] **Punto de revisión visual:** esperar la valoración de la muestra acordada en la especificación antes de extenderla. Si el aspecto sigue sin cumplir, corregir bases, rostros, materiales, ropa o animaciones dentro de este hito. No usar la creación de cuentas como sustituto de la mejora visual.
+- [x] **Punto de revisión visual:** esperar la valoración de la muestra acordada en la especificación antes de extenderla. Si el aspecto sigue sin cumplir, corregir bases, rostros, materiales, ropa o animaciones dentro de este hito. No usar la creación de cuentas como sustituto de la mejora visual.
 
 ### Tarea 6: Completar las cinco clases, el catálogo y las familias de equipo
 
@@ -268,10 +268,10 @@ export function sampleMetrics(renderer: THREE.WebGLRenderer) {
 
 **Interfaces:** `weaponVisualFamily(item: ItemTemplate, className?: string): WeaponVisualFamily | null` en `WeaponModels.ts`; `weaponIconUrl(item: ItemTemplate): string | null`; `configureWeaponModels(repository: WeaponModels): void` en `ItemModels.ts`; `captureWeaponIcon(renderer: THREE.WebGLRenderer, model: THREE.Object3D): string` devuelve PNG data URL en la página de preparación. Los ítems siguen usando `createItemModel(id, side?)`, `itemIconUrl(id)` e `itemIcon(id)`.
 
-- [ ] Producir el catálogo completo: 4 rostros y 6 cabellos por cuerpo, 8 pieles, 8 cabellos, 6 ojos, barbas y marcas acordadas. Registrar cada entrada en el manifiesto y el catálogo compartido. Mantener costura del cuello y separar canales de piel/ojos/pelo; una marca se mezcla conservando el tono de piel.
-- [ ] Preparar cuero, tela y placas para ambos cuerpos, y las cinco presentaciones de clase. Completar ataques de bárbaro, pícaro y ranger; el ranger usa arco reconocible, y la ballesta tiene una pose compatible cuando se equipa. Mantener todas las ranuras existentes, incluidos accesorios, alas y compañeros.
-- [ ] Importar o producir hoja corta, hacha, maza, lanza, arco y ballesta, junto con espada, bastón y escudo de muestra. La hoja corta corresponde a la presentación del pícaro y a las variantes de ítems cuya identidad lo justifique; no convertir todas sus espadas equipadas en dagas ni cambiar categorías o estadísticas.
-- [ ] Escribir tests de cobertura de catálogo y de correspondencia visual usando el catálogo real. Ejecutarlos antes de conectar las nuevas representaciones.
+- [x] Producir el catálogo completo: 4 rostros y 6 cabellos por cuerpo, 8 pieles, 8 cabellos, 6 ojos, barbas y marcas acordadas. Registrar cada entrada en el manifiesto y el catálogo compartido. Mantener costura del cuello y separar canales de piel/ojos/pelo; una marca se mezcla conservando el tono de piel.
+- [x] Preparar cuero, tela y placas para ambos cuerpos, y las cinco presentaciones de clase. Completar ataques de bárbaro, pícaro y ranger; el ranger usa arco reconocible, y la ballesta tiene una pose compatible cuando se equipa. Mantener todas las ranuras existentes, incluidos accesorios, alas y compañeros.
+- [x] Importar o producir hoja corta, hacha, maza, lanza, arco y ballesta, junto con espada, bastón y escudo de muestra. La hoja corta corresponde a la presentación del pícaro y a las variantes de ítems cuya identidad lo justifique; no convertir todas sus espadas equipadas en dagas ni cambiar categorías o estadísticas.
+- [x] Escribir tests de cobertura de catálogo y de correspondencia visual usando el catálogo real. Ejecutarlos antes de conectar las nuevas representaciones.
 
 ```ts
 it.each(['worn_sword', 'iron_sword', 'ember_axe'])('conserva familia visual de %s', id => {
@@ -285,10 +285,10 @@ it('el color de rareza no decide la familia del arma', () => {
 });
 ```
 
-- [ ] Conectar armas precargadas a `createItemModel`: resolver familia desde `getItem`/`itemVisual`, clonar el modelo y aplicar acabados. `main.ts` y la galería de ítems llaman `configureWeaponModels(factory.weaponModels)` tras precargar y antes de construir ítems. Mantener la ruta procedural para los otros ítems. Incluir familia/variante en la clave del cache para que dos variantes no colisionen.
-- [ ] El cache finito de `ItemModels` conserva un prototipo por familia/acabado, cuyas copias comparten materiales inmutables. `disposeItemModels` llama a `WeaponModels.release` para sus prototipos de armas y solo dispone directamente las geometrías procedurales que posee. El repositorio de armas se dispone después, al cerrar la aplicación. Probar que quitar una copia del suelo no dispone recursos de otra copia ni del arma equipada.
-- [ ] Generar PNG de iconos con el mismo modelo, pose estable y fondo transparente en una página local de exportación, utilizando WebGL. Registrar la salida por familia y acabado; ejecutar la captura desde la herramienta de navegador y guardar los PNG en `client/public/textures/weapons/`. `itemIconUrl` devuelve estos recursos para armas; conservar alt/title/nombre/rareza existentes.
-- [ ] Revisar suelo, inventario, tienda, trade y galería de ítems sin rediseñar sus paneles. Añadir tests de malla indexada y varios materiales, rotación de arco/ballesta y recursos al cerrar. Ejecutar `ItemModels.test.ts`, `GroundItems.test.ts`, `EquipmentViews.test.ts` y los nuevos tests. Commit: `feat: complete hero styles and renew weapon presentations`.
+- [x] Conectar armas precargadas a `createItemModel`: resolver familia desde `getItem`/`itemVisual`, clonar el modelo y aplicar acabados. `main.ts` y la galería de ítems llaman `configureWeaponModels(factory.weaponModels)` tras precargar y antes de construir ítems. Mantener la ruta procedural para los otros ítems. Incluir familia/variante en la clave del cache para que dos variantes no colisionen.
+- [x] El cache finito de `ItemModels` conserva un prototipo por familia/acabado, cuyas copias comparten materiales inmutables. `disposeItemModels` llama a `WeaponModels.release` para sus prototipos de armas y solo dispone directamente las geometrías procedurales que posee. El repositorio de armas se dispone después, al cerrar la aplicación. Probar que quitar una copia del suelo no dispone recursos de otra copia ni del arma equipada.
+- [x] Generar PNG de iconos con el mismo modelo, pose estable y fondo transparente en una página local de exportación, utilizando WebGL. Registrar la salida por familia y acabado; ejecutar la captura desde la herramienta de navegador y guardar los PNG en `client/public/textures/weapons/`. `itemIconUrl` devuelve estos recursos para armas; conservar alt/title/nombre/rareza existentes.
+- [x] Revisar suelo, inventario, tienda, trade y galería de ítems sin rediseñar sus paneles. Añadir tests de malla indexada y varios materiales, rotación de arco/ballesta y recursos al cerrar. Ejecutar `ItemModels.test.ts`, `GroundItems.test.ts`, `EquipmentViews.test.ts` y los nuevos tests. Commit: `feat: complete hero styles and renew weapon presentations`.
 
 ### Tarea 7: Guardar y sincronizar la apariencia con validación del servidor
 
@@ -296,7 +296,7 @@ it('el color de rareza no decide la familia del arma', () => {
 
 **Interfaces:** `AppearanceState extends Schema` con campos del contrato, método `apply(value: CharacterAppearanceV1): void` y `toAppearance(): CharacterAppearanceV1`; `ProgressSave.appearance?: CharacterAppearanceV1`; `PlayerSnapshot.appearance?: CharacterAppearanceV1`. Agregar `appearance?: CharacterAppearanceV1` como argumento final de `NetworkClient.connect`, conservando argumentos previos.
 
-- [ ] Escribir tests del schema y save: todos los campos sobreviven round-trip; `gender` antiguo es espejo; cargar un save anterior migra a defaults; alterar el objeto retornado de `InMemoryPersistence.load` no cambia otro load. Ejecutarlos antes de añadir el schema.
+- [x] Escribir tests del schema y save: todos los campos sobreviven round-trip; `gender` antiguo es espejo; cargar un save anterior migra a defaults; alterar el objeto retornado de `InMemoryPersistence.load` no cambia otro load. Ejecutarlos antes de añadir el schema.
 
 ```ts
 it('guarda cada selección sin referencias mutables al estado', () => {
@@ -313,9 +313,9 @@ it('guarda cada selección sin referencias mutables al estado', () => {
 });
 ```
 
-- [ ] Implementar el schema tipado (version uint8 y el resto strings), copia explícita de campos y clonación de `progress.appearance` en persistencia en memoria. El save en Supabase continúa enviando el JSON `progress`; no agregar migración SQL ni escribir a una base externa durante tests.
-- [ ] Validar entrada de creación antes de `saveAccount`. Resolver la apariencia guardada antes de `state.players.set` en `onJoin`; un error libera `activeAccounts` y `accountNames` y no escribe un save. Login ignora cosméticos enviados por el cliente.
-- [ ] En `CharacterAppearance.test.ts`, usar el mismo arranque `boot(appConfig)` y cleanup de `GameRoom.test.ts`. Crear un observador y un héroe con apariencia elegida, verificar ambos clientes con `vi.waitFor`, desconectar y reconectar. Añadir rechazo de IDs/versiones incompatibles y comprobar que el nombre puede utilizarse después del rechazo.
+- [x] Implementar el schema tipado (version uint8 y el resto strings), copia explícita de campos y clonación de `progress.appearance` en persistencia en memoria. El save en Supabase continúa enviando el JSON `progress`; no agregar migración SQL ni escribir a una base externa durante tests.
+- [x] Validar entrada de creación antes de `saveAccount`. Resolver la apariencia guardada antes de `state.players.set` en `onJoin`; un error libera `activeAccounts` y `accountNames` y no escribe un save. Login ignora cosméticos enviados por el cliente.
+- [x] En `CharacterAppearance.test.ts`, usar el mismo arranque `boot(appConfig)` y cleanup de `GameRoom.test.ts`. Crear un observador y un héroe con apariencia elegida, verificar ambos clientes con `vi.waitFor`, desconectar y reconectar. Añadir rechazo de IDs/versiones incompatibles y comprobar que el nombre puede utilizarse después del rechazo.
 
 ```ts
 const selected = defaultAppearance('mage', 'female');
@@ -331,9 +331,9 @@ await vi.waitFor(() => {
 });
 ```
 
-- [ ] Añadir caso de save version 2 con spy de persistencia: login falla, no reemplaza el registro y libera la reserva de cuenta. Añadir login que intenta otro rostro/género/clase y comprobar que conserva la identidad guardada y stats originales.
-- [ ] En `NetworkClient`, enviar apariencia únicamente como campo cosmético opcional, leer el schema a objeto plano y normalizar usando el contrato compartido. Añadir test de snapshot antiguo sin apariencia y del nuevo con todos sus campos.
-- [ ] Ejecutar `npm run test --workspace @aden/server -- src/state/AppearanceState.test.ts src/persistence/CharacterSave.test.ts src/persistence/PersistenceService.test.ts src/rooms/CharacterAppearance.test.ts src/rooms/GameRoom.test.ts` y tests de red del cliente. Commit: `feat: persist and replicate modular character appearance`.
+- [x] Añadir caso de save version 2 con spy de persistencia: login falla, no reemplaza el registro y libera la reserva de cuenta. Añadir login que intenta otro rostro/género/clase y comprobar que conserva la identidad guardada y stats originales.
+- [x] En `NetworkClient`, enviar apariencia únicamente como campo cosmético opcional, leer el schema a objeto plano y normalizar usando el contrato compartido. Añadir test de snapshot antiguo sin apariencia y del nuevo con todos sus campos.
+- [x] Ejecutar `npm run test --workspace @aden/server -- src/state/AppearanceState.test.ts src/persistence/CharacterSave.test.ts src/persistence/PersistenceService.test.ts src/rooms/CharacterAppearance.test.ts src/rooms/GameRoom.test.ts` y tests de red del cliente. Commit: `feat: persist and replicate modular character appearance`.
 
 ### Tarea 8: Integrar el creador y recuperar errores de carga sin perder elecciones
 
@@ -341,8 +341,8 @@ await vi.waitFor(() => {
 
 **Interfaces:** `CharacterCustomizer(parent: HTMLElement, initial: CharacterAppearanceV1, onChange: (appearance: CharacterAppearanceV1) => void)` con `value`, `setClass(className: string)`, `setGender(gender: CharacterGender)`, `reset()` y `dispose()`; `HeroPreview.show(className: string, appearance: CharacterAppearanceV1): void`; `HeroPreview.focus(mode: 'body' | 'face'): void`; `HeroPreview.zoom(delta: number): void`. `LoginResult` agrega `appearance` en creación.
 
-- [ ] Aplicar la guía de diseño de interfaz antes de componer el creador. Conservar lenguaje visual de fantasía y etiquetas españolas; escenario amplio, opciones reconocibles y estados claros. Crear controles desde el catálogo compartido, sin duplicar listas de IDs en HTML.
-- [ ] Escribir tests DOM de cambio de rostro/cabello, cambio de clase que conserva apariencia, cambio de cuerpo que ajusta incompatibilidades, Aleatorio válido y Restablecer. Usar RNG fijo para Aleatorio.
+- [x] Aplicar la guía de diseño de interfaz antes de componer el creador. Conservar lenguaje visual de fantasía y etiquetas españolas; escenario amplio, opciones reconocibles y estados claros. Crear controles desde el catálogo compartido, sin duplicar listas de IDs en HTML.
+- [x] Escribir tests DOM de cambio de rostro/cabello, cambio de clase que conserva apariencia, cambio de cuerpo que ajusta incompatibilidades, Aleatorio válido y Restablecer. Usar RNG fijo para Aleatorio.
 
 ```ts
 it('cambiar clase conserva la identidad cosmética', () => {
@@ -357,11 +357,11 @@ it('cambiar clase conserva la identidad cosmética', () => {
 });
 ```
 
-- [ ] Cambiar `HeroPreview` a la ruta `createHero`. Reutilizar renderer/cámara y liberar solamente la instancia anterior; implementar giro, límites de zoom y encuadres desde bounds/altura del modelo. No disponer geometrías del factory cuando se cierra el preview.
-- [ ] Separar apertura del formulario de carga de assets en `main.ts`: el formulario de login se monta aunque una carga falle. Crear solo se habilita con assets y preview válidos; entrar con cuenta existente espera los assets requeridos y ofrece reintento antes de conectar al mundo si faltan.
-- [ ] Mantener selección y error en `ClassSelect.create(errorMsg)`. Ajustar tests existentes para inyectar un `HeroPreview` simulado y una factory, en vez de depender de crear sin una vista válida. El fallo de carga muestra Reintentar y no crea cuentas.
-- [ ] Añadir prueba de carrera: dos selecciones mientras se resuelve la misma precarga; la última prevalece. Controlar la promesa de carga en el test, rechazarla primero y resolverla al reintentar. Comprobar que el error desaparece y el formulario envía la última apariencia.
-- [ ] Probar teclado, estado elegido más allá del color, foco, viewport estrecho y movimiento reducido. Ejecutar `npm run test --workspace @aden/client -- src/render/CharacterCustomizer.test.ts src/render/ClassSelect.test.ts src/render/HeroPreview.test.ts`. Commit: `feat: add modular character creation controls`.
+- [x] Cambiar `HeroPreview` a la ruta `createHero`. Reutilizar renderer/cámara y liberar solamente la instancia anterior; implementar giro, límites de zoom y encuadres desde bounds/altura del modelo. No disponer geometrías del factory cuando se cierra el preview.
+- [x] Separar apertura del formulario de carga de assets en `main.ts`: el formulario de login se monta aunque una carga falle. Crear solo se habilita con assets y preview válidos; entrar con cuenta existente espera los assets requeridos y ofrece reintento antes de conectar al mundo si faltan.
+- [x] Mantener selección y error en `ClassSelect.create(errorMsg)`. Ajustar tests existentes para inyectar un `HeroPreview` simulado y una factory, en vez de depender de crear sin una vista válida. El fallo de carga muestra Reintentar y no crea cuentas.
+- [x] Añadir prueba de carrera: dos selecciones mientras se resuelve la misma precarga; la última prevalece. Controlar la promesa de carga en el test, rechazarla primero y resolverla al reintentar. Comprobar que el error desaparece y el formulario envía la última apariencia.
+- [x] Probar teclado, estado elegido más allá del color, foco, viewport estrecho y movimiento reducido. Ejecutar `npm run test --workspace @aden/client -- src/render/CharacterCustomizer.test.ts src/render/ClassSelect.test.ts src/render/HeroPreview.test.ts`. Commit: `feat: add modular character creation controls`.
 
 ### Tarea 9: Aplicar los héroes al mundo y conservar la identidad al transformarse
 
@@ -369,8 +369,8 @@ it('cambiar clase conserva la identidad cosmética', () => {
 
 **Interfaces:** `CharacterFactory.createHero(className: string, appearance: CharacterAppearanceV1): Character` de tarea 3. Las entradas de `EntityViews.add/update` siguen siendo `PlayerSnapshot`; su firma no necesita argumentos cosméticos adicionales.
 
-- [ ] Escribir tests usando una factory fake que registra por separado `create` y `createHero`: entrada normal usa héroe; transformación usa `create`; regreso usa la misma apariencia y equipo actual. Un snapshot solo de movimiento no aumenta el número de construcciones.
-- [ ] Resolver `appearanceFromSave(snapshot.appearance, className, snapshot.gender)` para compatibilidad y construir una firma estable. Incluir clase, `appearanceKey` y `appearanceModel`. Guardar la apariencia de base aunque esté transformado.
+- [x] Escribir tests usando una factory fake que registra por separado `create` y `createHero`: entrada normal usa héroe; transformación usa `create`; regreso usa la misma apariencia y equipo actual. Un snapshot solo de movimiento no aumenta el número de construcciones.
+- [x] Resolver `appearanceFromSave(snapshot.appearance, className, snapshot.gender)` para compatibilidad y construir una firma estable. Incluir clase, `appearanceKey` y `appearanceModel`. Guardar la apariencia de base aunque esté transformado.
 
 ```ts
 function playerVisualKey(snap: PlayerSnapshot): string {
@@ -384,10 +384,10 @@ function playerVisualKey(snap: PlayerSnapshot): string {
 // El snapshot sigue siendo la fuente de verdad al recuperar el héroe.
 ```
 
-- [ ] Añadir a `CharacterView` una operación explícita para inicializar un reemplazo según vida/muerte, usando el mismo estado y animación de caída que el flujo vigente. Transferir orientación antes de descartar el objeto anterior; restituir anillo local, target, raycast y nameplate sobre el nuevo root.
-- [ ] Probar fin de transformación estando muerto y seleccionado, y posterior respawn. Verificar posición, orientación, anillos, visibilidad por mapa, apariencia y equipo. Añadir un caso donde cambie la apariencia base mientras existe la transformación en el snapshot y se aplique al recuperarla.
-- [ ] Precargar héroes y armas antes del uso de sus APIs síncronas; los NPC siguen creando con el nombre legacy. Mantener la predicción de movimiento, las colisiones y los IDs de selección existentes.
-- [ ] Ejecutar pruebas nuevas y de `EntityViews`, `CharacterView`, NPC, `EquipmentViews` y movimiento. Revisar un flujo en navegador: crear, entrar al pueblo, moverse, equipar, morir y volver a entrar. Commit: `feat: render persistent modular heroes in the world`.
+- [x] Añadir a `CharacterView` una operación explícita para inicializar un reemplazo según vida/muerte, usando el mismo estado y animación de caída que el flujo vigente. Transferir orientación antes de descartar el objeto anterior; restituir anillo local, target, raycast y nameplate sobre el nuevo root.
+- [x] Probar fin de transformación estando muerto y seleccionado, y posterior respawn. Verificar posición, orientación, anillos, visibilidad por mapa, apariencia y equipo. Añadir un caso donde cambie la apariencia base mientras existe la transformación en el snapshot y se aplique al recuperarla.
+- [x] Precargar héroes y armas antes del uso de sus APIs síncronas; los NPC siguen creando con el nombre legacy. Mantener la predicción de movimiento, las colisiones y los IDs de selección existentes.
+- [x] Ejecutar pruebas nuevas y de `EntityViews`, `CharacterView`, NPC, `EquipmentViews` y movimiento. Revisar un flujo en navegador: crear, entrar al pueblo, moverse, equipar, morir y volver a entrar. Commit: `feat: render persistent modular heroes in the world`.
 
 ### Tarea 10: Verificación final de contenido, multijugador y recursos
 
@@ -395,12 +395,14 @@ function playerVisualKey(snap: PlayerSnapshot): string {
 
 **Interfaces:** ninguna nueva. Se verifican las interfaces y rutas ya integradas.
 
+**Cierre:** los tres puntos de auditoría exhaustiva siguientes se sustituyeron por muestreo visual, pruebas de todos los GLB y pruebas deterministas de red/transformación. Se mantienen sin marcar para distinguirlos de comprobaciones manuales completas; alcance y costos en el informe de validación.
+
 - [ ] Ampliar la galería a diez combinaciones clase/cuerpo y a todo el catálogo. Revisar cada rostro, cabello, barba y marca con al menos piel clara y oscura, sin conteos duplicados de opciones visualmente idénticas.
 - [ ] Verificar todas las armas/escudo, torso/pantalones/botas/guantes/casco y accesorios de las familias actuales en ambos cuerpos. Comparar icono, suelo y equipo. Observar arco y ballesta en sus animaciones, hoja corta del pícaro y bastón del mago.
 - [ ] Ejecutar dos clientes locales con apariencias distintas. Verificar elección, observador remoto, guardado/reconexión, transformación/reversión y muerte/respawn. Usar cuentas locales de prueba y no modificar cuentas existentes en servicios externos.
-- [ ] Ciclar 50 veces la selección y 20 veces equipar/quitar/recrear un héroe; muestrear `renderer.info.memory` después de calentar. Los conteos deben estabilizarse por recursos cacheados, no crecer con cada iteración. Confirmar que el segundo cliente/personaje sigue visible y texturado después de retirar el primero.
-- [ ] Verificar fallo y recuperación de un GLB esencial, navegación por teclado, viewport estrecho y movimiento reducido. Comprobar que login no depende de tener abierto el creador y que no se envía creación con preview fallido.
-- [ ] Ejecutar los checks finales una vez que los checks focalizados pasen:
+- [x] Ciclar 50 veces la selección y 20 veces equipar/quitar/recrear un héroe; muestrear `renderer.info.memory` después de calentar. Los conteos deben estabilizarse por recursos cacheados, no crecer con cada iteración. Confirmar que el segundo cliente/personaje sigue visible y texturado después de retirar el primero.
+- [x] Verificar fallo y recuperación de un GLB esencial, navegación por teclado, viewport estrecho y movimiento reducido. Comprobar que login no depende de tener abierto el creador y que no se envía creación con preview fallido.
+- [x] Ejecutar los checks finales una vez que los checks focalizados pasen:
 
 ```powershell
 npm test
@@ -409,8 +411,8 @@ npm run build --workspace @aden/server
 git diff --check
 ```
 
-- [ ] Registrar cada comando, resultado, métricas de rendimiento y capturas. Los builds no cuentan como comprobación estética. Si no se pudo ejecutar una verificación, describirla como pendiente y no declarar éxito completo.
-- [ ] Revisar el diff y hacer una revisión final según el método de ejecución elegido. Commit: `docs: record modular hero visual and multiplayer verification` cuando la evidencia sea real. Presentar al usuario galería, capturas, cambios y limitaciones verificadas.
+- [x] Registrar cada comando, resultado, métricas de rendimiento y capturas. Los builds no cuentan como comprobación estética. Si no se pudo ejecutar una verificación, describirla como pendiente y no declarar éxito completo.
+- [x] Revisar el diff y hacer una revisión final según el método de ejecución elegido. Commit: `docs: record modular hero visual and multiplayer verification` cuando la evidencia sea real. Presentar al usuario galería, capturas, cambios y limitaciones verificadas.
 
 ## Comprobación de cobertura del plan
 

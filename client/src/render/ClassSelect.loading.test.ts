@@ -11,6 +11,6 @@ it('keeps latest choices across rejected preload and retry and prevents invalid 
  document.querySelector<HTMLButtonElement>('[data-class="mage"]')!.click();document.querySelector<HTMLInputElement>('input[value="female"]')!.click();
  const face=document.querySelector<HTMLSelectElement>('[aria-label="Rostro"]')!;face.value='noble';face.dispatchEvent(new Event('change'));
  const name=document.querySelector<HTMLInputElement>('input[type="text"]')!,pass=document.querySelector<HTMLInputElement>('input[type="password"]')!;name.value='LatestHero';pass.value='test123';name.dispatchEvent(new Event('input'));pass.dispatchEvent(new Event('input'));
- const submit=document.querySelector<HTMLButtonElement>('.character-enter')!;expect(submit.disabled).toBe(true);reject(Error('offline'));await vi.waitFor(()=>expect(document.body.textContent).toContain('offline'));
+ const submit=document.querySelector<HTMLButtonElement>('.character-enter')!;expect(submit.disabled).toBe(true);reject(Error('offline'));await vi.waitFor(()=>expect(document.body.textContent).toContain('No se pudieron cargar los personajes'));
  document.querySelector<HTMLButtonElement>('.character-retry')!.click();resolve();await vi.waitFor(()=>expect(submit.disabled).toBe(false));expect(attempt).toBe(2);expect(view.show).toHaveBeenLastCalledWith('mage',expect.objectContaining({gender:'female',faceId:'noble'}));submit.click();expect(await result).toMatchObject({className:'mage',appearance:{gender:'female',faceId:'noble'}});select.remove();
 });

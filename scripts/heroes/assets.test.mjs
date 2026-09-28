@@ -11,3 +11,19 @@ for(const gender of ['male','female'])test(`real ${gender} export has finite def
 });
 
 test('metal armor exports independently tintable visible equipment slots',async()=>{for(const gender of ['male','female']){const d=await readGltf(`client/public/models/heroes/hero-${gender}.glb`);for(const slot of ['armor','gloves','boots','helmet'])assert.ok(d.json.materials.some(m=>m.name==='armor_steel_'+slot),gender+' '+slot);}});
+
+test('every advertised body, face, hair and beard exists and fits the visible triangle budget',async()=>{
+ const weapons={};for(const name of ['sword','shield','staff','axe','dagger','bow'])weapons[name]=inspectGltf(await readGltf(`client/public/models/heroes/${name}.glb`)).triangles;
+ for(const gender of ['male','female']){
+  const d=await readGltf(`client/public/models/heroes/hero-${gender}.glb`);
+  const triangles=new Map(d.json.nodes.filter(n=>n.mesh!==undefined).map(n=>[n.name,d.json.meshes[n.mesh].primitives.reduce((sum,p)=>sum+d.json.accessors[p.indices].count/3,0)]));
+  const faces=['soft','angular','noble','broad'],hairs=gender==='male'?['none','parted','buzzed','swept','mane','topknot']:['none','long','buns','cropped','bob','ponytail'],beards=gender==='male'?['none','full','goatee','mustache']:['none'];
+  for(const [prefix,ids] of [['face_',faces],['hair_',hairs],['beard_',beards]])for(const id of ids)if(id!=='none')assert.ok(triangles.get(prefix+id)>0,gender+' '+prefix+id);
+  for(const cls of ['knight','mage','barbarian','rogue','ranger'])for(const face of faces)for(const hair of hairs)for(const beard of beards){
+   const outfit=[...triangles].filter(([name])=>name.startsWith('outfit_'+cls+'_')).reduce((sum,[,n])=>sum+n,0);
+   const body=outfit+triangles.get('face_'+face)+(triangles.get('hair_'+hair)??0)+(triangles.get('beard_'+beard)??0)+triangles.get('hero_eyes')+triangles.get('hero_brows');
+   const equipment=cls==='knight'?weapons.sword+weapons.shield:weapons[{mage:'staff',barbarian:'axe',rogue:'dagger',ranger:'bow'}[cls]];
+   assert.ok(body+equipment<35000,`${gender}/${cls}/${face}/${hair}/${beard}: ${body+equipment}`);
+  }
+ }
+});
