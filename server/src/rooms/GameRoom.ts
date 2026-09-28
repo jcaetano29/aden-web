@@ -1,3 +1,4 @@
+import {appearanceFromSave,validateAppearance,type CharacterAppearanceV1} from '@aden/shared';
 import { pvePower, getNpc, NPCS, campaignRoleNow, potionResource, getEncounter, encounterLeashRadius, isReturningHome, RETURNING_HOME_TEXT, encounterInterruptFor, encounterCoolFor, travelLockRemainingMs, travelLockText, mpRegenPerSecond, chapterAfter, isChapterComplete, mapGate, questReached, AMMO_SKILLS, invaderForTemplate, invasionProtected } from "@aden/shared";
 import { potionRecovery } from '../systems/PotionRecovery.js';
 import { getSideChain, sideChainForNpc, sideChainStep, nextSideChainStep, type SideChainDef } from '@aden/shared';
@@ -1702,7 +1703,7 @@ export class GameRoom extends Room<GameState> {
    * Sin `mode` (compat/tests): comportamiento tolerante (verifica si existe, registra
    * si no). Devuelve truthy para permitir el join; lanzar rechaza con el mensaje.
    */
-  async onAuth(_client: Client, options: { name?: string; password?: string; className?: string; mode?: string; gender?: unknown }) {
+  async onAuth(_client: Client, options: { name?: string; password?: string; className?: string; mode?: string; gender?: unknown; appearance?: unknown }) {
     const name = (options?.name ?? "").trim();
     const password = options?.password ?? "";
     const mode = options?.mode ?? "";
@@ -1711,6 +1712,7 @@ export class GameRoom extends Room<GameState> {
     if (mode !== 'login' && options.gender !== undefined && !isCharacterGender(options.gender)) {
       throw new Error('Elegí una apariencia masculina o femenina.');
     }
+    if(mode!=='login'&&options.appearance!==undefined)validateAppearance(options.appearance);
     const acct = await this.persistence.loadAccount(name);
     const hasAccount = !!(acct && acct.passwordHash);
 
@@ -1740,7 +1742,7 @@ export class GameRoom extends Room<GameState> {
     return { name };
   }
 
-  async onJoin(client: Client, options: { name?: string; className?: string; gender?: unknown }) {
+  async onJoin(client: Client, options: { name?: string; className?: string; gender?: unknown; appearance?: unknown }) {
     // No other room may load a second writable copy of this account.
     const name=(client.auth as {name?:string}|undefined)?.name ?? options.name?.trim() ?? 'Adventurer';
     if(GameRoom.activeAccounts.has(name))throw new Error('Esa cuenta ya está conectada o terminando de guardar.');
@@ -1757,7 +1759,10 @@ export class GameRoom extends Room<GameState> {
       ? preSave.className
       : (isValidClass(options?.className) ? options.className! : "knight");
     player.className = className;
-    player.gender = characterGender(preSave ? preSave.progress?.gender : options?.gender);
+    let appearance:CharacterAppearanceV1;
+    try {appearance=preSave?appearanceFromSave(preSave.progress?.appearance,className,preSave.progress?.gender):options.appearance!==undefined?validateAppearance(options.appearance):appearanceFromSave(undefined,className,options.gender);}
+    catch(error){if(GameRoom.activeAccounts.get(name)===client.sessionId)GameRoom.activeAccounts.delete(name);this.accountNames.delete(client.sessionId);throw error;}
+    player.appearance.apply(appearance);player.gender=appearance.gender;
     const st = statsForClass(className, 1);
     player.hp = st.maxHp;
     player.maxHp = st.maxHp;

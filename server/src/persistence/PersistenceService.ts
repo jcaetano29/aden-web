@@ -26,7 +26,7 @@ function cloneCharacterSave(data: CharacterSave): CharacterSave {
     ...data,
     inventory: { ...data.inventory },
     equipment: { ...(data.equipment ?? {}) },
-    progress: { ...data.progress, achievements: [...(data.progress?.achievements ?? [])] },
+    progress: { ...data.progress, ...(data.progress?.appearance?{appearance:{...data.progress.appearance}}:{}), achievements: [...(data.progress?.achievements ?? [])] },
   };
 }
 

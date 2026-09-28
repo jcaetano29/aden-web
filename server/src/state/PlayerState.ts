@@ -1,3 +1,4 @@
+import {AppearanceState} from './AppearanceState.js';
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { InventoryItemState } from "./InventoryItemState.js";
 import { AttributesState } from "./AttributesState.js";
@@ -29,6 +30,7 @@ export class PlayerState extends Schema {
   @type("boolean") dead = false;
   @type("string") className = "knight";
   @type("string") gender: CharacterGender = 'male';
+  @type(AppearanceState) appearance = new AppearanceState();
   @type("string") appearanceModel = "";
   /** Mapa actual del jugador (Etapa 15, estilo Mu). Se cambia warpeando (tecla M). */
   @type("string") mapId = "pueblo";

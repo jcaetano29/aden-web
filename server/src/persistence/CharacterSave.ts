@@ -1,9 +1,10 @@
-import { characterGender, type CharacterGender } from '@aden/shared';
+import { characterGender, type CharacterAppearanceV1, type CharacterGender } from '@aden/shared';
 
 export interface SideChainSave { id: string; progress: number }
 
 /** Appearance shares the existing JSON column, including in Supabase: no migration required. */
 export interface ProgressSave {
+  appearance?: CharacterAppearanceV1;
   /** Encargos opcionales por cadena; los campos de Varek y Boren se conservan para poder volver atrás. */
   sideChains?: Record<string, SideChainSave>;
   veilContractId?: string;
@@ -53,6 +54,7 @@ export interface CharacterSave {
 }
 
 export interface Persistable {
+  appearance?: {toAppearance():CharacterAppearanceV1};
   gender?: CharacterGender;
   learnedTomes?: { forEach(cb: (v: string) => void): void };
   level: number;
@@ -82,6 +84,7 @@ export interface Persistable {
 }
 
 export function toCharacterSave(p: Persistable): CharacterSave {
+  const appearance=p.appearance?.toAppearance();
   const inventory: Record<string, number> = {};
   p.inventory.forEach((v, k) => {
     inventory[k] = v.qty;
@@ -116,7 +119,8 @@ export function toCharacterSave(p: Persistable): CharacterSave {
     guildTag: p.guildTag,
     equipment,
     progress: {
-      gender: characterGender(p.gender),
+      gender: appearance?.gender ?? characterGender(p.gender),
+      ...(appearance ? {appearance} : {}),
       ...(learnedTomes.length ? {learnedTomes} : {}),
       loginStreak: p.retention.loginStreak,
       lastLoginDay: p.lastLoginDay,

@@ -39,7 +39,7 @@ import type { PartyPanelData, PartyMember } from '../render/PartyPanel.js';
 import { TRADE_RANGE, distance2D, isReturningHome, type TradeSnapshot, type TradeOffer } from '@aden/shared';
 import type { TradePanelData } from '../render/TradePanel.js';
 
-import { characterGender, type CharacterGender } from '@aden/shared';
+import { appearanceFromSave, characterGender, type CharacterAppearanceV1, type CharacterGender } from '@aden/shared';
 
 const SERVER_URL = import.meta.env.VITE_SERVER_URL ?? "ws://localhost:2567";
 
@@ -62,6 +62,7 @@ export interface PlayerSnapshot {
   /** Clase del jugador (knight/mage/barbarian/rogue); se sincroniza desde el server. Solo para jugadores. */
   className?: string;
   gender?: CharacterGender;
+  appearance?: CharacterAppearanceV1;
   /** Optional visual override supplied by equipment such as transformation rings. */
   appearanceModel?: string;
   equipment?:Record<string,string>;
@@ -182,12 +183,12 @@ export class NetworkClient {
   private partyInvitation: PartyInvitation | null = null;
   private trade: TradeSnapshot | null = null;
 
-  async connect(name: string, password: string, className: string, cb: RoomCallbacks, mode = "", gender: CharacterGender = 'male'): Promise<void> {
+  async connect(name: string, password: string, className: string, cb: RoomCallbacks, mode = "", gender: CharacterGender = 'male', appearance?:CharacterAppearanceV1): Promise<void> {
     this.chatConnected = false;
     this.partyInvitation = null;
     this.trade = null;
     const client = new Client(SERVER_URL);
-    this.room = await client.joinOrCreate("game", { name, password, className, mode, gender });
+    this.room = await client.joinOrCreate("game", { name, password, className, mode, gender, ...(appearance&&mode!=='login'?{appearance}:{}) });
     const selfId = this.room.sessionId;
     this.room.onLeave(() => { this.chatConnected = false; this.trade = null; cb.onConnectionChange?.(false); });
     this.room.onMessage(MessageType.ChatMessage, (message: ChatMessage) => cb.onChatMessage?.(message));
@@ -205,7 +206,8 @@ export class NetworkClient {
       stunMs: p.stunMs ?? 0, rootMs: p.rootMs ?? 0, poisonMs: p.poisonMs ?? 0,
       atkBuffMs: p.atkBuffMs ?? 0, defBuffMs: p.defBuffMs ?? 0,
       className: p.className,
-      gender: characterGender(p.gender),
+      gender: snapshotAppearance(p).gender,
+      appearance:snapshotAppearance(p),
       appearanceModel: p.appearanceModel ?? "",
       equipment:Object.fromEntries(p.equipment?.entries()??[]),
       guildTag: p.guildTag ?? "",
@@ -218,6 +220,7 @@ export class NetworkClient {
     this.room.state.players.onAdd((player: any, id: string) => {
       cb.onAdd(id, id === selfId, snap(player));
       player.onChange(() => cb.onChange(id, snap(player)));
+      player.appearance?.onChange(()=>cb.onChange(id,snap(player)));
       player.equipment?.onAdd(()=>cb.onChange(id,snap(player)));
       player.equipment?.onRemove(()=>cb.onChange(id,snap(player)));
       player.equipment?.onChange(()=>cb.onChange(id,snap(player)));
@@ -679,3 +682,5 @@ export function isAuthError(err: unknown): boolean {
   const e = err as { code?: number } | null;
   return !!e && typeof e.code === "number" && e.code >= 4000 && e.code < 5000;
 }
+
+export function snapshotAppearance(p:{appearance?:unknown;className?:string;gender?:unknown}):CharacterAppearanceV1{return appearanceFromSave(p.appearance,p.className??'knight',p.gender);}
