@@ -1,7 +1,7 @@
 # Personajes modulares y creador de apariencia
 
 Fecha: 2026-09-28.
-Estado: dirección y alcance aprobados en conversación; esta especificación está pendiente de revisión del usuario.
+Estado: especificación aprobada en conversación, incluyendo la aclaración sobre renovación visual de armas por familias. Plan de implementación pendiente de revisión.
 
 ## 1. Objetivo y decisiones acordadas
 
@@ -14,6 +14,7 @@ Decisiones explícitas del usuario:
 - Vista previa 3D con giro y acercamiento.
 - Exclusivamente recursos gratuitos.
 - Apariencia persistente y visible para otros jugadores; equipo adaptado al personaje.
+- Renovación visual de las armas por familias, comenzando con espada y escudo para el caballero y bastón para el mago. No se requiere una geometría exclusiva para cada ítem.
 - Primera comprobación con un personaje masculino y otro femenino vestidos y animados, de cerca y desde la cámara del juego; después, extensión a las cinco clases.
 - Esta etapa se concentra en personajes jugables y su creador.
 
@@ -27,6 +28,7 @@ El cliente usa Three.js y el servidor sincroniza jugadores con Colyseus. La apar
 - `HeroBody.ts` deforma el torso; otras piezas se fijan a huesos. Añadir detalle a ese ensamblaje no sustituye una base anatómica y un vestuario preparados para animación.
 - `ClassSelect.ts` combina acceso y creación, con clase, género y una vista previa rotatoria.
 - `HeroEquipment.ts` cambia materiales en piezas identificadas por nombres; `EquipmentViews.ts` utiliza nombres y posiciones de huesos del rig actual.
+- `ItemModels.ts` construye actualmente las armas con primitivas geométricas y deriva de ellas los iconos. Los nuevos modelos deben conservar correspondencia entre objeto equipado, objeto caído e icono.
 - `NpcAppearance.ts` también usa `CharacterFactory.create` y esos anclajes. Los NPC deben conservar su ruta actual durante esta etapa.
 - `appearanceModel` en `PlayerState` es una transformación temporal por equipo. Es distinto de la identidad cosmética persistente.
 - `CharacterSave.ts` guarda `progress` como JSON, y `SupabasePersistence.ts` lee y escribe ese objeto. La nueva apariencia se añade allí sin una columna SQL nueva.
@@ -65,7 +67,7 @@ Si los recursos gratuitos inspeccionados no permiten producir la muestra de cali
 
 ### Muestra previa a la integración completa
 
-Crear una galería local independiente del acceso a cuentas, reutilizando el contexto de `character-preview.html`. Mostrar los dos cuerpos con vestuario representativo de caballero y mago, al menos dos rostros distintos por cuerpo y dos peinados por cuerpo. Incluir piel y cabello claros y oscuros para comprobar los materiales.
+Crear una galería local independiente del acceso a cuentas, reutilizando el contexto de `character-preview.html`. Mostrar los dos cuerpos con vestuario representativo de caballero y mago, al menos dos rostros distintos por cuerpo y dos peinados por cuerpo. El caballero presenta espada y escudo nuevos; el mago, un bastón nuevo. Incluir piel y cabello claros y oscuros para comprobar los materiales.
 
 La galería debe permitir:
 
@@ -154,6 +156,7 @@ Componentes con responsabilidades acotadas:
 | `client/src/render/ModularHeroFactory.ts` | Carga compartida y construcción de cada héroe con materiales propios |
 | `client/src/render/HeroRig.ts` | Resolución de huesos y anclajes semánticos del nuevo rig |
 | `client/src/render/ModularHeroEquipment.ts` | Vestuario, máscaras de piel, ocultación de cabello y equipo del nuevo cuerpo |
+| `client/src/assets/weaponManifest.ts` y `client/src/render/WeaponModels.ts` | Modelos renovados por familia, materiales, orientación de empuñadura y reutilización en las representaciones de ítems |
 | `client/src/render/CharacterCustomizer.ts` | Controles y estado de selección cosmética |
 | `HeroPreview.ts` | Cámara, iluminación, interacción y ciclo de vida de la vista previa |
 | `server/src/state/AppearanceState.ts` | Representación sincronizada de la apariencia validada |
@@ -171,6 +174,18 @@ Cada clase tiene una selección explícita de clips de reposo, caminar/correr, a
 La ropa inicial identifica a cada clase. Las familias de tela, cuero y placas se representan con piezas ajustadas, con acabados según el equipo existente. No se exige una malla exclusiva por cada ítem del catálogo. Los cascos ocultan las partes de cabello incompatibles y las prendas ocultan las superficies corporales que cubren. Quitar equipo restaura el atuendo base y el cabello seleccionado.
 
 Las ranuras actuales de armas, escudo, casco, armadura, pantalones, guantes, botas, alas y accesorios deben funcionar con los nuevos anclajes. Los compañeros y monturas conservan su comportamiento actual. La apariencia no modifica atributos, alcance, velocidad, habilidades ni reglas de equipamiento.
+
+### Renovación visual de armas
+
+Reemplazar la representación geométrica básica de espadas, hachas, mazas, lanzas, bastones, arcos, ballestas y escudos por modelos de fantasía coherentes con los nuevos cuerpos y armaduras. La presentación del pícaro incluye una hoja corta de escala y agarre adecuados. Mantener las categorías actuales de objetos; la hoja corta puede ser una variante visual de espada.
+
+Cada familia debe tener una silueta reconocible, empuñadura colocada en la mano y materiales diferenciados para hoja, mango, cuerda y adornos cuando correspondan. Las variaciones de rareza pueden compartir malla y modificar el acabado y la intensidad de los efectos. No se crea una malla exclusiva para cada ID del catálogo.
+
+El manifiesto de armas declara ejes, escala, punto de agarre y orientación por familia. Las animaciones del arco y la ballesta se prueban con sus armas; una pose genérica que las atraviese no cumple el requisito. Para el pícaro se comprueba la hoja corta; los demás ataques usan una postura compatible con su arma de clase. El combate y sus reglas siguen siendo los existentes.
+
+Buscar primero las piezas gratuitas de Fantasy Props MegaKit y del catálogo oficial de Quaternius. La disponibilidad de cada arma se confirma en el inventario de assets. Las piezas ausentes requieren modelado/adaptación propia y revisión dentro de la misma muestra, sin compras ni un reemplazo silencioso por las primitivas actuales.
+
+`ItemModels.ts` consume los modelos de armas precargados manteniendo su API síncrona para el juego. Los ítems equipados y caídos comparten la selección de familia. Los iconos se generan a partir del modelo renovado durante la preparación de assets; para las armas nuevas no se depende del generador SVG actual, que no representa correctamente materiales texturados ni todas las geometrías indexadas. El resto de ítems conserva su ruta vigente.
 
 ### Sincronización y transformaciones
 
@@ -209,6 +224,7 @@ Verificación visual obligatoria en navegador con los assets reales:
 - Cinco clases en ambos cuerpos; rostros y peinados a corta distancia.
 - Secuencias de movimiento y combate con ropa: sin huecos visibles en cuello/articulaciones, penetraciones persistentes, ojos flotantes, manos deformadas o armas desancladas.
 - Equipar y quitar prendas y casco; comprobar cabello y piel oculta/restaurada.
+- Espada, hoja corta, hacha, maza, lanza, bastón, arco, ballesta y escudo: agarre y escala correctos, apariencia coherente en equipo, suelo e icono, sin cambios de estadísticas.
 - Dos clientes con apariencias distintas, reconexión y transformación reversible.
 - Cámara del juego, sombras y luces de mapa; UI en escritorio y viewport estrecho.
 - Build de cliente y servidor y suites relevantes del repositorio; después, suite completa por los cambios compartidos y de red.
@@ -217,7 +233,7 @@ Si una comprobación visual o de rendimiento falla, registrar el caso y corregir
 
 ## 9. Límites y entregables
 
-Esta etapa entrega una muestra visual revisable, diez presentaciones de clase/cuerpo sobre bases modulares, el catálogo cosmético, el creador integrado, persistencia, sincronización, adaptación de equipo y evidencia de verificación.
+Esta etapa entrega una muestra visual revisable, diez presentaciones de clase/cuerpo sobre bases modulares, el catálogo cosmético, el creador integrado, persistencia, sincronización, armaduras ajustadas, armas renovadas por familia y evidencia de verificación.
 
 Quedan fuera del alcance inicial: nuevas razas, sliders anatómicos, editor facial libre, varias cuentas/personajes por cuenta, cambios de apariencia posteriores a la creación, transfiguración cosmética de equipo, nuevas mecánicas de combate, rediseño artístico de NPC/enemigos, escenarios y HUD general. Los ajustes de iluminación se limitan a la galería y el creador; cualquier ajuste imprescindible en el mundo debe justificarse con comparación visual.
 
@@ -232,6 +248,7 @@ Consultadas el 2026-09-28; volver a contrastar el contenido exacto con los archi
 - Modular Character Outfits - Fantasy: https://quaternius.com/packs/modularcharacteroutfitsfantasy.html
 - Ediciones y descarga de ropa: https://quaternius.itch.io/modular-character-outfits-fantasy/purchase
 - Universal Animation Library: https://quaternius.com/packs/universalanimationlibrary.html
+- Fantasy Props MegaKit, candidato para armas gratuitas: https://quaternius.com/packs/fantasypropsmegakit.html
 - Licencias de MakeHuman/MPFB, alternativa de producción: https://static.makehumancommunity.org/about/license.html
 
 La investigación de fuentes confirma candidatos y condiciones publicadas; todavía no se han descargado, importado ni validado visualmente los nuevos modelos dentro del juego.
