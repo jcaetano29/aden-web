@@ -9,3 +9,5 @@ for(const gender of ['male','female'])test(`real ${gender} export has finite def
  const mixer=new AnimationMixer(gltf.scene);for(const clip of gltf.animations){mixer.stopAllAction();mixer.clipAction(clip).play();for(const fraction of [0,.25,.5,.75,.99]){mixer.setTime(clip.duration*fraction);gltf.scene.updateMatrixWorld(true);gltf.scene.traverse(o=>{if(!(o instanceof SkinnedMesh))return;o.skeleton.update();const v=new Vector3();for(let i=0;i<o.geometry.attributes.position.count;i+=17){o.getVertexPosition(i,v);assert.ok(v.toArray().every(Number.isFinite),`${clip.name} ${o.name}`);assert.ok(v.length()<4,`${clip.name} ${o.name} unbounded deformation`);}});}}
  assert.ok(gltf.scene.getObjectByName('hair_'+(gender==='male'?'parted':'long')));assert.ok(gltf.scene.getObjectByName('hero_helmet'));
 });
+
+test('metal armor exports independently tintable visible equipment slots',async()=>{for(const gender of ['male','female']){const d=await readGltf(`client/public/models/heroes/hero-${gender}.glb`);for(const slot of ['armor','gloves','boots','helmet'])assert.ok(d.json.materials.some(m=>m.name==='armor_steel_'+slot),gender+' '+slot);}});

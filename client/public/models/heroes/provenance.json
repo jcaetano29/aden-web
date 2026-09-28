@@ -284,10 +284,10 @@
   "outputs": [
     {
       "file": "hero-male.glb",
-      "bytes": 6165644,
-      "sha256": "aac4ce3d82f3b3707d282a1e595ec86b553358549ba749b9d4bafa1bce5f86bb",
-      "meshes": 44,
-      "skinnedMeshes": 44,
+      "bytes": 6168704,
+      "sha256": "c457d7e53474ddb4a05723843bcfc13c64ccf83e3e91e979479f24df78c2c7b6",
+      "meshes": 46,
+      "skinnedMeshes": 46,
       "triangles": 102721,
       "materials": [
         "skin",
@@ -329,9 +329,12 @@
         "cloth_ranger_pants",
         "cloth_ranger_gloves",
         "cloth_ranger_boots",
-        "armor_steel",
+        "armor_steel_armor",
         "armor_gold",
-        "robe"
+        "robe",
+        "armor_steel_gloves",
+        "armor_steel_boots",
+        "armor_steel_helmet"
       ],
       "joints": [
         "root",
@@ -415,10 +418,10 @@
     },
     {
       "file": "hero-female.glb",
-      "bytes": 6553700,
-      "sha256": "64bb08646fd57ccea54c1cdb7d8affd55e80c562a22b62da892030fd00c05d20",
-      "meshes": 41,
-      "skinnedMeshes": 41,
+      "bytes": 6556764,
+      "sha256": "5efd70e5b621f666236f4f83425225bdc38e4fddffa992b6f5098f85f6744f29",
+      "meshes": 43,
+      "skinnedMeshes": 43,
       "triangles": 108957,
       "materials": [
         "skin",
@@ -459,9 +462,12 @@
         "cloth_ranger_pants",
         "cloth_ranger_gloves",
         "cloth_ranger_boots",
-        "armor_steel",
+        "armor_steel_armor",
         "armor_gold",
-        "robe"
+        "robe",
+        "armor_steel_gloves",
+        "armor_steel_boots",
+        "armor_steel_helmet"
       ],
       "joints": [
         "root",

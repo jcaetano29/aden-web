@@ -7,7 +7,7 @@ export function authoredGeometry(geometry,bone,jointNames,transform=new T.Matrix
 }
 function matrix(position,scale=[1,1,1],rotation=[0,0,0]){return new T.Matrix4().compose(new T.Vector3(...position),new T.Quaternion().setFromEuler(new T.Euler(...rotation)),new T.Vector3(...scale));}
 function loft(rings,segments=32,range=[0,Math.PI*2]){const pos=[],uv=[],idx=[];for(let r=0;r<rings.length;r++){const [y,rx,rz,z=0]=rings[r];for(let s=0;s<=segments;s++){const a=range[0]+(range[1]-range[0])*s/segments;const pleat=1+.022*Math.cos(a*12);pos.push(Math.sin(a)*rx*pleat,y,Math.cos(a)*rz*pleat+z);uv.push(s/segments,r/(rings.length-1));if(r&&s){const i=r*(segments+1)+s;idx.push(i,i-1,i-segments-1,i-1,i-segments-2,i-segments-1);}}}const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();return g;}
-export function armor(gender,joints){const female=gender==='female',dy=female?-.038:0,sx=female?.9:1;const steel=emptyGeometry(),gold=emptyGeometry(),robe=emptyGeometry();
+export function armor(gender,joints){const female=gender==='female',dy=female?-.038:0,sx=female?.9:1;const steel=emptyGeometry(),gloves=emptyGeometry(),boots=emptyGeometry(),gold=emptyGeometry(),robe=emptyGeometry();
  const add=(bucket,geo,bone,pos=[0,0,0],scale=[1,1,1],rot=[0,0,0],weight)=>appendGeometry(bucket,authoredGeometry(geo,bone,joints,matrix(pos,scale,rot),weight));
  const torso=[[1.115,.155,.127,0],[1.20,.17,.139,-.005],[1.31,.218,.16,-.005],[1.40,.232,.147,-.025],[1.46,.17,.12,-.025],[1.49,.14,.11,-.035],[1.54,.13,.105,-.035],[1.575,.115,.100,-.035]];
  add(steel,loft(torso),'spine_03',[0,dy,0],[sx,1,1]);
@@ -17,10 +17,10 @@ export function armor(gender,joints){const female=gender==='female',dy=female?-.
  add(gold,new T.TorusGeometry(1,.045,5,28),'clavicle_'+suffix,[side*(female?.215:.258),1.455+dy,-.064],[.155,.145,.09],[Math.PI/2,0,0]);
  // Raised tapered ridge along each shoulder, built as a swept crest.
  add(gold,new T.ConeGeometry(.025,.15,5),'clavicle_'+suffix,[side*(female?.24:.285),1.56+dy,-.073],[1,1,1],[0,0,-side*.35]);
- add(steel,new T.CylinderGeometry(.059,.078,.21,12,1,true),'lowerarm_'+suffix,[side*(female?.548:.589),1.432+dy,-.063],[1,1,1],[0,0,Math.PI/2]);
+ add(gloves,new T.CylinderGeometry(.059,.078,.21,12,1,true),'lowerarm_'+suffix,[side*(female?.548:.589),1.432+dy,-.063],[1,1,1],[0,0,Math.PI/2]);
  for(const dx of [-.097,.097])add(gold,new T.TorusGeometry(.067,.009,5,16),'lowerarm_'+suffix,[side*(female?.548:.589)+dx,1.432+dy,-.063],[1,1,1],[0,Math.PI/2,0]);
- add(steel,new T.SphereGeometry(1,14,10),'calf_'+suffix,[side*(female?.11:.09),.29,-.015],[.069,.205,.065]);
- add(steel,new T.SphereGeometry(1,12,8),'calf_'+suffix,[side*(female?.11:.09),.447,.012],[.074,.05,.069]);
+ add(boots,new T.SphereGeometry(1,14,10),'calf_'+suffix,[side*(female?.11:.09),.29,-.015],[.069,.205,.065]);
+ add(boots,new T.SphereGeometry(1,12,8),'calf_'+suffix,[side*(female?.11:.09),.447,.012],[.074,.05,.069]);
  }
  // A single crest and inlaid vertical ribs, all merged by material.
  add(gold,new T.OctahedronGeometry(.045,0),'spine_03',[0,1.373+dy,.153],[.72,1.4,.23]);
@@ -34,7 +34,7 @@ export function armor(gender,joints){const female=gender==='female',dy=female?-.
  add(mageGold,loft([[1.14,.196,.18,0],[1.18,.19,.17,0]]),'pelvis',[0,0,0],[sx,1,1]);
  const mantle=emptyGeometry();add(mantle,loft([[1.075,.16,.138,0],[1.20,.165,.14,0],[1.32,.20,.155,-.01],[1.40,.205,.142,-.025],[1.455,.17,.11,-.025],[1.56,.12,.103,-.035]]),'spine_03',[0,dy,0],[sx,1,1]);
  add(mageGold,loft([[1.554,.122,.105,-.035],[1.57,.122,.105,-.035]]),'spine_03',[0,dy,0],[sx,1,1]);
- const helmet=emptyGeometry();add(helmet,new T.SphereGeometry(1,24,14,0,Math.PI*2,0,Math.PI*.52),'Head',[0,1.72+(female?-.045:0),-.012],[.101,.127,.113]);return {steel,gold,robe,mageGold,mantle,helmet};
+ const helmet=emptyGeometry();add(helmet,new T.SphereGeometry(1,24,14,0,Math.PI*2,0,Math.PI*.52),'Head',[0,1.72+(female?-.045:0),-.012],[.101,.127,.113]);return {steel,gloves,boots,gold,robe,mageGold,mantle,helmet};
 }
 export function staff(){const metal=emptyGeometry(),wood=emptyGeometry(),gem=emptyGeometry();const add=(bucket,g,pos,scale=[1,1,1],rot=[0,0,0])=>{const data=authoredGeometry(g,'root',['root'],matrix(pos,scale,rot));data.joints=[];data.weights=[];appendGeometry(bucket,data);};
  add(wood,new T.CylinderGeometry(.017,.024,1.55,12),[0,.45,0]);
