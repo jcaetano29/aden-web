@@ -1,3 +1,4 @@
+import {appearanceFromSave,appearanceKey,type CharacterAppearanceV1} from '@aden/shared';
 import * as THREE from "three";
 import { CharacterFactory } from "./CharacterFactory.js";
 import { CharacterView, type ServerState } from "./CharacterView.js";
@@ -68,7 +69,7 @@ export class EntityViews {
   /** playerId -> título lucido actual; detecta cambios para refrescar la línea de título. */
   private readonly playerTitle = new Map<string, string>();
   /** Base class model and currently rendered model for equipment-driven appearances. */
-  private readonly playerBaseModel = new Map<string, string>();
+  private readonly playerIdentity = new Map<string,{className:string;appearance:CharacterAppearanceV1}>();
   private readonly playerVisualModel = new Map<string, string>();
   private currentTargetId: string | null = null;
   private selfId: string | null = null;
@@ -85,10 +86,10 @@ export class EntityViews {
   ) {}
 
   add(id: string, isSelf: boolean, modelName: string, snap: PlayerSnapshot) {
-    const visualModel = snap.appearanceModel || modelName;
-    const view = new CharacterView(this.factory.create(visualModel));
-    view.snapTo(snap.x, snap.z);
-    view.setServerState(snap);
+    const visualModel=this.visualKey(id,snap,modelName);
+    const identity=this.playerIdentity.get(id)!;
+    const view=new CharacterView(snap.appearanceModel?this.factory.create(snap.appearanceModel):this.factory.createHero(identity.className,identity.appearance));
+    view.initializeState(snap);
     view.setEquipment(snap.equipment??{});
     this.scene.add(view.object);
     this.views.set(id, view);
@@ -97,7 +98,6 @@ export class EntityViews {
     this.playerDead.set(id, snap.dead);
     this.playerGuildTag.set(id, snap.guildTag ?? "");
     this.playerTitle.set(id, snap.title ?? "");
-    this.playerBaseModel.set(id, modelName);
     this.playerVisualModel.set(id, visualModel);
     this.playerMap.set(id, snap.mapId ?? "");
     view.object.visible = (snap.mapId ?? "") === this.currentMapId || isSelf;
@@ -108,7 +108,8 @@ export class EntityViews {
   }
 
   update(id: string, state: PlayerSnapshot) {
-    const desiredModel = state.appearanceModel || this.playerBaseModel.get(id);
+    if(!this.views.has(id))return;
+    const desiredModel=this.visualKey(id,state);
     if (desiredModel && desiredModel !== this.playerVisualModel.get(id)) this.replacePlayerVisual(id, desiredModel, state);
     this.views.get(id)?.setServerState(state);
     this.views.get(id)?.setEquipment(state.equipment??{});
@@ -118,6 +119,7 @@ export class EntityViews {
     this.playerDead.set(id, state.dead);
     if (wasDead && !state.dead) {
       this.views.get(id)?.respawn(state);
+      if(this.currentTargetId===id)this.views.get(id)?.addTargetRing();
     }
     // Refrescar el texto del nameplate si cambió el guildTag (crear/unirse/salir de guild).
     const prevTag = this.playerGuildTag.get(id) ?? "";
@@ -151,33 +153,38 @@ export class EntityViews {
     this.playerDead.delete(id);
     this.playerGuildTag.delete(id);
     this.playerTitle.delete(id);
-    this.playerBaseModel.delete(id);
+    this.playerIdentity.delete(id);
     this.playerVisualModel.delete(id);
     this.playerMap.delete(id);
     if (this.currentTargetId === id) this.currentTargetId = null;
   }
 
+  private visualKey(id:string,state:PlayerSnapshot,modelName?:string):string {
+    const previous=this.playerIdentity.get(id),className=state.className??previous?.className??modelName?.replace('_Female','').toLowerCase()??'knight';
+    const saved=state.appearance??(previous?.appearance?{...previous.appearance,...(state.gender?{gender:state.gender}:{})}:undefined);
+    const appearance=appearanceFromSave(saved,className,state.gender??(modelName?.endsWith('_Female')?'female':'male'));
+    this.playerIdentity.set(id,{className,appearance});return state.appearanceModel?`transform:${state.appearanceModel}`:`hero:${className}:${appearanceKey(appearance)}`;
+  }
   private replacePlayerVisual(id: string, modelName: string, state: PlayerSnapshot): void {
     const previous = this.views.get(id);
     if (!previous) return;
     const wasSelf = id === this.selfId;
     const wasTarget = id === this.currentTargetId;
+    const identity=this.playerIdentity.get(id)!;
+    const next=new CharacterView(state.appearanceModel?this.factory.create(state.appearanceModel):this.factory.createHero(identity.className,identity.appearance));
+    next.initializeState(state,previous.object.rotation);next.setEquipment(state.equipment??{});
     this.nameplates.remove(id);
     this.scene.remove(previous.object);
     this.playerRootToId.delete(previous.object);
     previous.dispose();
 
-    const next = new CharacterView(this.factory.create(modelName));
-    next.snapTo(state.x, state.z);
-    next.setServerState(state);
-    next.object.rotation.copy(previous.object.rotation);
+
     next.object.visible = (state.mapId ?? "") === this.currentMapId || wasSelf;
     this.scene.add(next.object);
     this.views.set(id, next);
     this.playerRootToId.set(next.object, id);
     if (wasSelf) next.addSelfRing();
     if (wasTarget && !state.dead) next.addTargetRing();
-    if (state.dead) next.playOnce("death");
     this.nameplates.add(id, nameplateText(state.name, state.guildTag), next.object, undefined, state.title ?? "");
     this.playerVisualModel.set(id, modelName);
   }

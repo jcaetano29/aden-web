@@ -9,7 +9,7 @@ function snapshot(x: number, z: number) {
 
 function makeViews(): EntityViews {
   const factory = {
-    create() {
+    createHero() {
       return {
         root: new THREE.Group(), mixer: { update() {}, stopAllAction() {} }, clipNames: [],
         play() {}, playOnce(_name: string, done: () => void) { done(); },

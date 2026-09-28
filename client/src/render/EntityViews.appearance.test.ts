@@ -22,12 +22,14 @@ describe("EntityViews appearance override", () => {
         };
       },
     };
+    (factory as any).createHero=(cls:string,a:any)=>factory.create(cls[0].toUpperCase()+cls.slice(1)+(a.gender==='female'?'_Female':''));
     const nameplates = { add: vi.fn(), remove: vi.fn(), setText: vi.fn(), setTitle: vi.fn() };
     const views = new EntityViews(new THREE.Scene(), factory as any, nameplates as any);
 
-    views.add("self", true, base, snapshot());
-    views.update("self", snapshot("DeathWraith"));
-    views.update("self", snapshot(""));
+    const state=(override='')=>({...snapshot(override),gender:base.endsWith('_Female')?'female' as const:'male' as const});
+    views.add("self", true, base, state());
+    views.update("self", state("DeathWraith"));
+    views.update("self", state(""));
 
     expect(created).toEqual([base, "DeathWraith", base]);
     expect(views.selfPosition()).toEqual({ x: 2, z: 3 });

@@ -60,6 +60,10 @@ export class CharacterView {
     this.state.z = z;
   }
 
+  initializeState(state:ServerState&{dead?:boolean},orientation?:THREE.Euler){
+    this.snapTo(state.x,state.z);this.setServerState(state);if(orientation)this.character.root.rotation.copy(orientation);
+    if(state.dead)this.playOnce('death');else this.resetAnimation();
+  }
   setServerState(s: ServerState) {
     this.state = s;
     const heading = headingFromDelta(s.targetX - s.x, s.targetZ - s.z);
@@ -217,6 +221,7 @@ export class CharacterView {
     this.equipment.dispose();
     this.character.dispose?.();
     this.removeTargetRing();
+    if(this.selfRing){this.selfRing.removeFromParent();this.selfRing.geometry.dispose();(this.selfRing.material as THREE.Material).dispose();this.selfRing=null;}
     this.character.mixer.stopAllAction();
   }
 }
