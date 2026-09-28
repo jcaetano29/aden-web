@@ -9,7 +9,7 @@ function matrix(position,scale=[1,1,1],rotation=[0,0,0]){return new T.Matrix4().
 function loft(rings,segments=32,range=[0,Math.PI*2]){const pos=[],uv=[],idx=[];for(let r=0;r<rings.length;r++){const [y,rx,rz,z=0]=rings[r];for(let s=0;s<=segments;s++){const a=range[0]+(range[1]-range[0])*s/segments;const pleat=1+.022*Math.cos(a*12);pos.push(Math.sin(a)*rx*pleat,y,Math.cos(a)*rz*pleat+z);uv.push(s/segments,r/(rings.length-1));if(r&&s){const i=r*(segments+1)+s;idx.push(i,i-1,i-segments-1,i-1,i-segments-2,i-segments-1);}}}const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(pos,3));g.setAttribute('uv',new T.Float32BufferAttribute(uv,2));g.setIndex(idx);g.computeVertexNormals();return g;}
 export function armor(gender,joints){const female=gender==='female',dy=female?-.038:0,sx=female?.9:1;const steel=emptyGeometry(),gold=emptyGeometry(),robe=emptyGeometry();
  const add=(bucket,geo,bone,pos=[0,0,0],scale=[1,1,1],rot=[0,0,0],weight)=>appendGeometry(bucket,authoredGeometry(geo,bone,joints,matrix(pos,scale,rot),weight));
- const torso=[[1.115,.155,.127,0],[1.20,.17,.139,-.005],[1.31,.218,.16,-.005],[1.40,.232,.147,-.025],[1.46,.17,.12,-.025],[1.49,.095,.077,-.025],[1.54,.087,.073,-.025]];
+ const torso=[[1.115,.155,.127,0],[1.20,.17,.139,-.005],[1.31,.218,.16,-.005],[1.40,.232,.147,-.025],[1.46,.17,.12,-.025],[1.49,.14,.11,-.035],[1.54,.13,.105,-.035],[1.575,.115,.100,-.035]];
  add(steel,loft(torso),'spine_03',[0,dy,0],[sx,1,1]);
  for(const ring of [torso[0],torso.at(-1)])add(gold,loft([ring,[ring[0]+.014,ring[1]+.002,ring[2]+.002,ring[3]]]),'spine_03',[0,dy,0],[sx,1,1]);
  for(const side of [-1,1]){const suffix=side===1?'l':'r';
@@ -25,15 +25,15 @@ export function armor(gender,joints){const female=gender==='female',dy=female?-.
  // A single crest and inlaid vertical ribs, all merged by material.
  add(gold,new T.OctahedronGeometry(.045,0),'spine_03',[0,1.373+dy,.153],[.72,1.4,.23]);
  for(const side of [-1,1])add(gold,new T.CylinderGeometry(.006,.004,.19,6),'spine_03',[side*.057,1.275+dy,.155],[1,1,1],[0,0,side*.22]);
- const mageWeight=([x,y])=>{const w=Math.max(0,Math.min(.6,(1.02-y)*.75));return [['pelvis',1-w],[x>0?'thigh_l':'thigh_r',w]];};
- const rings=[[.14,.32,.205,0],[.23,.305,.20,0],[.55,.245,.177,0],[.84,.195,.155,0],[1.08,.153,.137,0],[1.16,.151,.133,0]];
+ const mageWeight=([x,y])=>{const side=x>0?'l':'r',w=Math.max(0,Math.min(1,(1.14-y)/.5)),calf=Math.max(0,Math.min(.85,(.60-y)/.5));return [['pelvis',1-w],['thigh_'+side,w-calf],['calf_'+side,calf]];};
+ const rings=[[.14,.34,.34,0],[.23,.32,.32,0],[.55,.27,.29,0],[.84,.22,.23,0],[1.08,.205,.19,0],[1.16,.19,.17,0]];
  // The opening at the front is deliberate: legs can move independently of the robe.
- add(robe,loft(rings,40,[.09,Math.PI*2-.09]),'pelvis',[0,0,0],[sx,1,1],[0,0,0],mageWeight);
- const mageGold=emptyGeometry();add(mageGold,loft([[.14,.324,.208,0],[.18,.32,.208,0]],40,[.09,Math.PI*2-.09]),'pelvis',[0,0,0],[sx,1,1],[0,0,0],mageWeight);
- for(const a of [.09,Math.PI*2-.09]){const rows=rings.map(([y,rx,rz,z])=>[y,rx+.003,rz+.003,z]);add(mageGold,loft(rows,1,[a-.018,a+.018]),'pelvis',[0,0,0],[sx,1,1],[0,0,0],mageWeight);}
- add(mageGold,loft([[1.14,.157,.14,0],[1.18,.157,.14,0]]),'pelvis',[0,0,0],[sx,1,1]);
- const mantle=emptyGeometry();add(mantle,loft([[1.10,.16,.138,0],[1.20,.165,.14,0],[1.32,.20,.155,-.01],[1.40,.205,.142,-.025],[1.455,.17,.11,-.025],[1.51,.095,.075,-.02]]),'spine_03',[0,dy,0],[sx,1,1]);
- add(mageGold,loft([[1.504,.097,.078,-.02],[1.52,.097,.078,-.02]]),'spine_03',[0,dy,0],[sx,1,1]);
+ for(const range of [[.09,Math.PI-.09],[Math.PI+.09,Math.PI*2-.09]])add(robe,loft(rings,20,range),'pelvis',[0,0,0],[sx,1,1],[0,0,0],mageWeight);
+ const mageGold=emptyGeometry();for(const range of [[.09,Math.PI-.09],[Math.PI+.09,Math.PI*2-.09]])add(mageGold,loft([[.14,.344,.344,0],[.18,.336,.336,0]],20,range),'pelvis',[0,0,0],[sx,1,1],[0,0,0],mageWeight);
+ for(const a of [.09,Math.PI-.09,Math.PI+.09,Math.PI*2-.09]){const rows=rings.map(([y,rx,rz,z])=>[y,rx+.003,rz+.003,z]);add(mageGold,loft(rows,1,[a-.018,a+.018]),'pelvis',[0,0,0],[sx,1,1],[0,0,0],mageWeight);}
+ add(mageGold,loft([[1.14,.196,.18,0],[1.18,.19,.17,0]]),'pelvis',[0,0,0],[sx,1,1]);
+ const mantle=emptyGeometry();add(mantle,loft([[1.075,.16,.138,0],[1.20,.165,.14,0],[1.32,.20,.155,-.01],[1.40,.205,.142,-.025],[1.455,.17,.11,-.025],[1.56,.12,.103,-.035]]),'spine_03',[0,dy,0],[sx,1,1]);
+ add(mageGold,loft([[1.554,.122,.105,-.035],[1.57,.122,.105,-.035]]),'spine_03',[0,dy,0],[sx,1,1]);
  const helmet=emptyGeometry();add(helmet,new T.SphereGeometry(1,24,14,0,Math.PI*2,0,Math.PI*.52),'Head',[0,1.72+(female?-.045:0),-.012],[.101,.127,.113]);return {steel,gold,robe,mageGold,mantle,helmet};
 }
 export function staff(){const metal=emptyGeometry(),wood=emptyGeometry(),gem=emptyGeometry();const add=(bucket,g,pos,scale=[1,1,1],rot=[0,0,0])=>{const data=authoredGeometry(g,'root',['root'],matrix(pos,scale,rot));data.joints=[];data.weights=[];appendGeometry(bucket,data);};

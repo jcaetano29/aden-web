@@ -137,6 +137,7 @@ export class CharacterFactory {
     for (const clip of model.animations) {
       actions.set(clip.name, mixer.clipAction(clip));
     }
+    let disposed=false;
     let current: THREE.AnimationAction | null = null;
     // Estado del one-shot activo (si hay uno), para saber a cuál corresponde
     // el evento "finished" del mixer (que se dispara para CUALQUIER acción).
@@ -155,7 +156,15 @@ export class CharacterFactory {
       root,
       mixer,
       clipNames: model.animations.map((c) => c.name),
+      dispose() {
+        if(disposed)return;disposed=true;onceAction=null;onceCallback=null;
+        mixer.stopAllAction();mixer.uncacheRoot(root);
+        const skeletons=new Set<THREE.Skeleton>();
+        root.traverse(o=>{if(o instanceof THREE.SkinnedMesh)skeletons.add(o.skeleton);});
+        skeletons.forEach(s=>s.dispose());root.removeFromParent();
+      },
       play(name: string, immediate = false) {
+        if(disposed)return;
         const next = actions.get(name);
         if (!next || (next === current && !immediate)) return;
         if (immediate) {
@@ -174,6 +183,7 @@ export class CharacterFactory {
         if (immediate) mixer.update(0);
       },
       playOnce(name: string, onFinished: () => void) {
+        if(disposed)return;
         const next = actions.get(name);
         if (!next) {
           onFinished();

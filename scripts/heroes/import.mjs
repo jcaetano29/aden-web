@@ -4,7 +4,7 @@ import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {Matrix4,Color} from 'three';
 import {readGltf,inspectGltf} from './gltf.mjs';
-import {Builder,hierarchy,extract,headVariant,addAnimations,emptyGeometry,appendGeometry} from './build.mjs';
+import {Builder,hierarchy,extract,headVariant,addAnimations,emptyGeometry,appendGeometry,clipGeometryAtY} from './build.mjs';
 import {armor,staff} from './wardrobe.mjs';
 const args=process.argv.slice(2),option=(key,fallback)=>args.includes(key)?args[args.indexOf(key)+1]:fallback;
 const selection=JSON.parse((await readFile(option('--selection','scripts/heroes/source-selection.json'),'utf8')).replace(/^\uFEFF/,''));
@@ -38,7 +38,7 @@ for(const gender of ['male','female']){
  const skinMat=await material(b,gender,2,'skin','skin');const eyeMat=await material(b,gender,1,'eyes','eye');const browMat=await material(b,gender,0,'hair','hair');
  for(let i=0;i<base.json.nodes.length;i++){const node=base.json.nodes[i];if(node.mesh===undefined)continue;const prim=base.json.meshes[node.mesh].primitives[0];
  if(/Eyes|Eyebrows/.test(node.name))b.mesh(node.name==='Eyes'?'hero_eyes':'hero_brows',extract(base,i,prim,()=>true,p=>p,names),node.name==='Eyes'?eyeMat:browMat,0);
- else for(const variant of ['soft','angular'])b.mesh('face_'+variant,extract(base,i,prim,tri=>tri.every(([x,y])=>y>(gender==='male'?1.485:1.45)&&Math.abs(x)<(y>(gender==='male'?1.59:1.545)?.16:.078)),p=>headVariant(p,gender,variant),names),skinMat,0);
+ else for(const variant of ['soft','angular'])b.mesh('face_'+variant,clipGeometryAtY(extract(base,i,prim,tri=>tri.some(v=>v[1]>(gender==='male'?1.56:1.50)),p=>headVariant(p,gender,variant),names),gender==='male'?1.56:1.50),skinMat,0);
  }
  for(const hairId of gender==='male'?['parted','buzzed']:['long','buns']){
  const h=doc(hairId),mat=await material(b,hairId,0,'hair','hair');for(let i=0;i<h.json.nodes.length;i++){const n=h.json.nodes[i];if(n.mesh===undefined)continue;const data=extract(h,i,h.json.meshes[n.mesh].primitives[0]);for(let v=0;v<data.positions.length/3;v++){data.joints.push(names.indexOf('Head'),0,0,0);data.weights.push(1,0,0,0);}b.mesh('hair_'+hairId,data,mat,0);}}
@@ -46,12 +46,12 @@ for(const gender of ['male','female']){
  const clothingId=gender+(family==='knight'?'-ranger':'-peasant'),c=doc(clothingId);
  const clothMat=await material(b,clothingId,0,'cloth_'+family,'cloth',family==='knight'?0x4b6278:0x615675,0,.8);
  const skinIndex=c.json.materials.findIndex(m=>m.name.includes('Regular'));const handsMat=await material(b,clothingId,Math.max(0,skinIndex),'skin_hands','skin');const cloth=emptyGeometry(),hands=emptyGeometry();
- for(let i=0;i<c.json.nodes.length;i++){const n=c.json.nodes[i];if(n.mesh===undefined||/Hood|Pauldron|Bracer/.test(n.name)||(family==='mage'&&/Legs/.test(n.name)))continue;
+ for(let i=0;i<c.json.nodes.length;i++){const n=c.json.nodes[i];if(n.mesh===undefined||/Hood|Pauldron|Bracer/.test(n.name)||(family==='mage'&&/Body/.test(n.name)))continue;
  // Boots from the peasant pack avoid the ranger boot's 9k hidden triangles.
  if(family==='knight'&&/Feet/.test(n.name))continue;
  for(const p of c.json.meshes[n.mesh].primitives){const isSkin=c.json.materials[p.material].name.includes('Regular');if(isSkin){appendGeometry(hands,extract(c,i,p,()=>true,p=>p,names));continue;}
  const arm=/Arms$/.test(n.name),limit=gender==='female'?.69:.74;
- appendGeometry(cloth,extract(c,i,p,tri=>!(arm&&tri.every(v=>Math.abs(v[0])>limit))&&(!/Body/.test(n.name)||tri.every(v=>v[1]<1.12)),p=>p,names));
+ appendGeometry(cloth,extract(c,i,p,tri=>!(arm&&tri.every(v=>Math.abs(v[0])>limit))&&(!/Body/.test(n.name)||tri.every(v=>v[1]<1.12)),p=>{if(family==='mage'&&/Legs/.test(n.name)){const center=(p[0]>=0?1:-1)*(gender==='female'?.11:.09);p[0]=center+(p[0]-center)*.86;p[2]*=.86;}return p;},names));
  if(arm&&family==='mage')appendGeometry(hands,extract(c,i,p,tri=>tri.every(v=>Math.abs(v[0])>limit),p=>p,names));}}
  if(family==='knight'){for(let i=0;i<canon.json.nodes.length;i++){const n=canon.json.nodes[i];if(n.mesh!==undefined&&/Feet/.test(n.name))for(const p of canon.json.meshes[n.mesh].primitives)appendGeometry(cloth,extract(canon,i,p,()=>true,p=>p,names));}}
  b.mesh('outfit_'+family+'_cloth',cloth,clothMat,0);if(hands.indices.length)b.mesh('outfit_'+family+'_hands',hands,handsMat,0);

@@ -45,3 +45,13 @@ export function addAnimations(builder,source,targetJson,aliases){
  }
 }
 
+
+/** Clip triangles against a horizontal garment seam, keeping shared edge vertices smooth. */
+export function clipGeometryAtY(source,cut){
+ const out=emptyGeometry(),cache=new Map();
+ const original=i=>({key:String(i),position:source.positions.slice(i*3,i*3+3),uv:source.uvs.slice(i*2,i*2+2),joints:source.joints.slice(i*4,i*4+4),weights:source.weights.slice(i*4,i*4+4)});
+ function cross(a,b){const t=(cut-a.position[1])/(b.position[1]-a.position[1]),influences=new Map();for(const [v,f]of [[a,1-t],[b,t]])v.joints.forEach((joint,i)=>influences.set(joint,(influences.get(joint)??0)+v.weights[i]*f));const sorted=[...influences].sort((a,b)=>b[1]-a[1]).slice(0,4);while(sorted.length<4)sorted.push([0,0]);const sum=sorted.reduce((s,[,w])=>s+w,0);return {key:[a.key,b.key].sort().join('/'),position:a.position.map((v,i)=>i===1?cut:v+(b.position[i]-v)*t),uv:a.uv.map((v,i)=>v+(b.uv[i]-v)*t),joints:sorted.map(([j])=>j),weights:sorted.map(([,w])=>w/sum)};}
+ function add(v){if(!cache.has(v.key)){cache.set(v.key,out.positions.length/3);out.positions.push(...v.position);out.uvs.push(...v.uv);out.joints.push(...v.joints);out.weights.push(...v.weights);}return cache.get(v.key);}
+ for(let i=0;i<source.indices.length;i+=3){const tri=source.indices.slice(i,i+3).map(original),poly=[];for(let k=0;k<3;k++){const a=tri[k],b=tri[(k+1)%3],inside=a.position[1]>=cut,next=b.position[1]>=cut;if(inside)poly.push(a);if(inside!==next)poly.push(cross(a,b));}for(let k=1;k<poly.length-1;k++)out.indices.push(add(poly[0]),add(poly[k]),add(poly[k+1]));}
+ return out;
+}

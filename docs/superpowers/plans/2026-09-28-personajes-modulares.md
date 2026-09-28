@@ -10,7 +10,7 @@
 
 **Spec:** [Especificación aprobada](../specs/2026-09-28-personajes-modulares-design.md).
 
-**Estado:** plan pendiente de revisión; ninguna tarea de implementación se ha ejecutado. La especificación fue aprobada con la incorporación del rediseño de armas por familias.
+**Estado:** plan aprobado por el usuario. Hito A implementado en `codex/modular-heroes`; revisión visual de la muestra pendiente. Hitos B/C todavía no iniciados.
 
 ## Global Constraints
 
@@ -64,9 +64,9 @@ Las rutas abreviadas en esta tabla pertenecen al directorio del primer archivo d
 
 **Interfaces:** `readGltf(file: string): Promise<{ json: object; buffers: Buffer[] }>`; `inspectGltf(document): { meshes: number; skinnedMeshes: number; triangles: number; materials: string[]; joints: string[]; clips: string[] }`; CLI `node scripts/heroes/import.mjs --selection scripts/heroes/source-selection.json --out client/public/models/heroes`.
 
-- [ ] Descargar únicamente las ediciones Standard desde las fuentes oficiales de la especificación. Inspeccionar los archivos de licencia y el contenido antes de seleccionar modelos; guardar los originales en la carpeta ignorada. Si la descarga necesita interacción, utilizar el flujo gratuito del sitio y su herramienta de navegador, sin compras.
-- [ ] Generar un inventario de nombres reales, mallas, materiales, huesos y clips. Completar `source-selection.json` con rutas existentes y SHA-256, incluyendo dos cuerpos, prendas para ambas bases, dos peinados por cuerpo, espada, escudo, bastón y clips. No copiar nombres de un tutorial ni adivinar huesos.
-- [ ] Escribir pruebas del lector con una fixture glTF mínima que referencia un buffer externo y otra GLB con el mismo contenido. Comprobar igualdad de posiciones e índices y un error explícito cuando un buffer requerido falta. Usar `node:test`, `node:assert/strict`, `mkdtemp` y `node:os` en `gltf.test.mjs`; sin instalar un framework adicional.
+- [x] Descargar únicamente las ediciones Standard desde las fuentes oficiales de la especificación. Inspeccionar los archivos de licencia y el contenido antes de seleccionar modelos; guardar los originales en la carpeta ignorada. Si la descarga necesita interacción, utilizar el flujo gratuito del sitio y su herramienta de navegador, sin compras.
+- [x] Generar un inventario de nombres reales, mallas, materiales, huesos y clips. Completar `source-selection.json` con rutas existentes y SHA-256, incluyendo dos cuerpos, prendas para ambas bases, dos peinados por cuerpo, espada, escudo, bastón y clips. No copiar nombres de un tutorial ni adivinar huesos.
+- [x] Escribir pruebas del lector con una fixture glTF mínima que referencia un buffer externo y otra GLB con el mismo contenido. Comprobar igualdad de posiciones e índices y un error explícito cuando un buffer requerido falta. Usar `node:test`, `node:assert/strict`, `mkdtemp` y `node:os` en `gltf.test.mjs`; sin instalar un framework adicional.
 
 ```js
 import { test } from 'node:test';
@@ -95,8 +95,8 @@ test('lee el buffer externo y detecta su ausencia', async () => {
 });
 ```
 
-- [ ] Ejecutar `node --test scripts/heroes/gltf.test.mjs` y comprobar que falla por la función ausente. Implementar lectura de GLB, glTF con buffers externos o data URI, accessors con offset/stride e inventario; repetir hasta pasar. El lector debe conservar índices y no tratar todos los accessors como Float32.
-- [ ] Preparar la selección de muestra: normalizar ejes, escala y posición de reposo; conservar pesos e inverse bind matrices; incrustar texturas y buffers. El proceso debe fallar ante huesos requeridos ausentes, pesos no finitos, índices fuera de rango o archivos no licenciados en el inventario.
+- [x] Ejecutar `node --test scripts/heroes/gltf.test.mjs` y comprobar que falla por la función ausente. Implementar lectura de GLB, glTF con buffers externos o data URI, accessors con offset/stride e inventario; repetir hasta pasar. El lector debe conservar índices y no tratar todos los accessors como Float32.
+- [x] Preparar la selección de muestra: normalizar ejes, escala y posición de reposo; conservar pesos e inverse bind matrices; incrustar texturas y buffers. El proceso debe fallar ante huesos requeridos ausentes, pesos no finitos, índices fuera de rango o archivos no licenciados en el inventario.
 
 ```js
 import { createHash } from 'node:crypto';
@@ -107,9 +107,9 @@ const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 // El importador valida sourceSha256 antes de exportar y registra outputSha256.
 ```
 
-- [ ] Producir dos variantes de rostro por cuerpo conservando la unión de cuello y pesos. Si la edición no incluye rostros distintos, derivar variantes sobre la malla real: anchura de mandíbula, pómulos y perfil nasal, sin escalar toda la cabeza. Registrar la receta o archivo fuente editable y renderizar frente/perfil/tres cuartos. Una modificación que no se vea distinta no cuenta.
-- [ ] Adaptar los clips a la misma pose base de cuerpo y prendas. Exportar aliases explícitos `Idle`, `Walk`, `Primary_Attack`, `Hit`, `Death`; el ataque del mago debe ser de lanzamiento. Si hace falta retargeting, verificarlo visualmente: copiar tracks por nombre no basta cuando cambian matrices de reposo.
-- [ ] Repetir importación y comprobar salida determinista, salvo timestamps excluidos del hash. Registrar exactamente qué falta si el paquete gratuito no permite la muestra. Commit: `feat: prepare licensed modular hero sample assets`.
+- [x] Producir dos variantes de rostro por cuerpo conservando la unión de cuello y pesos. Si la edición no incluye rostros distintos, derivar variantes sobre la malla real: anchura de mandíbula, pómulos y perfil nasal, sin escalar toda la cabeza. Registrar la receta o archivo fuente editable y renderizar frente/perfil/tres cuartos. Una modificación que no se vea distinta no cuenta.
+- [x] Adaptar los clips a la misma pose base de cuerpo y prendas. Exportar aliases explícitos `Idle`, `Walk`, `Primary_Attack`, `Hit`, `Death`; el ataque del mago debe ser de lanzamiento. Si hace falta retargeting, verificarlo visualmente: copiar tracks por nombre no basta cuando cambian matrices de reposo.
+- [x] Repetir importación y comprobar salida determinista, salvo timestamps excluidos del hash. Registrar exactamente qué falta si el paquete gratuito no permite la muestra. Commit: `feat: prepare licensed modular hero sample assets`.
 
 **Entregable:** exports locales e inventario auditado; todavía no se cambia el aspecto de los jugadores del mundo.
 
@@ -119,7 +119,7 @@ const sha256 = bytes => createHash('sha256').update(bytes).digest('hex');
 
 **Interfaces:** `CharacterAppearanceV1`; `defaultAppearance(className: string, gender: CharacterGender): CharacterAppearanceV1`; `validateAppearance(value: unknown): CharacterAppearanceV1` (lanza ante entrada inválida); `appearanceFromSave(value: unknown, className: string, legacyGender: unknown): CharacterAppearanceV1`; `rebaseAppearance(value: CharacterAppearanceV1, gender: CharacterGender): CharacterAppearanceV1`; `randomAppearance(gender: CharacterGender, random?: () => number): CharacterAppearanceV1`; `appearanceKey(value: CharacterAppearanceV1): string`.
 
-- [ ] Mantener `CharacterGender`, `characterGender`, `isCharacterGender` y `feminineClassName`. Añadir el contrato y el catálogo tipado de IDs; los IDs iniciales se asignan a los recursos realmente producidos en tarea 1. No publicar opciones cosméticas sin recurso.
+- [x] Mantener `CharacterGender`, `characterGender`, `isCharacterGender` y `feminineClassName`. Añadir el contrato y el catálogo tipado de IDs; los IDs iniciales se asignan a los recursos realmente producidos en tarea 1. No publicar opciones cosméticas sin recurso.
 
 ```ts
 export interface CharacterAppearanceV1 {
@@ -137,7 +137,7 @@ export interface CharacterAppearanceV1 {
 // Usar arrays readonly con IDs estables: no guardar posiciones de arrays.
 ```
 
-- [ ] Escribir estos casos y ejecutar `npm run test --workspace @aden/shared -- src/appearance.test.ts` antes de implementar las funciones:
+- [x] Escribir estos casos y ejecutar `npm run test --workspace @aden/shared -- src/appearance.test.ts` antes de implementar las funciones:
 
 ```ts
 it('valida sin devolver el objeto mutable del llamador', () => {
@@ -155,10 +155,10 @@ it('separa creación estricta de migración de campos antiguos', () => {
 });
 ```
 
-- [ ] Implementar validación de objeto no nulo, versión, tipos, pertenencia al catálogo y compatibilidad por cuerpo. Crear un nuevo objeto con solo los campos permitidos. No usar coerción de tipos ni aceptar IDs por su longitud.
-- [ ] Implementar migración determinista: `undefined` usa clase/género antiguo; versión 1 normaliza campos cosméticos individuales; otra versión explícita rechaza. `rebaseAppearance` conserva opciones compatibles y colores; `randomAppearance` solo elige entradas válidas con RNG inyectable.
-- [ ] Añadir tests de `null`, arrays, versión string, géneros inválidos, barba incompatible, cambio de cuerpo y 200 combinaciones aleatorias. Verificar que `appearanceKey` usa orden de campos fijo, no el orden de propiedades recibido.
-- [ ] Repetir tests y comprobar exports existentes. Commit: `feat: define versioned character appearance rules`.
+- [x] Implementar validación de objeto no nulo, versión, tipos, pertenencia al catálogo y compatibilidad por cuerpo. Crear un nuevo objeto con solo los campos permitidos. No usar coerción de tipos ni aceptar IDs por su longitud.
+- [x] Implementar migración determinista: `undefined` usa clase/género antiguo; versión 1 normaliza campos cosméticos individuales; otra versión explícita rechaza. `rebaseAppearance` conserva opciones compatibles y colores; `randomAppearance` solo elige entradas válidas con RNG inyectable.
+- [x] Añadir tests de `null`, arrays, versión string, géneros inválidos, barba incompatible, cambio de cuerpo y 200 combinaciones aleatorias. Verificar que `appearanceKey` usa orden de campos fijo, no el orden de propiedades recibido.
+- [x] Repetir tests y comprobar exports existentes. Commit: `feat: define versioned character appearance rules`.
 
 ### Tarea 3: Ensamblar y animar un héroe con recursos bien aislados
 
@@ -166,8 +166,8 @@ it('separa creación estricta de migración de campos antiguos', () => {
 
 **Interfaces:** `HeroAnchor = 'head' | 'torso' | 'pelvis' | 'rightHand' | 'leftHand' | 'rightFoot' | 'leftFoot'`; `resolveHeroAnchors(root, names: Record<HeroAnchor, string>): Record<HeroAnchor, THREE.Object3D>`; `ModularHeroFactory.preload(): Promise<void>`; `ModularHeroFactory.create(className: string, appearance: CharacterAppearanceV1): Character`; `ModularHeroFactory.dispose(): void`. Agregar `CharacterFactory.preloadHeroes()` y `createHero(className, appearance)` como delegación.
 
-- [ ] Definir el manifiesto con URLs de exports, altura normalizada, correspondencia real de huesos, materiales semánticos, opciones cosméticas y clips por clase/cuerpo. No traducir nombres de huesos dentro del código de UI. Tarea 1 aporta los nombres concretos.
-- [ ] Extender `Character` con propiedad opcional `equipment` y método opcional `dispose`. Introducir en `CharacterFactory.ts` el tipo siguiente, sin modificar la firma de `create(modelName)`:
+- [x] Definir el manifiesto con URLs de exports, altura normalizada, correspondencia real de huesos, materiales semánticos, opciones cosméticas y clips por clase/cuerpo. No traducir nombres de huesos dentro del código de UI. Tarea 1 aporta los nombres concretos.
+- [x] Extender `Character` con propiedad opcional `equipment` y método opcional `dispose`. Introducir en `CharacterFactory.ts` el tipo siguiente, sin modificar la firma de `create(modelName)`:
 
 ```ts
 export interface CharacterEquipment {
@@ -181,8 +181,8 @@ this.equipment = character.equipment ?? new EquipmentViews(character.root);
 // El dispose del héroe no vuelve a disponer el controlador; solo su mixer/materiales.
 ```
 
-- [ ] Crear `makeModularHeroFixture(): { scene: THREE.Group; animations: THREE.AnimationClip[] }` en la fixture: esqueleto con los 7 anclajes semánticos nombrados según el manifiesto, una malla triangular skinned con pesos válidos, materiales con los canales del manifiesto y cinco clips de prueba. La fixture es un consumidor del manifiesto: no define un segundo mapa de nombres. Inyectar carga mediante constructor `new ModularHeroFactory(load?: (url: string) => Promise<{ scene: THREE.Group; animations: THREE.AnimationClip[] }>)`; en producción se usa GLTFLoader.
-- [ ] Escribir tests de hueso requerido ausente, clonación y propiedad de materiales; ejecutar `npm run test --workspace @aden/client -- src/render/HeroRig.test.ts src/render/ModularHeroFactory.test.ts` y confirmar fallos antes de implementar.
+- [x] Crear `makeModularHeroFixture(): { scene: THREE.Group; animations: THREE.AnimationClip[] }` en la fixture: esqueleto con los 7 anclajes semánticos nombrados según el manifiesto, una malla triangular skinned con pesos válidos, materiales con los canales del manifiesto y cinco clips de prueba. La fixture es un consumidor del manifiesto: no define un segundo mapa de nombres. Inyectar carga mediante constructor `new ModularHeroFactory(load?: (url: string) => Promise<{ scene: THREE.Group; animations: THREE.AnimationClip[] }>)`; en producción se usa GLTFLoader.
+- [x] Escribir tests de hueso requerido ausente, clonación y propiedad de materiales; ejecutar `npm run test --workspace @aden/client -- src/render/HeroRig.test.ts src/render/ModularHeroFactory.test.ts` y confirmar fallos antes de implementar.
 
 ```ts
 it('retirar un héroe no dispone la geometría compartida por otro', async () => {
@@ -204,9 +204,9 @@ it('retirar un héroe no dispone la geometría compartida por otro', async () =>
 });
 ```
 
-- [ ] Implementar cache de assets, clones por esqueleto y materiales por instancia. Las prendas comparten la matriz de reposo y el orden de huesos canonizados por el importador. Seleccionar variantes de rostro/cabello antes de devolver el personaje; aplicar tonos a todas las superficies de piel y canales separados de ojos/cabello/cejas. Guardar `root.userData.appearanceKey = appearanceKey(appearance)` como metadato de diagnóstico, sin guardar controladores ni funciones en `userData`.
-- [ ] Conservar la normalización fuera de nodos animados, el frente +Z y la posición del servidor. Reproducir los aliases exportados con crossfade, one-shot y cancelación de callbacks igual al contrato existente. `dispose` es idempotente y libera solo recursos propios.
-- [ ] Añadir un test donde recolorear el material de un héroe no cambia otro y otro donde `playOnce` se interrumpe sin disparar el callback anterior. Correr también `src/render/CharacterView.test.ts` y `src/render/NpcAppearance.test.ts`. Commit: `feat: assemble modular heroes on a dedicated rig`.
+- [x] Implementar cache de assets, clones por esqueleto y materiales por instancia. Las prendas comparten la matriz de reposo y el orden de huesos canonizados por el importador. Seleccionar variantes de rostro/cabello antes de devolver el personaje; aplicar tonos a todas las superficies de piel y canales separados de ojos/cabello/cejas. Guardar `root.userData.appearanceKey = appearanceKey(appearance)` como metadato de diagnóstico, sin guardar controladores ni funciones en `userData`.
+- [x] Conservar la normalización fuera de nodos animados, el frente +Z y la posición del servidor. Reproducir los aliases exportados con crossfade, one-shot y cancelación de callbacks igual al contrato existente. `dispose` es idempotente y libera solo recursos propios.
+- [x] Añadir un test donde recolorear el material de un héroe no cambia otro y otro donde `playOnce` se interrumpe sin disparar el callback anterior. Correr también `src/render/CharacterView.test.ts` y `src/render/NpcAppearance.test.ts`. Commit: `feat: assemble modular heroes on a dedicated rig`.
 
 ### Tarea 4: Integrar armaduras y armas de la muestra
 
@@ -214,7 +214,7 @@ it('retirar un héroe no dispone la geometría compartida por otro', async () =>
 
 **Interfaces:** `WeaponVisualFamily = 'sword' | 'dagger' | 'axe' | 'mace' | 'spear' | 'staff' | 'bow' | 'crossbow' | 'shield'`; `WeaponModels.preload(): Promise<void>`; `WeaponModels.create(family: WeaponVisualFamily, finish: ReturnType<typeof itemVisual>): THREE.Group`; `WeaponModels.release(model: THREE.Group): void`; `WeaponModels.dispose(): void`; `ModularHeroEquipment` implementa `CharacterEquipment` y recibe anclajes, piezas del atuendo y repositorio de armas. `WeaponModels` recibe el mismo loader opcional e inyectable de `ModularHeroFactory`; esta última se lo transmite, también en tests. Exponer ese repositorio con el getter readonly `weaponModels` en ambas fábricas; no crear una segunda carga para los ítems del suelo.
 
-- [ ] Escribir tests con las fixtures de tarea 3: casco oculta cabello y quitarlo lo restaura; cambiar torso no recolorea la cara; arma sigue la mano durante un clip; quitar equipo restaura el vestuario/arma inicial de clase. Ejecutar tests nuevos y observar el fallo.
+- [x] Escribir tests con las fixtures de tarea 3: casco oculta cabello y quitarlo lo restaura; cambiar torso no recolorea la cara; arma sigue la mano durante un clip; quitar equipo restaura el vestuario/arma inicial de clase. Ejecutar tests nuevos y observar el fallo.
 
 ```ts
 it('el equipo cambia sin destruir la apariencia elegida', async () => {
@@ -231,10 +231,10 @@ it('el equipo cambia sin destruir la apariencia elegida', async () => {
 });
 ```
 
-- [ ] Implementar grupos con propiedad clara: `hero_default_outfit`, piezas equipadas por slot y grupos de piel/cabello ocultables. Ocultar partes corporales mediante grupos de índices preparados en importación, no por adivinación durante cada frame.
-- [ ] Implementar manifiesto de armas con pivote de empuñadura y transformaciones locales. Espada en mano derecha y escudo en izquierda; bastón según el clip del mago. Ajustar ambos cuerpos con la misma unidad del héroe. Las superficies texturadas mantienen sus mapas al cambiar rareza.
-- [ ] Dejar cada objeto de arma con geometría y texturas compartidas, materiales por instancia cuando tengan tintes. El controlador llama a `WeaponModels.release` al retirar una instancia: libera sus materiales exclusivos y la desacopla, conservando geometría/texturas del repositorio. `dispose` libera el repositorio al terminar la aplicación. Añadir comprobación de GLB con índices y múltiples materiales en el loader real. Para la muestra únicamente se exponen las tres familias cuyos assets estén listos.
-- [ ] Comprobar en renderer real el agarre, escudo, túnica y placas durante los cinco estados. Corregir clipping mediante geometría, pesos o máscaras; no ocultar el defecto eligiendo un solo ángulo favorable. Commit: `feat: fit sample armor and weapons to modular heroes`.
+- [x] Implementar grupos con propiedad clara: `hero_default_outfit`, piezas equipadas por slot y grupos de piel/cabello ocultables. Ocultar partes corporales mediante grupos de índices preparados en importación, no por adivinación durante cada frame.
+- [x] Implementar manifiesto de armas con pivote de empuñadura y transformaciones locales. Espada en mano derecha y escudo en izquierda; bastón según el clip del mago. Ajustar ambos cuerpos con la misma unidad del héroe. Las superficies texturadas mantienen sus mapas al cambiar rareza.
+- [x] Dejar cada objeto de arma con geometría y texturas compartidas, materiales por instancia cuando tengan tintes. El controlador llama a `WeaponModels.release` al retirar una instancia: libera sus materiales exclusivos y la desacopla, conservando geometría/texturas del repositorio. `dispose` libera el repositorio al terminar la aplicación. Añadir comprobación de GLB con índices y múltiples materiales en el loader real. Para la muestra únicamente se exponen las tres familias cuyos assets estén listos.
+- [x] Comprobar en renderer real el agarre, escudo, túnica y placas durante los cinco estados. Corregir clipping mediante geometría, pesos o máscaras; no ocultar el defecto eligiendo un solo ángulo favorable. Commit: `feat: fit sample armor and weapons to modular heroes`.
 
 ### Tarea 5: Entregar la galería comparativa y revisar la calidad
 
@@ -242,11 +242,11 @@ it('el equipo cambia sin destruir la apariencia elegida', async () => {
 
 **Interfaces:** `mountHeroRedesignPreview(parent: HTMLElement, factory: CharacterFactory): { dispose(): void }` monta la galería tras precargar sus assets. La página utiliza `CharacterFactory.create` para la versión actual y `createHero` para la nueva. Exportar `sampleMetrics(renderer: THREE.WebGLRenderer): { triangles: number; drawCalls: number; geometries: number; textures: number }` desde el módulo de preview. La UI expone controles accesibles por nombre. El HTML arranca la página; importar el módulo en un test no crea renderers por efecto lateral.
 
-- [ ] Construir una vista comparativa a igual escala, cámara y luz. Ofrecer caballero/mago y ambos cuerpos, rostro/cabello de muestra, giro, encuadre Cuerpo/Rostro, cámara Juego y los cinco estados de animación. Incluir contadores de rendimiento visibles en el modo de diagnóstico.
-- [ ] Comprobar que el control de reproducción llama al alias correcto y que cambiar selección retira/dispose la instancia anterior sin recrear el renderer. El test DOM usa factory inyectada y verifica esas llamadas; no reemplaza la inspección de modelos reales.
-- [ ] Para cámara de juego, usar parámetros de `Renderer.ts` y una escena de suelo/luces equivalente al pueblo obtenida del código de `Environment.ts`; para comparación cercana, mismo encuadre para ambos modelos. La galería debe cargar sin servidor, contraseña ni escritura de cuentas.
-- [ ] Arrancar `npm run dev:client`. Usar la herramienta de navegador y su guía de verificación para abrir `http://localhost:5173/hero-redesign-preview.html`. Comprobar consola, assets, todos los controles y obtener capturas de frente, perfil, tres cuartos y cámara de juego.
-- [ ] Medir bytes de recursos nuevos desde la red del navegador y `renderer.info`. Añadir escenarios de 1, 10 y 20 héroes, contabilizando frames después de cargar y calentar durante 5 segundos. Registrar navegador, GPU reportada si está disponible, resolución y duración del muestreo; no inventar FPS si no se pudieron medir.
+- [x] Construir una vista comparativa a igual escala, cámara y luz. Ofrecer caballero/mago y ambos cuerpos, rostro/cabello de muestra, giro, encuadre Cuerpo/Rostro, cámara Juego y los cinco estados de animación. Incluir contadores de rendimiento visibles en el modo de diagnóstico.
+- [x] Comprobar que el control de reproducción llama al alias correcto y que cambiar selección retira/dispose la instancia anterior sin recrear el renderer. El test DOM usa factory inyectada y verifica esas llamadas; no reemplaza la inspección de modelos reales.
+- [x] Para cámara de juego, usar parámetros de `Renderer.ts` y una escena de suelo/luces equivalente al pueblo obtenida del código de `Environment.ts`; para comparación cercana, mismo encuadre para ambos modelos. La galería debe cargar sin servidor, contraseña ni escritura de cuentas.
+- [x] Arrancar `npm run dev:client`. Usar la herramienta de navegador y su guía de verificación para abrir `http://localhost:5173/hero-redesign-preview.html`. Comprobar consola, assets, todos los controles y obtener capturas de frente, perfil, tres cuartos y cámara de juego.
+- [x] Medir bytes de recursos nuevos desde la red del navegador y `renderer.info`. Añadir escenarios de 1, 10 y 20 héroes, contabilizando frames después de cargar y calentar durante 5 segundos. Registrar navegador, GPU reportada si está disponible, resolución y duración del muestreo; no inventar FPS si no se pudieron medir.
 
 ```ts
 export function sampleMetrics(renderer: THREE.WebGLRenderer) {
@@ -259,7 +259,7 @@ export function sampleMetrics(renderer: THREE.WebGLRenderer) {
 }
 ```
 
-- [ ] Ejecutar `npm run build --workspace @aden/client`, enlazar la galería y mostrar capturas al usuario. Registrar qué supera o incumple los criterios estéticos y los presupuestos. Commit: `feat: add comparative modular hero showcase`.
+- [x] Ejecutar `npm run build --workspace @aden/client`, enlazar la galería y mostrar capturas al usuario. Registrar qué supera o incumple los criterios estéticos y los presupuestos. Commit: `feat: add comparative modular hero showcase`.
 - [ ] **Punto de revisión visual:** esperar la valoración de la muestra acordada en la especificación antes de extenderla. Si el aspecto sigue sin cumplir, corregir bases, rostros, materiales, ropa o animaciones dentro de este hito. No usar la creación de cuentas como sustituto de la mejora visual.
 
 ### Tarea 6: Completar las cinco clases, el catálogo y las familias de equipo

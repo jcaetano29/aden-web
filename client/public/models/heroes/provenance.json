@@ -239,11 +239,11 @@
   "outputs": [
     {
       "file": "hero-male.glb",
-      "bytes": 5205844,
-      "sha256": "e90407842b0db8ac3ef0ffee03ff3e63819b4f08419bd34abea7a879b8b89f04",
+      "bytes": 5161388,
+      "sha256": "bc1bb3daccb18ddaf57a91f225f6f49e700c28bfa9b1de2c46afc5f0edec295d",
       "meshes": 16,
       "skinnedMeshes": 16,
-      "triangles": 32294,
+      "triangles": 31942,
       "materials": [
         "skin",
         "eyes",
@@ -336,11 +336,11 @@
     },
     {
       "file": "hero-female.glb",
-      "bytes": 6025192,
-      "sha256": "5109ce4dde8e8b92627a904968aaf1587a96d7d78117517edab955e159b3c468",
+      "bytes": 6078424,
+      "sha256": "bdb7a7dedbd010d4990ff8199c8a246e4aac889e4c806f03ab1f06fc4998f89f",
       "meshes": 16,
       "skinnedMeshes": 16,
-      "triangles": 38335,
+      "triangles": 39689,
       "materials": [
         "skin",
         "eyes",

@@ -20,3 +20,9 @@ test('face variants preserve neck, eyes and differ at jaw and nose',()=>{
  assert.deepEqual(headVariant([.04,1.7,.08],'male','angular'),[.04,1.7,.08]);
  assert.notDeepEqual(headVariant([.055,1.62,.06],'male','angular'),headVariant([.055,1.62,.06],'male','soft'));
 });
+
+import {clipGeometryAtY} from './build.mjs';
+test('clips a neck boundary exactly while preserving interpolated UVs and skin weights',()=>{
+ const g={positions:[0,0,0,1,2,0,-1,2,0],indices:[0,1,2],uvs:[.5,0,1,1,0,1],joints:[0,0,0,0,1,0,0,0,1,0,0,0],weights:[1,0,0,0,1,0,0,0,1,0,0,0],colors:[]};
+ const cut=clipGeometryAtY(g,1);assert.equal(cut.indices.length,6);assert.ok(cut.positions.filter((_,i)=>i%3===1).every(y=>y>=1));for(let i=0;i<cut.weights.length;i+=4)assert.ok(Math.abs(cut.weights.slice(i,i+4).reduce((a,b)=>a+b,0)-1)<1e-6);assert.ok(cut.weights.includes(.5));assert.equal(g.positions[1],0);
+});
