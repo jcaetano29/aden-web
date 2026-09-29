@@ -1,0 +1,19 @@
+{
+  "passed": true,
+  "character": "Guidemum08h5h",
+  "errors": [],
+  "checks": [
+    "desktop and mobile landing",
+    "controls disclosure",
+    "character creation",
+    "first-entry prologue",
+    "contextual NPC guidance",
+    "H manual toggle",
+    "manual Enter and Space controls",
+    "walk to Rowan and accept first quest",
+    "hidden tips survive login",
+    "returning login skips prologue",
+    "manual reactivation",
+    "travel to forest switches to combat lesson"
+  ]
+}

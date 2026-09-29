@@ -43,12 +43,15 @@ export class ClassSelect {
     this.root.className = 'character-select aden-scroll';
     this.root.hidden = true;
     this.root.innerHTML = `
-      <header class="character-brand"><h1>ADEN</h1><p>El asedio de Aden</p></header>
-      <div class="character-tabs" role="tablist" aria-label="Acceso">
-        <button type="button" role="tab" data-mode="login">Entrar</button>
-        <button type="button" role="tab" data-mode="create">Crear personaje</button>
-      </div>
+      <header class="character-brand"><div><h1>ADEN</h1><p>El asedio de Aden</p></div><span>Un mundo compartido. Tu propia historia.</span><button type="button" data-open-controls>Cómo jugar</button></header>
       <div class="character-layout">
+        <section class="character-welcome" aria-label="Descubrí Aden">
+          <p class="character-world-note">Rol multijugador en tu navegador</p>
+          <h2>Un reino en sombras.<br>Una historia por escribir.</h2>
+          <p class="character-welcome-copy">Más allá del pueblo, los bosques guardan secretos y los muertos aún obedecen a su rey. Elegí tu camino, encontrá aliados y rompé la maldición de Nihil.</p>
+          <button type="button" class="character-start">Comenzá tu aventura <span aria-hidden="true">↗</span></button>
+          <p class="character-first-steps">Tu primera aventura, paso a paso.<br><span>Rowan te espera en la plaza. La guía te acompaña desde el primer clic.</span></p>
+        </section>
         <section class="character-creation" aria-label="Diseño del personaje">
           <div class="character-stage"><div class="character-canvas"></div>
             <div class="character-caption" aria-live="polite"></div>
@@ -61,6 +64,11 @@ export class ClassSelect {
           <div class="character-camera" aria-label="Encuadre"><button type="button" data-focus="body" aria-pressed="true">Cuerpo</button><button type="button" data-focus="face" aria-pressed="false">Rostro</button><button type="button" data-zoom="-180" aria-label="Acercar">+</button><button type="button" data-zoom="180" aria-label="Alejar">−</button></div><p class="character-hint">Mismas habilidades y atributos en ambas apariencias.</p>
         </section>
         <form class="character-form">
+          <div class="character-tabs" role="tablist" aria-label="Acceso">
+            <button type="button" role="tab" data-mode="login">Entrar</button>
+            <button type="button" role="tab" data-mode="create">Crear personaje</button>
+          </div>
+          <div class="character-form-heading"><h2>Volvé a tu aventura</h2><p>Tu personaje y su próximo destino te esperan.</p></div>
           <div class="character-class-picker"><h2>Elegí tu clase</h2><div class="character-classes" role="group" aria-label="Clase"></div><div class="character-cosmetics"></div></div>
           <div class="character-credentials">
             <label>Nombre del personaje<input type="text" maxlength="16" autocomplete="username" placeholder="Tu nombre en Aden" required></label>
@@ -68,10 +76,17 @@ export class ClassSelect {
           </div>
           <p class="character-assets" role="status">Cargando personajes…</p><button class="character-retry" type="button" hidden>Reintentar carga</button><div class="character-error" role="alert"></div>
           <button type="submit" class="character-enter">Entrar a Aden</button>
+          <p class="character-entry-note">Jugá desde una computadora, con mouse y teclado.</p>
         </form>
       </div>
-      <section class="character-guide" aria-labelledby="character-guide-title">
-        <h2 id="character-guide-title">Cómo jugar</h2>
+      <section class="character-discover" aria-label="Tu aventura en Aden">
+        <article><span aria-hidden="true">⚔</span><div><h3>Cinco formas de luchar</h3><p>De la espada a la magia. Elegí una clase y hacé tuyo cada combate.</p></div></article>
+        <article><span aria-hidden="true">♜</span><div><h3>Un mundo por descubrir</h3><p>Seguí las misiones desde Umbra hasta las criptas y el trono de Nihil.</p></div></article>
+        <article><span aria-hidden="true">✧</span><div><h3>Mejor en compañía</h3><p>Formá un grupo, intercambiá equipo y enfrentá los peligros con aliados.</p></div></article>
+      </section>
+      <details class="character-guide">
+        <summary id="character-guide-title">Tu primer viaje a Aden <span>Ver controles y consejos</span></summary>
+        <h2>Cómo jugar</h2>
         <p class="character-guide-intro">Movete con el mouse y usá el teclado para combatir y abrir tus paneles.</p>
         <div class="character-guide-columns">
           <div>
@@ -96,6 +111,7 @@ export class ClassSelect {
             <h3>Paneles y sonido</h3>
             <dl class="character-guide-keys">
               <div><dt><kbd>I</kbd></dt><dd>Inventario y equipo</dd></div>
+              <div><dt><kbd>H</kbd></dt><dd>Guía de juego y consejos para tu aventura</dd></div>
               <div><dt><kbd>C</kbd></dt><dd>Atributos del personaje</dd></div>
               <div><dt><kbd>M</kbd></dt><dd>Mapa y viajes</dd></div>
               <div><dt><kbd>P</kbd></dt><dd>Grupo (party)</dd></div>
@@ -110,7 +126,8 @@ export class ClassSelect {
           </div>
         </div>
         <p class="character-guide-tip"><strong>Tu primera misión:</strong> al entrar, hablá con el Anciano del pueblo para comenzar la aventura.</p>
-      </section>`;
+      </details>
+      <footer class="character-footer">Aden <span>El asedio de Aden</span><span>La aventura empieza con un primer paso.</span></footer>`;
     this.creation = this.root.querySelector('.character-creation')!;
     this.caption = this.root.querySelector('.character-caption')!;
     this.nameInput = this.root.querySelector('input[type="text"]')!;
@@ -130,6 +147,15 @@ export class ClassSelect {
     this.root.querySelectorAll<HTMLButtonElement>('[data-mode]').forEach(button => {
       button.addEventListener('click', () => this.setMode(button.dataset.mode as LoginMode));
     });
+    this.root.querySelector('.character-start')!.addEventListener('click', () => {
+      this.setMode('create'); this.root.scrollTo?.({ top: 0 });
+      this.root.querySelector<HTMLButtonElement>('[data-mode="create"]')!.focus();
+    });
+    this.root.querySelector('[data-open-controls]')!.addEventListener('click', () => {
+      const guide = this.root.querySelector<HTMLDetailsElement>('.character-guide')!;
+      guide.open = true; guide.scrollIntoView?.({ block: 'start' });
+      guide.querySelector('summary')!.focus();
+    });
     this.root.querySelectorAll<HTMLInputElement>('input[type="radio"]').forEach(input => {
       input.addEventListener('change', () => { this.gender = input.value as CharacterGender;this.customizer.setGender(this.gender); this.refreshAppearance(); });
     });
@@ -148,6 +174,10 @@ export class ClassSelect {
   private setMode(mode: LoginMode) {
     this.mode = mode;
     this.root.dataset.mode = mode;
+    this.root.querySelector<HTMLElement>('.character-welcome')!.hidden = mode === 'create';
+    this.root.querySelector<HTMLElement>('.character-discover')!.hidden = mode === 'create';
+    this.root.querySelector('.character-form-heading h2')!.textContent = mode === 'create' ? 'Tu historia empieza acá' : 'Volvé a tu aventura';
+    this.root.querySelector('.character-form-heading p')!.textContent = mode === 'create' ? 'Elegí tu clase, personalizá tu héroe y dale un nombre.' : 'Tu personaje y su próximo destino te esperan.';
     this.creation.hidden = mode !== 'create';
     this.root.querySelector<HTMLElement>('.character-class-picker')!.hidden = mode !== 'create';
     this.root.querySelectorAll('[data-mode]').forEach(button => button.setAttribute('aria-selected', String((button as HTMLElement).dataset.mode === mode)));
@@ -184,7 +214,7 @@ export class ClassSelect {
       this.resolver = resolve; this.errorDiv.textContent = errorMsg; this.passwordInput.value = '';
       this.root.hidden = false; this.preview?.setVisible(this.mode === 'create'); this.refreshButton();
       clearTimeout(this.focusTimer);
-      this.focusTimer = setTimeout(() => (this.nameInput.value ? this.passwordInput : this.nameInput).focus(), 50);
+      this.focusTimer = setTimeout(() => (this.nameInput.value ? this.passwordInput : this.nameInput).focus({ preventScroll: true }), 50);
     });
   }
 

@@ -116,4 +116,16 @@ describe('ChatPanel', () => {
     input.focus(); input.value = 'hola'; key(input, 'Enter', { isComposing: true });
     expect(send).not.toHaveBeenCalled();
   });
+
+  it('leaves Enter on a guide summary so it can expand using the keyboard', () => {
+    setup();
+    const details = document.createElement('details');
+    details.innerHTML = '<summary>Guía de juego</summary><p>Consejos</p>';
+    document.body.append(details);
+    const summary = details.querySelector('summary')!; summary.focus();
+    const event = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true });
+    summary.dispatchEvent(event);
+    expect(document.activeElement).toBe(summary);
+    expect(event.defaultPrevented).toBe(false);
+  });
 });

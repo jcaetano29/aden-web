@@ -1801,7 +1801,8 @@ export class GameRoom extends Room<GameState> {
     player.defBuffMult = 1;
     player.exp = 0;
     player.level = 1;
-    player.questId = firstQuestId();
+    // La primera misión se acepta con Rowan: el inicio enseña la interacción con NPCs.
+    player.questId = '';
     player.questProgress = 0;
     player.gold = 0;
     player.pvpKills = 0;

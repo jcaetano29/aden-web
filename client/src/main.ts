@@ -34,7 +34,7 @@ import { Npc } from "./render/Npc.js";
 import { Merchant } from "./render/Merchant.js";
 import { ServiceNpc } from "./render/ServiceNpc.js";
 import { ShopPanel } from "./render/ShopPanel.js";
-import { ClassSelect } from "./render/ClassSelect.js";
+import { ClassSelect, type LoginMode } from "./render/ClassSelect.js";
 import { Minimap } from "./render/Minimap.js";
 import { StoryCard } from "./render/StoryCard.js";
 import { classAdvice, npcStory } from "@aden/shared";
@@ -345,6 +345,7 @@ async function main() {
   let connected = false;
   let loginError = "";
   let initialLogin=true;
+  let entryMode: LoginMode = 'login';
   while (!connected) {
     const creds = await (initialLogin?firstLogin:classSelect.create(loginError));
     initialLogin=false;
@@ -352,6 +353,8 @@ async function main() {
     try {
       await net.connect(creds.name, creds.password, creds.className, netCallbacks, creds.mode, creds.gender,creds.appearance);
       connected = true;
+      entryMode = creds.mode;
+      adventure.beginner.setCharacter(creds.name, creds.mode === 'create');
     } catch (err) {
       if (isAuthError(err)) {
         loginError = (err as Error)?.message || "No se pudo entrar. Probá de nuevo.";
@@ -371,8 +374,9 @@ async function main() {
   for (let i = 0; i < 120 && !net.getSelf(); i++) await new Promise((r) => setTimeout(r, 16));
   className = net.getSelf()?.className || className || "knight";
 
-  // Mostrar la premisa narrativa una sola vez, ya conectado.
-  await storyCard.show();
+  // El prólogo pertenece a la creación, no a cada ingreso del mismo personaje.
+  await storyCard.showForEntry(entryMode);
+  storyCard.remove();
   chatPanel.mount(document.body);
 
   // Interacción con el NPC de misiones: diálogo narrativo contextual.
@@ -622,6 +626,10 @@ async function main() {
     // o el tag "GG" cierra el panel o dispara otras acciones por accidente.
     const ae = document.activeElement;
     if (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement) return;
+    if ((e.key.toLowerCase() === 'h' || e.code === 'KeyH') && !e.repeat) {
+      adventure.beginner.toggleManual();
+      return;
+    }
     if (e.key === "i" || e.key === "I" || e.code === "KeyI") {
       inventoryPanel.toggle();
     }

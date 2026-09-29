@@ -1,5 +1,6 @@
 import { cryptStory, dungeonObjective, getQuest, getZone, getWorldObject, getNpc, CRYPT_ROOMS, CRYPT_SEALS, CRYPT_BOSS } from "@aden/shared";
 import { chapterAfter, chapterForComplete, SIDE_CHAINS, sideChainStep } from '@aden/shared';
+import { BeginnerGuide, type BeginnerState } from './BeginnerGuide.js';
 
 export interface AdventureState {
   questId: string; questProgress: number; mapId: string;
@@ -55,6 +56,7 @@ export class AdventureTracker {
   private readonly hint = document.createElement("div");
   private readonly story = document.createElement("div");
   private readonly contract = document.createElement('div');
+  readonly beginner: BeginnerGuide;
   constructor(parent: HTMLElement = document.body) {
     this.root.dataset.adventureTracker = "";
     this.root.style.cssText = "position:fixed;right:12px;top:272px;width:min(260px,28vw);padding:13px 15px;background:linear-gradient(135deg,rgba(19,24,31,.92),rgba(12,13,18,.88));border:1px solid #655434;border-left:3px solid #d1ab63;border-radius:4px;color:#e6dfcf;z-index:1000;pointer-events:none;font:13px/1.5 Georgia,serif;box-sizing:border-box;box-shadow:0 5px 20px #0005;";
@@ -68,8 +70,10 @@ export class AdventureTracker {
     this.root.append(this.title, this.hint, this.story); parent.appendChild(this.root);
     this.contract.style.cssText='margin-top:10px;padding-top:8px;border-top:1px solid #655434;color:#bfc8bd;font:11px/1.5 system-ui,sans-serif';
     this.contract.hidden=true;this.root.appendChild(this.contract);
+    this.beginner = new BeginnerGuide(this.root);
   }
-  update(state: AdventureState): ObjectiveMarker | undefined {
+  update(state: BeginnerState): ObjectiveMarker | undefined {
+    this.beginner.update(state);
     const guide = adventureGuide(state);
     if (this.title.textContent !== guide.title) this.title.textContent = guide.title;
     if (this.hint.textContent !== guide.hint) this.hint.textContent = guide.hint;

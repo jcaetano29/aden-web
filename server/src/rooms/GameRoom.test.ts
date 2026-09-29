@@ -486,13 +486,27 @@ describe("GameRoom", () => {
     expect(p.x).toBeLessThanOrEqual(puebloMax); // nunca supera el bound clampeado
   });
 
-  it("asigna la primera mision al unirse", async () => {
+  it("espera a que el jugador acepte la primera misión con Rowan y conserva su avance al volver", async () => {
     const room = await colyseus.createRoom("game", {});
-    const client = await colyseus.connectTo(room, { name: "Quester" });
+    await colyseus.connectTo(room, { name: 'Observer' });
+    let client = await colyseus.connectTo(room, { name: "Quester", password: 'test123', mode: 'create' });
     await room.waitForNextPatch();
-    const p = room.state.players.get(client.sessionId)!;
-    expect(p.questId).toBe(firstQuestId());
+    let p = room.state.players.get(client.sessionId)!;
+    expect(p.questId).toBe('');
     expect(p.questProgress).toBe(0);
+    await client.leave(); await room.waitForNextPatch();
+    client = await colyseus.connectTo(room, { name: 'Quester', password: 'test123', mode: 'login' });
+    await room.waitForNextPatch(); p = room.state.players.get(client.sessionId)!;
+    expect(p.questId).toBe('');
+    p.x = p.targetX = TOWN.x; p.z = p.targetZ = TOWN.z;
+    client.send(MessageType.InteractNpc, { npcId: 'elder' });
+    await room.waitForNextPatch();
+    expect(p.questId).toBe('q1');
+    p.questProgress = 2;
+    await client.leave(); await room.waitForNextPatch();
+    client = await colyseus.connectTo(room, { name: 'Quester', password: 'test123', mode: 'login' });
+    await room.waitForNextPatch();
+    expect(room.state.players.get(client.sessionId)).toMatchObject({ questId: 'q1', questProgress: 2 });
   });
 
   it("no entrega la mision si el progreso no esta completo (no-op)", async () => {
@@ -501,6 +515,7 @@ describe("GameRoom", () => {
     await room.waitForNextPatch();
     const p = room.state.players.get(client.sessionId)!;
     p.x = TOWN.x; p.z = TOWN.z; // en el pueblo (radio de entrega)
+    p.questId = firstQuestId();
     p.questProgress = 0; // incompleta
     const gold0 = p.gold;
     client.send(MessageType.InteractNpc, {});
@@ -515,6 +530,7 @@ describe("GameRoom", () => {
     await room.waitForNextPatch();
     const p = room.state.players.get(client.sessionId)!;
     p.x = TOWN.x; p.z = TOWN.z; // en el pueblo, dentro del radio de entrega
+    p.questId = firstQuestId();
     const q = getQuest(p.questId);
     const expBefore = p.exp;
     const gold0 = p.gold;
@@ -535,6 +551,7 @@ describe("GameRoom", () => {
     await room.waitForNextPatch();
     const p = room.state.players.get(client.sessionId)!;
     p.x = 50; p.z = 50; // lejos del NPC
+    p.questId = firstQuestId();
     const q = getQuest(p.questId);
     p.questProgress = q.amount;
     const gold0 = p.gold;

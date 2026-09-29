@@ -12,6 +12,7 @@ export class StoryCard {
 
   constructor(parent: HTMLElement = document.body) {
     this.root = document.createElement("div");
+    this.root.dataset.storyCard = '';
     this.root.style.cssText =
       "position:fixed;inset:0;display:none;flex-direction:column;" +
       "justify-content:center;align-items:center;pointer-events:auto;z-index:2000;padding:40px;" +
@@ -75,7 +76,12 @@ export class StoryCard {
     return new Promise((resolve) => {
       this.resolver = resolve;
       this.root.style.display = "flex";
+      this.root.querySelector('button')?.focus();
     });
+  }
+
+  async showForEntry(mode: 'login' | 'create'): Promise<void> {
+    if (mode === 'create') await this.show();
   }
 
   private hide() {

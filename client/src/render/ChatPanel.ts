@@ -32,7 +32,7 @@ export class ChatPanel {
     if (!this.connected || event.defaultPrevented || event.key !== 'Enter' || event.repeat ||
         event.isComposing || event.ctrlKey || event.altKey || event.metaKey || event.shiftKey) return;
     const active = document.activeElement;
-    if (active instanceof Element && active.closest('input,textarea,select,button,a,[contenteditable], [role="dialog"]')) return;
+    if (active instanceof Element && active.closest('input,textarea,select,button,a,summary,[contenteditable], [role="dialog"]')) return;
     event.preventDefault(); event.stopPropagation();
     this.setExpanded(true); this.input.focus();
   };

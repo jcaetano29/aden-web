@@ -17,11 +17,11 @@ export class SkillInput {
 
   attach(dom: HTMLElement | Document) {
     dom.addEventListener("keydown", (e) => {
-      // No disparar skills mientras se tipea en un input (login/guild/etc.).
+      // Preserve native keyboard actions on forms and the guide's disclosures.
       const ae = document.activeElement;
-      if (ae instanceof HTMLInputElement || ae instanceof HTMLTextAreaElement) return;
-
       const ev = e as KeyboardEvent;
+      if (ae instanceof Element && ae.closest('input,textarea,select,[contenteditable]')) return;
+      if ((ev.code === 'Space' || ev.key === ' ') && ae instanceof Element && ae.closest('button,a,summary')) return;
       let slot: number | null = null;
 
       if (ev.code === "Space" || ev.key === " ") {

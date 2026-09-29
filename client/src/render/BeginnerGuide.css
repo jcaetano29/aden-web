@@ -1,0 +1,15 @@
+.beginner-guide{margin-top:12px;padding-top:10px;border-top:1px solid #655434;font:12px/1.55 system-ui,sans-serif;color:#dadace}
+.beginner-guide [hidden],.beginner-guide[hidden]{display:none!important}
+.beginner-guide button{cursor:pointer;color:#ead9b4;border:1px solid #776547;border-radius:3px;background:#242a2d;padding:7px 9px;font:inherit}
+.beginner-guide button:focus-visible,.beginner-guide summary:focus-visible{outline:2px solid #f2d896;outline-offset:3px}
+.beginner-guide .beginner-guide-toggle{display:flex;align-items:center;justify-content:space-between;width:100%;background:transparent;border:0;padding:3px 0;color:#e8c588;text-align:left;font-size:13px}
+.beginner-guide kbd{border:1px solid #75654b;border-radius:3px;padding:0 5px;font:11px/1.6 system-ui}
+.beginner-guide h3{font:600 15px/1.35 Georgia,serif;color:#f5dfb1;margin:12px 0 7px}
+.beginner-guide p{margin:7px 0 10px}.beginner-guide strong{display:block;font-size:11px;color:#afccc6;font-weight:500}
+.beginner-guide-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:13px}
+.beginner-guide-actions button:first-child{background:#3e493e;border-color:#879275;color:#f5eddb}
+.beginner-guide-actions [data-guide-hide]{background:transparent;border-color:transparent;color:#b7b8b1;font-size:11px}
+.beginner-guide details{padding:9px 0;border-bottom:1px solid #ffffff1c}.beginner-guide summary{cursor:pointer;color:#f0dfbc}.beginner-guide details p{color:#d0cec6}
+.beginner-guide [data-guide-resume]{margin-top:14px;width:100%}.beginner-guide-intro{color:#b7b8b1}
+[data-adventure-tracker]{scrollbar-width:thin;scrollbar-color:#887145 #151b20}
+@media(max-width:700px){[data-adventure-tracker]{width:min(280px,calc(100vw - 24px))!important;top:212px!important;max-height:calc(100dvh - 440px)!important;min-height:96px}}
