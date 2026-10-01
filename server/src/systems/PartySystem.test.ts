@@ -15,6 +15,23 @@ function setup() {
 }
 
 describe('PartySystem', () => {
+  it('defaults to round robin and lets only the loaded current leader change valid loot modes', () => {
+    const { state, system } = setup();
+    system.invite('a', 'b'); system.respond('b', 'a', true);
+    const party = state.parties.get(state.players.get('a')!.partyId)!;
+    expect(party.toJSON().lootMode).toBe('round_robin');
+    expect(system.setLootMode('b', 'free').success).toBe(false);
+    expect(system.setLootMode('c', 'free').success).toBe(false);
+    expect(system.setLootMode('a', 'invalid').success).toBe(false);
+    state.players.get('a')!.loaded = false;
+    expect(system.setLootMode('a', 'free').success).toBe(false);
+    state.players.get('a')!.loaded = true;
+    expect(system.setLootMode('a', 'free').success).toBe(true);
+    expect(party.toJSON().lootMode).toBe('free');
+    expect(system.setLootMode('a', 'round_robin').success).toBe(true);
+    expect(party.toJSON().lootMode).toBe('round_robin');
+  });
+
   it('requires a live invitation and consent before grouping players', () => {
     const { state, system } = setup();
     expect(system.respond('b', 'a', true).success).toBe(false);

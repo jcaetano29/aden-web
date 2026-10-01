@@ -40,6 +40,7 @@ export const MessageType = {
   PartyLeave: "partyLeave",
   PartyKick: "partyKick",
   PartyInvitation: "partyInvitation",
+  PartyLootMode: "partyLootMode",
 } as const;
 
 export const PARTY_MAX_MEMBERS = 10;
@@ -63,6 +64,8 @@ export interface SetTargetMessage {
 
 export interface UseSkillMessage {
   skillId: string;
+  /** Selección de apoyo independiente del objetivo ofensivo. */
+  allyId?: string;
 }
 
 export interface DamageEvent {

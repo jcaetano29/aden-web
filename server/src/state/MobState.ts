@@ -1,6 +1,16 @@
 import { Schema, type } from "@colyseus/schema";
+import type { PoisonEffect } from '../systems/PoisonSystem.js';
 
 export class MobState extends Schema {
+  threat = new Map<string, number>();
+  tauntTargetId = '';
+  tauntMs = 0;
+  controlImmuneMs = 0;
+  exposedBy = '';
+  @type('number') exposedMs = 0;
+  markedBy = '';
+  @type('number') markedMs = 0;
+  poisons = new Map<string, PoisonEffect>();
   @type("number") x = 0;
   @type("number") z = 0;
   @type("number") targetX = 0;
@@ -40,7 +50,7 @@ export class MobState extends Schema {
   homeX = 0;
   homeZ = 0;
   wanderCooldownMs = 0;
-  aggroTargetId = "";
+  @type('string') aggroTargetId = "";
   windupTargetId = "";
 
   // Combat cooldowns — server-only

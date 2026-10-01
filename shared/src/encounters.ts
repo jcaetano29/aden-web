@@ -100,6 +100,10 @@ export const ENCOUNTERS: Record<string, EncounterDef> = {
       { shape: 'cone', anchor: 'self', radius: 10, angleDeg: 80, windupMs: 1800, power: 2.6 }, circle(6, 1600, 2.2),
       { shape: 'circle', anchor: 'self', radius: 16, windupMs: 6000, power: 3.0, channel: true },
     ] },
+    summons: [
+      { templateId: 'forged_guardian', atHpPct: .7, count: 2, maxAlive: 4 },
+      { templateId: 'forged_guardian', atHpPct: .35, count: 2, maxAlive: 4 },
+    ],
   },
   waste_herald: invader('waste_herald'),
   veil_specter: invader('veil_specter'),

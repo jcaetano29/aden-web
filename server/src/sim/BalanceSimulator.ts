@@ -2,7 +2,7 @@ import { boot, type ColyseusTestServer } from '@colyseus/testing';
 import type { Client } from 'colyseus';
 import {
   MessageType, TICK_RATE, availableSkills, getSkill, nearestWalkable, pointsForLevel, weaponRange, distance2D,
-  CATALOG_ITEMS, getEncounter, type SkillConfig,
+  CATALOG_ITEMS, getEncounter, PARTY_MAX_MEMBERS, POTION_COOLDOWN_MS, type SkillConfig,
 } from '@aden/shared';
 import config from '../testServer.js';
 import type { GameRoom } from '../rooms/GameRoom.js';
@@ -41,6 +41,24 @@ export interface FightResult {
   /** Mayor caída de vida durante la pelea, en % de la vida máxima. */
   hpLostPct: number;
   potions: number;
+}
+export interface GroupSupport {
+  /** Curas a compañeros que recuperaron vida; nunca autocuras ni overheal. */
+  heals: number;
+  healing: number;
+  /** Guardias aplicadas a compañeros; no equivale a daño prevenido. */
+  protections: number;
+}
+export interface GroupFightResult {
+  outcome: 'kill' | 'wipe' | 'timeout';
+  seconds: number;
+  deaths: number;
+  potions: number;
+  support: GroupSupport;
+}
+export interface GroupFightOptions {
+  /** Solo desactiva decisiones de apoyo de los bots. La party y el motor de combate se conservan. */
+  cooperation?: boolean;
 }
 
 const BOT_ID = 'sim_bot';
@@ -161,7 +179,7 @@ export class BalanceSimulator {
   }
 
   /** Devuelve 1 si usó una poción en este tick. */
-  private attentiveStep(p: PlayerState, mob: MobState): number {
+  private attentiveStep(p: PlayerState, mob: MobState, support?: GroupSupport): number {
     // Una persona atenta corta la canalización con el objeto activo más cercano.
     const anchor = mob.channeling ? this.nearestActive(p, this.encounterObjects(mob).interrupt) : null;
     if (anchor) { this.reach(p, anchor); return 0; }
@@ -169,6 +187,7 @@ export class BalanceSimulator {
       this.send(MessageType.MoveTo, escapePoint(mob, p));
       return 0;
     }
+    if (support) this.supportStep(p, support);
     let used = 0;
     if (p.hp < p.maxHp * 0.45 && p.hpPotionCooldownMs <= 0) {
       const potion = HP_POTIONS.find(id => (p.inventory.get(id)?.qty ?? 0) > 0);
@@ -193,6 +212,35 @@ export class BalanceSimulator {
       if (!(mob.hazardMs > 0 && inHazard(mob, goal.x, goal.z))) this.send(MessageType.MoveTo, goal);
     }
     return used;
+  }
+
+  /** Cura al más herido o protege a quien recibe la amenaza; conserva el objetivo ofensivo. */
+  private supportStep(p: PlayerState, totals: GroupSupport): void {
+    if (!p.partyId || p.dead || p.stunMs > 0 || p.mapId === 'castillo') return;
+    const party = this.room.state.parties.get(p.partyId);
+    const partners = [...(party?.members ?? [])].flatMap(id => {
+      const ally = this.room.state.players.get(id);
+      return ally && ally !== p && !ally.dead && ally.hp > 0 && ally.partyId === p.partyId && ally.mapId === p.mapId &&
+        distance2D(p.x, p.z, ally.x, ally.z) <= 10 ? [{ id, p: ally }] : [];
+    }).sort((a, b) => a.p.hp / a.p.maxHp - b.p.hp / b.p.maxHp);
+    for (const skill of this.skills(p)) {
+      if (!skill.allyTarget || p.mp < skill.mpCost || (p.skillCooldowns.get(skill.id) ?? 0) > 0) continue;
+      if (skill.type === 'heal') {
+        const ally = partners.find(ally => ally.p.hp < ally.p.maxHp * .6 && ally.p.hp / ally.p.maxHp < p.hp / p.maxHp);
+        if (!ally) continue;
+        const before = ally.p.hp;
+        this.send(MessageType.UseSkill, { skillId: skill.id, allyId: ally.id });
+        const actual = Math.max(0, ally.p.hp - before);
+        if (actual > 0) { totals.heals++; totals.healing += actual; }
+      } else if (skill.id === 'guard') {
+        const ally = partners.find(ally => ally.p.cooperation.protectedMs <= 0 && [...this.room.state.mobs.values()].some(m =>
+          !m.dead && m.mapId === p.mapId && (m.aggroTargetId === ally.id || m.windupTargetId === ally.id ||
+            (m.hazardMs > 0 && inHazard(m, ally.p.x, ally.p.z)))));
+        if (!ally) continue;
+        this.send(MessageType.UseSkill, { skillId: skill.id, allyId: ally.id });
+        if (ally.p.cooperation.protectedBy === this.botId && ally.p.cooperation.protectedMs > 0) totals.protections++;
+      }
+    }
   }
 
   /** Objetos del encuentro: los que cortan su canalización y los que se enfrían. */
@@ -248,7 +296,7 @@ export class BalanceSimulator {
    * Pelea de grupo: todos los bots atentos contra el mismo jefe. Los caídos reaparecen en el
    * spawn del mapa y vuelven caminando, como jugadores reales; 'wipe' = todos caídos a la vez.
    */
-  fightGroup(s: Scenario, profiles: Profile[], seed = 1, maxSeconds = 1200): { outcome: 'kill' | 'wipe' | 'timeout'; seconds: number; deaths: number } {
+  fightGroup(s: Scenario, profiles: Profile[], seed = 1, maxSeconds = 1200, options: GroupFightOptions = {}): GroupFightResult {
     return this.controlled(seed, advance => {
       this.clearWorld();
       const bots = profiles.map((profile, i) => ({ id: `sim_bot_${i}`, p: this.addBot(`sim_bot_${i}`, profile) }));
@@ -259,30 +307,52 @@ export class BalanceSimulator {
         this.place(p, s.mapId, mob.x + Math.cos(angle) * 5, mob.z + Math.sin(angle) * 5);
         this.botId = id; this.send(MessageType.SetTarget, { targetId: TARGET_ID });
       });
+      this.formParty(bots.map(bot => bot.id));
       const dt = 1 / TICK_RATE;
-      let t = 0, deaths = 0;
+      let t = 0, deaths = 0, potions = 0;
+      const support: GroupSupport = { heals: 0, healing: 0, protections: 0 };
       const wasDead = new Set<string>();
-      const done = (outcome: 'kill' | 'wipe' | 'timeout') => ({ outcome, seconds: Math.round(t * 10) / 10, deaths });
+      const observeDeaths = () => {
+        for (const { id, p } of bots) {
+          if (p.dead && !wasDead.has(id)) { wasDead.add(id); deaths++; }
+          if (!p.dead) wasDead.delete(id);
+        }
+      };
+      const done = (outcome: GroupFightResult['outcome']): GroupFightResult => ({ outcome, seconds: Math.round(t * 10) / 10, deaths, potions, support });
       while (t < maxSeconds) {
+        observeDeaths();
         if (mob.dead) return done('kill');
         if (bots.every(b => b.p.dead)) return done('wipe');
         for (const { id, p } of bots) {
-          if (p.dead) { if (!wasDead.has(id)) { wasDead.add(id); deaths++; } continue; }
-          wasDead.delete(id);
+          if (p.dead) continue;
           this.botId = id;
-          this.attentiveStep(p, mob);
+          potions += this.attentiveStep(p, mob, options.cooperation === false ? undefined : support);
         }
         this.room.tick(dt);
         advance(dt * 1000);
         t += dt;
       }
+      observeDeaths();
       return done('timeout');
     });
   }
 
+  private formParty(ids: string[]): void {
+    if (ids.length > PARTY_MAX_MEMBERS) throw new Error(`El simulador admite hasta ${PARTY_MAX_MEMBERS} miembros por grupo.`);
+    for (const id of ids.slice(1)) {
+      this.botId = ids[0]; this.send(MessageType.PartyInvite, { targetId: id });
+      this.botId = id; this.send(MessageType.PartyRespond, { inviterId: ids[0], accept: true });
+      const leader = this.room.state.players.get(ids[0])!, member = this.room.state.players.get(id)!;
+      if (!leader.partyId || member.partyId !== leader.partyId) throw new Error('No se pudo formar la party del simulador.');
+    }
+  }
+
   private clearWorld(): void {
+    // PotionRecovery conserva recargas por nombre entre sesiones del proceso. Dejá vencer
+    // la última de la pelea anterior antes de reutilizar los nombres deterministas de los bots.
+    this.clock += POTION_COOLDOWN_MS;
     const r = this.room;
-    r.state.mobs.clear(); r.state.players.clear(); r.state.droppedItems.clear();
+    r.state.mobs.clear(); r.state.players.clear(); r.state.droppedItems.clear(); r.state.parties.clear(); this.clients.clear();
     r.state.worldObjects.forEach(o => { o.active = true; o.cooled = false; o.respawnMs = 0; });
     (r as unknown as { dungeonRun: { dungeonStage: number; dungeonKills: number } }).dungeonRun.dungeonStage = 0;
   }
@@ -296,6 +366,7 @@ export class BalanceSimulator {
     const r = this.room;
     const p = new PlayerState();
     p.name = id; p.className = profile.className; p.level = profile.level;
+    p.loaded = true;
     p.questId = profile.questId ?? 'q1';
     for (const [slot, id] of Object.entries(profile.equipment)) p.equipment.set(slot, id);
     const a = profile.attributes ?? balancedAttributes(profile.level);

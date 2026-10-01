@@ -11,6 +11,9 @@ export interface AIMob {
   homeZ: number;
   wanderCooldownMs: number;
   aggroTargetId: string;
+  threat?: Map<string, number>;
+  tauntTargetId?: string;
+  tauntMs?: number;
 }
 
 export interface PlayerPos {
@@ -66,6 +69,23 @@ export function stepMobAI(
   }
 
   const leashedOut = distance2D(mob.x, mob.z, mob.homeX, mob.homeZ) > cfg.leashRadius;
+
+  // Threat only matters after engagement. Invalid/departed targets never retain aggro.
+  const eligible = new Map(players.map(p => [p.id, p]));
+  for (const id of mob.threat?.keys() ?? []) if (!eligible.has(id)) mob.threat!.delete(id);
+  let preferred = (mob.tauntMs ?? 0) > 0 ? eligible.get(mob.tauntTargetId ?? '') : undefined;
+  if (!preferred && mob.threat?.size) {
+    const current = eligible.get(mob.aggroTargetId);
+    let best = current;
+    let score = current ? (mob.threat.get(current.id) ?? 0) * 1.15 : 0;
+    for (const [id, threat] of mob.threat) if (threat > score) { best = eligible.get(id); score = threat; }
+    preferred = best;
+  }
+  if (preferred && !leashedOut) {
+    mob.aiState = 'chase'; mob.aggroTargetId = preferred.id;
+    mob.targetX = preferred.x; mob.targetZ = preferred.z; mob.moving = true;
+    return;
+  }
 
   if (nearest && nearestD <= cfg.aggroRadius && !leashedOut) {
     mob.aiState = "chase";

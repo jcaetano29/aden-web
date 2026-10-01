@@ -1,6 +1,6 @@
 import {
   INVADERS, chooseInvasionSpawn, INVASION_WARNING_MS, INVASION_DURATION_MS, INVASION_RADIUS, MINOR_MIN_PLAYERS,
-  PARTICIPATION_MIN_SHARE, PARTICIPATION_GEM_CHANCE, UPGRADE_GEMS, CHAOS_SEAL,
+  PARTICIPATION_MIN_SHARE, PARTICIPATION_GEM_CHANCE, UPGRADE_GEMS, CHAOS_SEAL, INVASION_MIN_LEVEL,
   getInvader, getTemplate, getZone, nextDailyInvasion, nextMinorInvasion, inInvasionArea, type InvaderDef,
 } from '@aden/shared';
 import type { GameState } from '../state/GameState.js';
@@ -14,7 +14,7 @@ export interface EventHost {
   announce(text: string): void;
   onlinePlayers(): number;
   spawnInvader(id: string, templateId: string, x: number, z: number, mapId: string): MobState;
-  dropReserved(itemId: string, x: number, z: number, mapId: string, owner: { guildId: string; playerId: string; label: string }): void;
+  dropReserved(itemId: string, x: number, z: number, mapId: string, owner: { guildId: string; playerId: string; label: string; partyMembers?: readonly string[] }): void;
   reward(playerId: string, gold: number, exp: number, itemId?: string): void;
   dropPublic(itemId: string, qty: number, x: number, z: number, mapId: string): void;
 }
@@ -27,9 +27,12 @@ export class EventSystem {
   private nextMinorAt: number;
   private current: CurrentEvent | null = null;
   private seq = 0;
-  /** Daño al invasor por jugador, su grupo (gremio o `solo:<id>`) y la etiqueta visible del grupo. */
+  /** Group and party identities are captured on first contribution for this encounter. */
   private readonly damage = new Map<string, number>();
+  private readonly support = new Map<string, number>();
   private readonly groupOf = new Map<string, string>();
+  private readonly partyOf = new Map<string, string>();
+  private readonly partyParticipants = new Map<string, Set<string>>();
   private readonly labels = new Map<string, string>();
   private rankedAt = 0;
 
@@ -73,18 +76,82 @@ export class EventSystem {
     this.announce(invader, mapId, this.host.now() + leadMs, false);
   }
 
-  /** Suma daño al invasor activo; agrupa por gremio (o jugador sin gremio). */
+  /** Effective damage is validated by combat; captures guild, then party, then solo credit. */
   recordDamage(mobId: string, playerId: string, amount: number): void {
     const cur = this.current;
-    if (!cur || amount <= 0 || mobId !== cur.bossId || this.host.state.worldEvent.phase !== 'active') return;
-    const p = this.host.state.players.get(playerId);
-    if (p) {
-      const key = p.guildId ? p.guildId : `solo:${playerId}`;
-      this.groupOf.set(playerId, key);
-      this.labels.set(key, p.guildTag || p.name);
-    }
-    if (!this.groupOf.has(playerId)) return;
+    if (!cur || !Number.isFinite(amount) || amount <= 0 || mobId !== cur.bossId || this.host.state.worldEvent.phase !== 'active') return;
+    if (!this.captureGroup(playerId)) return;
     this.damage.set(playerId, (this.damage.get(playerId) ?? 0) + amount);
+    this.capturePartyParticipant(playerId);
+  }
+
+  /** Accept ONLY actual allied healing/prevention/bonus/control validated by combat, never casts or overheal. */
+  recordSupport(mobId: string, playerId: string, amount: number): void {
+    const cur = this.current;
+    if (!cur || !Number.isFinite(amount) || amount <= 0 || mobId !== cur.bossId ||
+        this.host.state.worldEvent.phase !== 'active' || this.host.now() >= cur.endsAt) return;
+    const boss = this.host.state.mobs.get(mobId);
+    const player = this.eligibleParticipant(playerId);
+    // Damage resolution subtracts HP before its support hook, then marks death synchronously.
+    // Keep the lethal hit's effective bonus; reject all later calls once death is committed.
+    if (!boss || boss.dead || !player) return;
+    const ownDamage = this.damage.get(playerId) ?? 0;
+    const partyId = this.partyOf.get(playerId) ?? player.partyId;
+    const party = this.host.state.parties.get(partyId);
+    let alliedDamage = 0;
+    if (party && player.partyId === partyId && party.members.includes(playerId)) {
+      for (const id of party.members) {
+        const ally = this.eligibleParticipant(id);
+        if (id !== playerId && ally?.partyId === partyId && this.partyOf.get(id) === partyId) {
+          alliedDamage += this.damage.get(id) ?? 0;
+        }
+      }
+    }
+    // A pure healer needs a party that meaningfully engaged this boss. Excess is discarded,
+    // so spamming now cannot buy contribution when somebody deals damage later.
+    if (alliedDamage < Math.max(1, boss.maxHp * PARTICIPATION_MIN_SHARE)) alliedDamage = 0;
+    const cap = ownDamage * 0.5 + alliedDamage * 0.2;
+    const previous = this.support.get(playerId) ?? 0;
+    const credited = Math.min(amount, Math.max(0, cap - previous));
+    if (credited <= 0 || !this.captureGroup(playerId)) return;
+    this.support.set(playerId, previous + credited);
+    this.capturePartyParticipant(playerId);
+  }
+
+  private eligibleParticipant(id: string) {
+    const player = this.host.state.players.get(id);
+    return player?.loaded && !player.dead && player.hp > 0 && player.level >= INVASION_MIN_LEVEL && this.inArea(player)
+      ? player : undefined;
+  }
+
+  private captureGroup(playerId: string): string | undefined {
+    const captured = this.groupOf.get(playerId);
+    if (captured) return captured;
+    const player = this.host.state.players.get(playerId);
+    if (!player) return undefined;
+    const party = this.host.state.parties.get(player.partyId);
+    const partyId = party?.members.includes(playerId) ? player.partyId : '';
+    const key = player.guildId || (partyId ? `party:${partyId}` : `solo:${playerId}`);
+    const leader = party && this.host.state.players.get(party.leaderId);
+    const label = player.guildId ? player.guildTag || player.name : partyId ? `Party de ${leader?.name || player.name}` : player.name;
+    this.groupOf.set(playerId, key);
+    this.partyOf.set(playerId, partyId);
+    if (!this.labels.has(key)) this.labels.set(key, label);
+    return key;
+  }
+
+  private capturePartyParticipant(playerId: string): void {
+    const key = this.groupOf.get(playerId);
+    if (!key?.startsWith('party:') || !this.eligibleParticipant(playerId)) return;
+    let members = this.partyParticipants.get(key);
+    if (!members) { members = new Set(); this.partyParticipants.set(key, members); }
+    members.add(playerId);
+  }
+
+  private contributions(): Map<string, number> {
+    const result = new Map(this.damage);
+    for (const [id, amount] of this.support) result.set(id, (result.get(id) ?? 0) + amount);
+    return result;
   }
 
   inArea(p: { mapId: string; x: number; z: number }): boolean {
@@ -126,7 +193,7 @@ export class EventSystem {
   private standings(): { key: string; label: string; share: number }[] {
     const totals = new Map<string, number>();
     let all = 0;
-    for (const [playerId, dmg] of this.damage) {
+    for (const [playerId, dmg] of this.contributions()) {
       const key = this.groupOf.get(playerId)!;
       totals.set(key, (totals.get(key) ?? 0) + dmg);
       all += dmg;
@@ -136,20 +203,26 @@ export class EventSystem {
       .sort((a, b) => b.share - a.share);
   }
 
-  /** Pieza única (y gema) reservada al grupo con más daño; recompensa a quien hizo al menos 1 %. */
+  /** Unique loot goes to the leading contribution group; individual rewards require at least 1%. */
   private resolve(cur: CurrentEvent, boss: MobState | undefined): void {
     const name = getTemplate(cur.invader.templateId).name;
     const winner = this.standings()[0];
     if (!winner || !boss) { this.host.announce(`⚔ ¡${name} cayó!`); return; }
     const solo = winner.key.startsWith('solo:');
-    const owner = { guildId: solo ? '' : winner.key, playerId: solo ? winner.key.slice(5) : '', label: winner.label };
+    const party = winner.key.startsWith('party:');
+    const owner = {
+      guildId: solo || party ? '' : winner.key,
+      playerId: solo ? winner.key.slice(5) : '', label: winner.label,
+      ...(party ? { partyMembers: [...(this.partyParticipants.get(winner.key) ?? [])] } : {}),
+    };
     const unique = this.host.rng() < cur.invader.uniqueChance ? this.pick(cur.invader.uniqueLoot) : undefined;
     const loot = unique ? [unique] : [];
     if (cur.invader.guaranteedGem || !unique) loot.push(this.pick(UPGRADE_GEMS));
     for (const id of loot) this.host.dropReserved(id, boss.x, boss.z, cur.mapId, owner);
     this.host.dropPublic(CHAOS_SEAL, 2, boss.x, boss.z, cur.mapId); // dos Sellos del Caos para quien los alcance
-    const total = [...this.damage.values()].reduce((a, b) => a + b, 0);
-    for (const [playerId, dmg] of this.damage) {
+    const contributions = this.contributions();
+    const total = [...contributions.values()].reduce((a, b) => a + b, 0);
+    for (const [playerId, dmg] of contributions) {
       if (dmg / total < PARTICIPATION_MIN_SHARE) continue;
       const gem = this.host.rng() < PARTICIPATION_GEM_CHANCE ? this.pick(UPGRADE_GEMS) : undefined;
       this.host.reward(playerId, cur.invader.rewardGold, cur.invader.rewardExp, gem);
@@ -163,7 +236,8 @@ export class EventSystem {
     const ev = this.host.state.worldEvent;
     ev.id = ''; ev.invaderId = ''; ev.phase = ''; ev.mapId = ''; ev.bossId = ''; ev.radius = 0; ev.startsAt = 0; ev.endsAt = 0;
     ev.ranking.clear();
-    this.damage.clear(); this.groupOf.clear(); this.labels.clear(); this.rankedAt = 0;
+    this.damage.clear(); this.support.clear(); this.groupOf.clear(); this.partyOf.clear();
+    this.partyParticipants.clear(); this.labels.clear(); this.rankedAt = 0;
     if (cur.daily) this.nextDailyAt = nextDailyInvasion(now);
     this.nextMinorAt = nextMinorInvasion(now, () => this.host.rng());
     this.current = null;

@@ -79,7 +79,11 @@ export class PartySystem {
     if (player) player.partyId = '';
     if (!party) return result(false, 'No estás en una party.');
     const index = party.members.indexOf(id);
-    if (index >= 0) party.members.splice(index, 1);
+    if (index >= 0) {
+      if (index < party.lootCursor) party.lootCursor--;
+      party.members.splice(index, 1);
+      party.lootCursor = party.members.length ? party.lootCursor % party.members.length : 0;
+    }
     if (party.members.length < 2) {
       for (const memberId of party.members) {
         const member = this.state.players.get(memberId);
@@ -101,5 +105,16 @@ export class PartySystem {
     }
     this.leave(targetId);
     return result(true, 'Jugador expulsado de la party.');
+  }
+
+  setLootMode(id: string, mode: unknown) {
+    const player = this.state.players.get(id);
+    const party = this.state.parties.get(player?.partyId ?? '');
+    if (!player?.loaded || !party || party.leaderId !== id || !party.members.includes(id)) {
+      return result(false, 'Solo el líder puede cambiar el modo de botín.');
+    }
+    if (mode !== 'free' && mode !== 'round_robin') return result(false, 'Modo de botín inválido.');
+    party.lootMode = mode;
+    return result(true, mode === 'free' ? 'Botín libre.' : 'Botín por turnos.');
   }
 }

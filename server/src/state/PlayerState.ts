@@ -1,4 +1,6 @@
 import {AppearanceState} from './AppearanceState.js';
+import { CooperationState } from './CooperationState.js';
+import type { PoisonEffect } from '../systems/PoisonSystem.js';
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import { InventoryItemState } from "./InventoryItemState.js";
 import { AttributesState } from "./AttributesState.js";
@@ -8,6 +10,8 @@ import { emptyEffects, MOVE_SPEED } from '@aden/shared';
 import type { CharacterGender } from '@aden/shared';
 
 export class PlayerState extends Schema {
+  @type(CooperationState) cooperation = new CooperationState();
+  poisons = new Map<string, PoisonEffect>();
   @type("number") x = 0;
   @type("number") z = 0;
   @type("number") targetX = 0;

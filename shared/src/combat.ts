@@ -26,10 +26,10 @@ export const MOB_COMBAT: Record<string, CombatStats> = {
   vharzul: { maxHp: 12650, pAtk: 150, pDef: 76, attackCooldownMs: 2400 },
   chaos_guard_minor: { maxHp: 1450, pAtk: 95, pDef: 50, attackCooldownMs: 2400 },
   chaos_guard_major: { maxHp: 2030, pAtk: 125, pDef: 66, attackCooldownMs: 2400 },
-  crimson_dragon: { maxHp: 221000, pAtk: 190, pDef: 80, attackCooldownMs: 2200 },
+  crimson_dragon: { maxHp: 250000, pAtk: 190, pDef: 80, attackCooldownMs: 2200 },
   waste_herald: { maxHp: 38700, pAtk: 70, pDef: 30, attackCooldownMs: 2200 },
-  veil_specter: { maxHp: 53400, pAtk: 110, pDef: 50, attackCooldownMs: 2200 },
-  ember_colossus: { maxHp: 69100, pAtk: 185, pDef: 80, attackCooldownMs: 2400 },
+  veil_specter: { maxHp: 60000, pAtk: 110, pDef: 50, attackCooldownMs: 2200 },
+  ember_colossus: { maxHp: 78000, pAtk: 185, pDef: 80, attackCooldownMs: 2400 },
   magma_wyrm: { maxHp: 14000, pAtk: 200, pDef: 95, attackCooldownMs: 2800 },
   mine_digger: { maxHp: 1400, pAtk: 90, pDef: 46, attackCooldownMs: 2200 },
   mine_armor: { maxHp: 1400, pAtk: 95, pDef: 54, attackCooldownMs: 2400 },
@@ -107,6 +107,9 @@ export interface SkillConfig {
   cleanse?: boolean;
   /** Cura al caster por esta fracción del daño infligido (0..1). */
   lifestealPct?: number;
+  /** Puede dirigirse a un compañero de party, sin cambiar el objetivo ofensivo. */
+  allyTarget?: boolean;
+  description?: string;
 }
 
 export const POWER_STRIKE: SkillConfig = { id: "power_strike", name: "Golpe Poderoso", mpCost: 10, cooldownMs: 4000, type: "damage", factor: 2.5, vfxColor: 0xffe066 };
@@ -114,17 +117,17 @@ export const POWER_STRIKE: SkillConfig = { id: "power_strike", name: "Golpe Pode
 // Etapa 22: 6 skills por clase con roles + counterplay. Números afinables.
 export const SKILLS: Record<string, SkillConfig> = {
   ...ITEM_SKILLS,
-  aimed_shot: { id:"aimed_shot", name:"Tiro del Vigía", type:"damage", factor:2.8, mpCost:10, cooldownMs:3500, range:10, projectile:true, vfxColor:0x8cce74 },
+  aimed_shot: { id:"aimed_shot", name:"Tiro del Vigía", type:"damage", factor:2.8, mpCost:10, cooldownMs:3500, range:10, projectile:true, vfxColor:0x8cce74, description: "Marca la presa: vos y tu party infligen +10% de daño PvE durante 6 s." },
   trail_mend: { id:"trail_mend", name:"Aliento del Bosque", type:"heal", healPct:.25, mpCost:15, cooldownMs:12000, vfxColor:0x71ca97 },
-  snaring_shot: { id:"snaring_shot", name:"Flecha de Zarzas", type:"damage", factor:2.2, rootMs:1200, mpCost:16, cooldownMs:7000, range:10, projectile:true, vfxColor:0x81a65f },
+  snaring_shot: { id:"snaring_shot", name:"Flecha de Zarzas", type:"damage", factor:2.2, rootMs:1200, mpCost:16, cooldownMs:7000, range:10, projectile:true, vfxColor:0x81a65f, description: "Inmoviliza también hasta 2 refuerzos a 4 m del objetivo en PvE." },
   retreat: { id:"retreat", name:"Paso del Sendero", type:"dash", dash:"away", dashRange:7, mpCost:14, cooldownMs:9000, vfxColor:0x9de5b1 },
   eagle_focus: { id:"eagle_focus", name:"Ojo del Horizonte", type:"buff", buffStat:"pAtk", buffMult:1.4, buffMs:5000, mpCost:20, cooldownMs:16000, vfxColor:0xffd77f },
   piercing_shot: { id:"piercing_shot", name:"Saeta del Alba", type:"damage", factor:4.2, mpCost:30, cooldownMs:14000, range:12, projectile:true, vfxColor:0xffeaaa },
   power_strike: POWER_STRIKE,
 
   // ── Caballero (tanque / control) ──
-  shield_bash: { id: "shield_bash", name: "Golpe de Escudo", mpCost: 10, cooldownMs: 5000, type: "damage", factor: 3.4, stunMs: 900, vfxColor: 0x9ecbff },
-  guard: { id: "guard", name: "Guardia", mpCost: 12, cooldownMs: 12000, type: "buff", buffStat: "pDef", buffMult: 1.6, buffMs: 6000, vfxColor: 0x4fa3ff },
+  shield_bash: { id: "shield_bash", name: "Golpe de Escudo", mpCost: 10, cooldownMs: 5000, type: "damage", factor: 3.4, stunMs: 900, vfxColor: 0x9ecbff, description: "Provoca al enemigo durante 4 s y genera amenaza adicional. Solo PvE." },
+  guard: { id: "guard", name: "Guardia", mpCost: 12, cooldownMs: 12000, type: "buff", buffStat: "pDef", buffMult: 1.6, buffMs: 6000, vfxColor: 0x4fa3ff, description: "Conservás Guardia y protegés al aliado seleccionado a 10 m: recibe 30% menos daño PvE durante 6 s. Permanecé a 12 m.", allyTarget: true },
   second_wind: { id: "second_wind", name: "Segundo Aire", mpCost: 16, cooldownMs: 14000, type: "heal", healPct: 0.4, vfxColor: 0x66e08a },
   shield_charge: { id: "shield_charge", range: 12, name: "Carga con Escudo", mpCost: 16, cooldownMs: 9000, type: "damage", factor: 3.0, dash: "toTarget", rootMs: 1200, vfxColor: 0xbfe0ff },
   iron_will: { id: "iron_will", name: "Voluntad de Hierro", mpCost: 18, cooldownMs: 18000, type: "buff", buffStat: "pDef", buffMult: 1.4, buffMs: 5000, cleanse: true, vfxColor: 0xffe066 },
@@ -133,24 +136,24 @@ export const SKILLS: Record<string, SkillConfig> = {
   // ── Mago (kite / ranged) ──
   fireball: { id: "fireball", range: 10, name: "Bola de Fuego", mpCost: 16, cooldownMs: 3500, type: "damage", factor: 3.4, vfxColor: 0xff6a2a, projectile: true },
   ice_lance: { id: "ice_lance", range: 10, name: "Lanza de Hielo", mpCost: 14, cooldownMs: 3000, type: "damage", factor: 2.2, rootMs: 800, vfxColor: 0x66d0ff, projectile: true },
-  arcane_mend: { id: "arcane_mend", name: "Cura Arcana", mpCost: 20, cooldownMs: 12000, type: "heal", healPct: 0.32, vfxColor: 0x8fe0ff },
+  arcane_mend: { id: "arcane_mend", name: "Cura Arcana", mpCost: 20, cooldownMs: 12000, type: "heal", healPct: 0.32, vfxColor: 0x8fe0ff, description: "Cura al aliado seleccionado a 10 m. Sin aliado seleccionado, te cura a vos.", allyTarget: true },
   blink: { id: "blink", name: "Parpadeo", mpCost: 14, cooldownMs: 9000, type: "dash", dash: "away", dashRange: 9, vfxColor: 0xc9b0ff },
   frost_nova: { id: "frost_nova", range: 3, name: "Nova de Escarcha", mpCost: 24, cooldownMs: 12000, type: "damage", factor: 2.6, rootMs: 2000, vfxColor: 0xaef0ff },
   meteor: { id: "meteor", range: 10, name: "Meteoro", mpCost: 40, cooldownMs: 16000, type: "damage", factor: 5.5, vfxColor: 0xff7a2a, projectile: true },
 
   // ── Bárbaro (enganche / sustain) ──
   brutal_strike: { id: "brutal_strike", name: "Golpe Brutal", mpCost: 12, cooldownMs: 4000, type: "damage", factor: 3.0, vfxColor: 0xff4040 },
-  rage: { id: "rage", name: "Furia", mpCost: 14, cooldownMs: 12000, type: "buff", buffStat: "pAtk", buffMult: 1.5, buffMs: 6000, vfxColor: 0xff5252 },
+  rage: { id: "rage", name: "Furia", mpCost: 14, cooldownMs: 12000, type: "buff", buffStat: "pAtk", buffMult: 1.5, buffMs: 6000, vfxColor: 0xff5252, description: "Furia para vos y +15% de ataque PvE para compañeros a 10 m durante 6 s. Los gritos no se acumulan." },
   cleave: { id: "cleave", name: "Tajo", mpCost: 10, cooldownMs: 3000, type: "damage", factor: 2.4, vfxColor: 0xffa640 },
   charge: { id: "charge", range: 12, name: "Embestida", mpCost: 16, cooldownMs: 10000, type: "damage", factor: 2.0, dash: "toTarget", stunMs: 1000, vfxColor: 0xffb060 },
   bloodthirst: { id: "bloodthirst", name: "Sed de Sangre", mpCost: 16, cooldownMs: 8000, type: "damage", factor: 2.8, lifestealPct: 0.6, vfxColor: 0xcc2b2b },
   rampage: { id: "rampage", name: "Masacre", mpCost: 30, cooldownMs: 40000, type: "buff", buffStat: "pAtk", buffMult: 1.9, buffMs: 8000, vfxColor: 0xff3030 },
 
   // ── Pícaro (burst / evasión) ──
-  backstab: { id: "backstab", name: "Puñalada", mpCost: 10, cooldownMs: 2500, type: "damage", factor: 2.8, vfxColor: 0xb96bff },
+  backstab: { id: "backstab", name: "Puñalada", mpCost: 10, cooldownMs: 2500, type: "damage", factor: 2.8, vfxColor: 0xb96bff, description: "Expone la armadura enemiga: -20% de defensa durante 5 s en PvE." },
   poison: { id: "poison", name: "Veneno", mpCost: 12, cooldownMs: 6000, type: "dot", dotDps: 14, dotMs: 5000, vfxColor: 0x8fdd4a },
   evasion: { id: "evasion", name: "Evasión", mpCost: 10, cooldownMs: 10000, type: "buff", buffStat: "pDef", buffMult: 1.8, buffMs: 4000, vfxColor: 0xffffff },
-  shadowstep: { id: "shadowstep", range: 12, name: "Paso Sombrío", mpCost: 14, cooldownMs: 8000, type: "damage", factor: 2.4, dash: "toTarget", vfxColor: 0x9b6bff },
+  shadowstep: { id: "shadowstep", range: 12, name: "Paso Sombrío", mpCost: 14, cooldownMs: 8000, type: "damage", factor: 2.4, dash: "toTarget", vfxColor: 0x9b6bff, description: "Interrumpe el ataque anunciado del enemigo. Los jefes resisten interrupciones consecutivas durante 8 s." },
   vanish: { id: "vanish", name: "Vanish", mpCost: 16, cooldownMs: 16000, type: "buff", buffStat: "pDef", buffMult: 1.6, buffMs: 3000, cleanse: true, dash: "away", dashRange: 7, vfxColor: 0x6a5a8a },
   assassinate: { id: "assassinate", name: "Asesinato", mpCost: 28, cooldownMs: 14000, type: "damage", factor: 4.8, vfxColor: 0xd040ff },
 };

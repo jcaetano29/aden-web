@@ -44,8 +44,9 @@ export function tryPickup(state:GameState,sessionId:string,dropId:string,automat
   const p=state.players.get(sessionId),drop=state.droppedItems.get(dropId);
   if(!p || !drop || p.dead || p.hp<=0 || p.mapId!==drop.mapId || drop.pickDelayMs>0 || drop.despawnMs<=0) return false;
   if(automatic && drop.droppedBy===sessionId)return false;
-  // Botín de invasión: sólo el gremio (o jugador) ganador mientras dura la reserva.
-  if(drop.reservedMs>0 && !(drop.reservedGuildId && drop.reservedGuildId===p.guildId) && drop.reservedPlayerId!==sessionId)return false;
+  // Party event membership is captured when contributing; joining later grants no pickup rights.
+  if(drop.reservedMs>0 && !(drop.reservedGuildId && drop.reservedGuildId===p.guildId) &&
+      drop.reservedPlayerId!==sessionId && !drop.reservedPartyMembers.has(sessionId))return false;
   const distance=distance2D(p.x,p.z,drop.x,drop.z);
   if(!Number.isFinite(distance) || distance>PICKUP_RANGE || !Number.isSafeInteger(drop.qty) || drop.qty<=0 || drop.qty>10000)return false;
   let item;try{item=getItem(drop.itemTemplateId);}catch{return false;}

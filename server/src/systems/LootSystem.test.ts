@@ -14,6 +14,15 @@ function fixture() {
   return {state,p,other,drop};
 }
 describe('public atomic loot',()=>{
+  it('honors captured invasion party members even after the party changes, then opens after expiry',()=>{
+    const {state,p,other,drop}=fixture();
+    drop.reservedPartyMembers = new Set(['p']); drop.reservedMs=60000;
+    p.partyId='new_party'; other.partyId='old_party';
+    expect(tryPickup(state,'other','drop')).toBe(false);
+    expect(tryPickup(state,'p','drop')).toBe(true);
+    state.droppedItems.set('again',drop); drop.reservedMs=0;
+    expect(tryPickup(state,'other','again')).toBe(true);
+  });
   it('drops a partial stack publicly without automatically reclaiming it',()=>{
     const {state,p,other}=fixture(); p.loaded=true;
     grantItem(p,'bone',7);

@@ -10,6 +10,21 @@ function mob(over: Partial<AIMob> = {}): AIMob {
 }
 
 describe("stepMobAI — aggro", () => {
+  it('retains a threatened tank instead of switching to a closer player', () => {
+    const m = mob({ aiState: 'chase', aggroTargetId: 'tank' });
+    Object.assign(m, { threat: new Map([['tank', 200], ['mage', 50]]) });
+    stepMobAI(m, [{ id: 'mage', x: 1, z: 0 }, { id: 'tank', x: 3, z: 0 }], AI_CONFIG, () => .5, 16);
+    expect(m.aggroTargetId).toBe('tank');
+  });
+
+  it('honors a living taunt target but ignores absent targets', () => {
+    const m = mob({ aiState: 'chase', aggroTargetId: 'mage' });
+    Object.assign(m, { tauntTargetId: 'tank', tauntMs: 3000, threat: new Map([['mage', 200]]) });
+    stepMobAI(m, [{ id: 'mage', x: 1, z: 0 }, { id: 'tank', x: 3, z: 0 }], AI_CONFIG, () => .5, 16);
+    expect(m.aggroTargetId).toBe('tank');
+    stepMobAI(m, [{ id: 'mage', x: 1, z: 0 }], AI_CONFIG, () => .5, 16);
+    expect(m.aggroTargetId).toBe('mage');
+  });
   it("entra en chase y apunta al jugador dentro de aggroRadius", () => {
     const m = mob();
     stepMobAI(m, [{ id: "p1", x: 3, z: 0 }], AI_CONFIG, () => 0.5, 16);

@@ -33,6 +33,8 @@ import {
   getTemplate,
   getQuest,
   CRYPT_WAVE_TEMPLATES,
+  CASTLE_MAP,
+  getSkill,
 } from "@aden/shared";
 import type { WorldObjectSnapshot } from "../render/WorldObjectViews.js";
 import type { PartyInvitation, WorldEventView, CastleView } from '@aden/shared';
@@ -182,16 +184,18 @@ export class NetworkClient {
   private chatConnected = false;
   private room!: Room;
   private partyInvitation: PartyInvitation | null = null;
+  private supportTargetId = '';
   private trade: TradeSnapshot | null = null;
 
   async connect(name: string, password: string, className: string, cb: RoomCallbacks, mode = "", gender: CharacterGender = 'male', appearance?:CharacterAppearanceV1): Promise<void> {
     this.chatConnected = false;
     this.partyInvitation = null;
+    this.supportTargetId = '';
     this.trade = null;
     const client = new Client(SERVER_URL);
     this.room = await client.joinOrCreate("game", { name, password, className, mode, gender, ...(appearance&&mode!=='login'?{appearance}:{}) });
     const selfId = this.room.sessionId;
-    this.room.onLeave(() => { this.chatConnected = false; this.trade = null; cb.onConnectionChange?.(false); });
+    this.room.onLeave(() => { this.chatConnected = false; this.trade = null; this.supportTargetId = ''; cb.onConnectionChange?.(false); });
     this.room.onMessage(MessageType.ChatMessage, (message: ChatMessage) => cb.onChatMessage?.(message));
     this.room.onMessage(MessageType.ChatError, (error: ChatErrorEvent) => cb.onChatError?.(error));
 
@@ -310,7 +314,29 @@ export class NetworkClient {
   /** Envía la intención de usar una skill (p.ej. "power_strike"). El server resuelve target/rango/MP/cooldown. */
   sendUseSkill(skillId: string) {
     const msg: UseSkillMessage = { skillId };
+    const allyId = this.getSupportTarget();
+    if (allyId && getSkill(skillId).allyTarget) msg.allyId = allyId;
     this.room.send(MessageType.UseSkill, msg);
+  }
+
+  /** La selección de apoyo es local e independiente del objetivo ofensivo. */
+  setSupportTarget(id: string): void {
+    this.supportTargetId = id === this.room?.sessionId ? '' : id;
+    this.getSupportTarget();
+  }
+
+  /** Descarta selecciones que dejaron de ser compañeros vivos del mismo mapa. */
+  getSupportTarget(): string {
+    if (!this.supportTargetId) return '';
+    const selfId = this.room?.sessionId;
+    const self = this.room?.state.players.get(selfId);
+    const ally = this.room?.state.players.get(this.supportTargetId);
+    const party = self?.partyId ? this.room?.state.parties?.get(self.partyId) : undefined;
+    const members = [...(party?.members ?? [])];
+    if (!self || !ally || self.dead || self.hp <= 0 || ally.dead || ally.hp <= 0 ||
+        !party || ally.partyId !== self.partyId || !members.includes(selfId) || !members.includes(this.supportTargetId) ||
+        ally.mapId !== self.mapId || self.mapId === CASTLE_MAP) this.supportTargetId = '';
+    return this.supportTargetId;
   }
 
   /** Envía la intención de interactuar con un NPC (npcId ruteado por el server). */
@@ -357,6 +383,7 @@ export class NetworkClient {
   sendPartyRespond(inviterId: string, accept: boolean) { this.room.send(MessageType.PartyRespond, { inviterId, accept }); }
   sendPartyLeave() { this.room.send(MessageType.PartyLeave); }
   sendPartyKick(targetId: string) { this.room.send(MessageType.PartyKick, { targetId }); }
+  sendPartyLootMode(mode: 'free' | 'round_robin') { this.room.send(MessageType.PartyLootMode, { mode }); }
 
   getPartyPanelData(): PartyPanelData {
     const selfId = this.room.sessionId;
@@ -366,13 +393,15 @@ export class NetworkClient {
     const members: PartyMember[] = [];
     for (const id of party?.members ?? []) {
       const p = this.room.state.players.get(id);
-      if (p) members.push({ id, name: p.name, level: p.level, mapId: p.mapId, hp: p.hp, maxHp: p.maxHp, mp: p.mp, maxMp: p.maxMp, dead: p.dead });
+      if (p) members.push({ id, name: p.name, level: p.level, mapId: p.mapId, hp: p.hp, maxHp: p.maxHp, mp: p.mp, maxMp: p.maxMp, dead: p.dead,
+        className: p.className, protectedMs: p.cooperation?.protectedMs ?? 0, rallyMs: p.cooperation?.rallyMs ?? 0 });
     }
     const candidates: PartyPanelData['candidates'] = [];
     this.room.state.players.forEach((p: any, id: string) => {
       if (id !== selfId && !p.partyId && p.mapId === self?.mapId) candidates.push({ id, name: p.name, level: p.level });
     });
-    return { selfId, partyId, leaderId: party?.leaderId ?? '', members, candidates, invitation: this.partyInvitation };
+    return { selfId, partyId, leaderId: party?.leaderId ?? '', members, candidates, invitation: this.partyInvitation,
+      selectedAllyId: this.getSupportTarget(), lootMode: party?.lootMode ?? 'round_robin' };
   }
 
   /** Envía la intención de crear una guild nueva (el jugador local pasa a ser el líder). */

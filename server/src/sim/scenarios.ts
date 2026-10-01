@@ -104,3 +104,20 @@ export function invasionScenarios(): InvasionScenario[] {
 export function manaProfile(): Profile {
   return profile('mage', 15, 'act2', 'a2_prior');
 }
+
+export interface CooperationScenario { encounter: string; composition: string; scenario: Scenario; group: Profile[] }
+
+/** Comparaciones con equipo equivalente por clase; el mismo encuentro se ejecuta con ambas conductas. */
+export function cooperationScenarios(): CooperationScenario[] {
+  const dragon = invasionScenarios().find(inv => inv.scenario.templateId === 'crimson_dragon')!.scenario;
+  const vharzul = forgeScenarios('knight').find(s => s.templateId === 'vharzul')!;
+  const teams: [string, string[]][] = [
+    ['mixto', ['knight', 'mage', 'barbarian', 'rogue', 'ranger']],
+    ['5 magos', Array(5).fill('mage')],
+    ['5 bárbaros', Array(5).fill('barbarian')],
+  ];
+  return [dragon, vharzul].flatMap(scenario => teams.map(([composition, classes]) => ({
+    encounter: scenario.name, composition, scenario,
+    group: classes.map(cls => profile(cls, 25, 'forge_late', scenario.profile.questId)),
+  })));
+}

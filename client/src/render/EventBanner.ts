@@ -6,7 +6,7 @@ const clock = (ms: number) => {
   return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 };
 
-/** Cartel de evento de mundo: cuenta regresiva antes de la invasión y ranking de gremios durante. */
+/** Cartel de evento de mundo: cuenta regresiva antes de la invasión y contribución de grupos durante. */
 export class EventBanner {
   private readonly root = document.createElement("div");
   private readonly title = document.createElement("div");
@@ -30,10 +30,10 @@ export class EventBanner {
     this.root.style.display = "";
     if (ev.phase === "announced") {
       this.title.textContent = `⚔ Invasión: ${name} en ${map} · empieza en ${clock(ev.startsAt - now)}`;
-      this.ranking.textContent = "Reuní a tu gremio y explorá el mapa: la ubicación es desconocida.";
+      this.ranking.textContent = "Reuní a tu party o gremio y explorá el mapa: la ubicación es desconocida.";
     } else {
       this.title.textContent = `⚔ ${name} · ${map} · quedan ${clock(ev.endsAt - now)}`;
-      this.ranking.textContent = ev.ranking.length ? ev.ranking.join("   ·   ") : "Buscá al invasor explorando el mapa.";
+      this.ranking.textContent = ev.ranking.length ? `Contribución (daño y apoyo): ${ev.ranking.join("   ·   ")}` : "Buscá al invasor explorando el mapa.";
     }
   }
 

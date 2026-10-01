@@ -1,0 +1,1281 @@
+{
+  "note": "Mismo motor, party y encuentro con o sin decisiones de apoyo de los bots. No reproduce el motor anterior ni sustituye partidas humanas. Protections cuenta aplicaciones de Guardia, no daño prevenido; healing es vida realmente recuperada en compañeros.",
+  "isolation": {
+    "clockAdvanceBetweenFightsMs": 8000,
+    "reason": "Vencen las recargas de pociones del intento anterior antes de reutilizar nombres de bots."
+  },
+  "balance": {
+    "reason": "Los beneficios cooperativos acortaron los combates. Se ajustó sólo la vida de estos invasores para conservar los intervalos originales; la mejora PvE del caballero mantiene la viabilidad individual con el límite original de 1,5 veces la mediana.",
+    "invaderHp": {
+      "crimson_dragon": 250000,
+      "veil_specter": 60000,
+      "ember_colossus": 78000
+    }
+  },
+  "rows": [
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "mixto",
+      "seed": 1,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 277.2,
+      "deaths": 0,
+      "potions": 1,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "mixto",
+      "seed": 1,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 276.7,
+      "deaths": 0,
+      "potions": 2,
+      "support": {
+        "heals": 7,
+        "healing": 1463,
+        "protections": 3
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "mixto",
+      "seed": 2,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 274.9,
+      "deaths": 0,
+      "potions": 1,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "mixto",
+      "seed": 2,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 280.9,
+      "deaths": 0,
+      "potions": 2,
+      "support": {
+        "heals": 9,
+        "healing": 1881,
+        "protections": 4
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "mixto",
+      "seed": 3,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 277.1,
+      "deaths": 0,
+      "potions": 1,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "mixto",
+      "seed": 3,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 284.1,
+      "deaths": 0,
+      "potions": 5,
+      "support": {
+        "heals": 8,
+        "healing": 1672,
+        "protections": 5
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 magos",
+      "seed": 1,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 287.5,
+      "deaths": 1,
+      "potions": 21,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 magos",
+      "seed": 1,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 295.6,
+      "deaths": 0,
+      "potions": 5,
+      "support": {
+        "heals": 18,
+        "healing": 3762,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 magos",
+      "seed": 2,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 287.5,
+      "deaths": 1,
+      "potions": 18,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 magos",
+      "seed": 2,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 295.6,
+      "deaths": 0,
+      "potions": 6,
+      "support": {
+        "heals": 19,
+        "healing": 3971,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 magos",
+      "seed": 3,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 287.5,
+      "deaths": 1,
+      "potions": 19,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 magos",
+      "seed": 3,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 295.7,
+      "deaths": 1,
+      "potions": 4,
+      "support": {
+        "heals": 23,
+        "healing": 4807,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 bárbaros",
+      "seed": 1,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 320.9,
+      "deaths": 1,
+      "potions": 28,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 bárbaros",
+      "seed": 1,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 320.9,
+      "deaths": 1,
+      "potions": 28,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 bárbaros",
+      "seed": 2,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 313.7,
+      "deaths": 1,
+      "potions": 25,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 bárbaros",
+      "seed": 2,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 313.7,
+      "deaths": 1,
+      "potions": 25,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 bárbaros",
+      "seed": 3,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 330.3,
+      "deaths": 1,
+      "potions": 29,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 bárbaros",
+      "seed": 3,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 330.3,
+      "deaths": 1,
+      "potions": 29,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "mixto",
+      "seed": 1,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 10.5,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "mixto",
+      "seed": 1,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 10.5,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "mixto",
+      "seed": 2,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 10.5,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "mixto",
+      "seed": 2,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 10.5,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "mixto",
+      "seed": 3,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 10.5,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "mixto",
+      "seed": 3,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 10.5,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 magos",
+      "seed": 1,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 10.9,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 magos",
+      "seed": 1,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 10.9,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 magos",
+      "seed": 2,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 12,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 magos",
+      "seed": 2,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 12,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 magos",
+      "seed": 3,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 10.9,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 magos",
+      "seed": 3,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 10.9,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 bárbaros",
+      "seed": 1,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 7.1,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 bárbaros",
+      "seed": 1,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 7.1,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 bárbaros",
+      "seed": 2,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 7.1,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 bárbaros",
+      "seed": 2,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 7.1,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 bárbaros",
+      "seed": 3,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 7.1,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Vharzul",
+      "composition": "5 bárbaros",
+      "seed": 3,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 7.1,
+      "deaths": 0,
+      "potions": 0,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    }
+  ],
+  "invasions": [
+    {
+      "encounter": "Dragón Carmesí",
+      "seed": 1,
+      "targetSeconds": [
+        240,
+        360
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 276.7,
+        "deaths": 0,
+        "potions": 2,
+        "support": {
+          "heals": 7,
+          "healing": 1463,
+          "protections": 3
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 103.6,
+        "deaths": 1,
+        "potions": 7,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "seed": 2,
+      "targetSeconds": [
+        240,
+        360
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 280.9,
+        "deaths": 0,
+        "potions": 2,
+        "support": {
+          "heals": 9,
+          "healing": 1881,
+          "protections": 4
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 103.6,
+        "deaths": 1,
+        "potions": 7,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "seed": 3,
+      "targetSeconds": [
+        240,
+        360
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 284.1,
+        "deaths": 0,
+        "potions": 5,
+        "support": {
+          "heals": 8,
+          "healing": 1672,
+          "protections": 5
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 90.2,
+        "deaths": 1,
+        "potions": 5,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Heraldo del Yermo",
+      "seed": 1,
+      "targetSeconds": [
+        120,
+        180
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 136.3,
+        "deaths": 0,
+        "potions": 4,
+        "support": {
+          "heals": 1,
+          "healing": 166,
+          "protections": 0
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 390.5,
+        "deaths": 1,
+        "potions": 28,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Heraldo del Yermo",
+      "seed": 2,
+      "targetSeconds": [
+        120,
+        180
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 136.3,
+        "deaths": 0,
+        "potions": 5,
+        "support": {
+          "heals": 1,
+          "healing": 166,
+          "protections": 0
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 375.1,
+        "deaths": 1,
+        "potions": 28,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Heraldo del Yermo",
+      "seed": 3,
+      "targetSeconds": [
+        120,
+        180
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 135.7,
+        "deaths": 0,
+        "potions": 4,
+        "support": {
+          "heals": 1,
+          "healing": 166,
+          "protections": 0
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 390.5,
+        "deaths": 1,
+        "potions": 28,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Espectro del Velo",
+      "seed": 1,
+      "targetSeconds": [
+        120,
+        180
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 146.5,
+        "deaths": 0,
+        "potions": 5,
+        "support": {
+          "heals": 1,
+          "healing": 200,
+          "protections": 0
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 298.1,
+        "deaths": 1,
+        "potions": 24,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Espectro del Velo",
+      "seed": 2,
+      "targetSeconds": [
+        120,
+        180
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 145.3,
+        "deaths": 0,
+        "potions": 5,
+        "support": {
+          "heals": 1,
+          "healing": 200,
+          "protections": 0
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 306.3,
+        "deaths": 1,
+        "potions": 25,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Espectro del Velo",
+      "seed": 3,
+      "targetSeconds": [
+        120,
+        180
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 145.2,
+        "deaths": 0,
+        "potions": 5,
+        "support": {
+          "heals": 1,
+          "healing": 200,
+          "protections": 0
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 303.3,
+        "deaths": 1,
+        "potions": 25,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Coloso de Brasa",
+      "seed": 1,
+      "targetSeconds": [
+        120,
+        180
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 138.8,
+        "deaths": 0,
+        "potions": 0,
+        "support": {
+          "heals": 1,
+          "healing": 209,
+          "protections": 0
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 128.9,
+        "deaths": 1,
+        "potions": 10,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Coloso de Brasa",
+      "seed": 2,
+      "targetSeconds": [
+        120,
+        180
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 138.8,
+        "deaths": 0,
+        "potions": 0,
+        "support": {
+          "heals": 1,
+          "healing": 209,
+          "protections": 0
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 133.9,
+        "deaths": 1,
+        "potions": 10,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    },
+    {
+      "encounter": "Coloso de Brasa",
+      "seed": 3,
+      "targetSeconds": [
+        120,
+        180
+      ],
+      "group": {
+        "outcome": "kill",
+        "seconds": 138,
+        "deaths": 0,
+        "potions": 0,
+        "support": {
+          "heals": 1,
+          "healing": 209,
+          "protections": 0
+        }
+      },
+      "solo": {
+        "outcome": "wipe",
+        "seconds": 133.9,
+        "deaths": 1,
+        "potions": 11,
+        "support": {
+          "heals": 0,
+          "healing": 0,
+          "protections": 0
+        }
+      }
+    }
+  ],
+  "soloBosses": [
+    {
+      "seed": 1,
+      "scenario": "Halden",
+      "className": "knight",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 87.4,
+      "hpLostPct": 44,
+      "potions": 0
+    },
+    {
+      "seed": 2,
+      "scenario": "Halden",
+      "className": "knight",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 85.1,
+      "hpLostPct": 44,
+      "potions": 0
+    },
+    {
+      "seed": 3,
+      "scenario": "Halden",
+      "className": "knight",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 85.1,
+      "hpLostPct": 45,
+      "potions": 0
+    },
+    {
+      "seed": 1,
+      "scenario": "Halden",
+      "className": "mage",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 61.3,
+      "hpLostPct": 66,
+      "potions": 2
+    },
+    {
+      "seed": 2,
+      "scenario": "Halden",
+      "className": "mage",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 61.3,
+      "hpLostPct": 64,
+      "potions": 2
+    },
+    {
+      "seed": 3,
+      "scenario": "Halden",
+      "className": "mage",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 61.3,
+      "hpLostPct": 64,
+      "potions": 2
+    },
+    {
+      "seed": 1,
+      "scenario": "Halden",
+      "className": "barbarian",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 69.1,
+      "hpLostPct": 63,
+      "potions": 5
+    },
+    {
+      "seed": 2,
+      "scenario": "Halden",
+      "className": "barbarian",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 69.1,
+      "hpLostPct": 61,
+      "potions": 5
+    },
+    {
+      "seed": 3,
+      "scenario": "Halden",
+      "className": "barbarian",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 67.6,
+      "hpLostPct": 61,
+      "potions": 5
+    },
+    {
+      "seed": 1,
+      "scenario": "Halden",
+      "className": "rogue",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 60.7,
+      "hpLostPct": 59,
+      "potions": 4
+    },
+    {
+      "seed": 2,
+      "scenario": "Halden",
+      "className": "rogue",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 60.7,
+      "hpLostPct": 61,
+      "potions": 4
+    },
+    {
+      "seed": 3,
+      "scenario": "Halden",
+      "className": "rogue",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 60.7,
+      "hpLostPct": 60,
+      "potions": 4
+    },
+    {
+      "seed": 1,
+      "scenario": "Halden",
+      "className": "ranger",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 73.7,
+      "hpLostPct": 57,
+      "potions": 2
+    },
+    {
+      "seed": 2,
+      "scenario": "Halden",
+      "className": "ranger",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 73.7,
+      "hpLostPct": 66,
+      "potions": 2
+    },
+    {
+      "seed": 3,
+      "scenario": "Halden",
+      "className": "ranger",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 73.7,
+      "hpLostPct": 59,
+      "potions": 2
+    },
+    {
+      "seed": 1,
+      "scenario": "Vharzul",
+      "className": "knight",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 104.7,
+      "hpLostPct": 43,
+      "potions": 0
+    },
+    {
+      "seed": 2,
+      "scenario": "Vharzul",
+      "className": "knight",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 99.9,
+      "hpLostPct": 43,
+      "potions": 0
+    },
+    {
+      "seed": 3,
+      "scenario": "Vharzul",
+      "className": "knight",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 103.1,
+      "hpLostPct": 42,
+      "potions": 0
+    },
+    {
+      "seed": 1,
+      "scenario": "Vharzul",
+      "className": "mage",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 75.7,
+      "hpLostPct": 60,
+      "potions": 1
+    },
+    {
+      "seed": 2,
+      "scenario": "Vharzul",
+      "className": "mage",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 74.1,
+      "hpLostPct": 57,
+      "potions": 2
+    },
+    {
+      "seed": 3,
+      "scenario": "Vharzul",
+      "className": "mage",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 74.1,
+      "hpLostPct": 60,
+      "potions": 2
+    },
+    {
+      "seed": 1,
+      "scenario": "Vharzul",
+      "className": "barbarian",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 66.7,
+      "hpLostPct": 58,
+      "potions": 1
+    },
+    {
+      "seed": 2,
+      "scenario": "Vharzul",
+      "className": "barbarian",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 66.7,
+      "hpLostPct": 59,
+      "potions": 1
+    },
+    {
+      "seed": 3,
+      "scenario": "Vharzul",
+      "className": "barbarian",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 66.7,
+      "hpLostPct": 62,
+      "potions": 1
+    },
+    {
+      "seed": 1,
+      "scenario": "Vharzul",
+      "className": "rogue",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 75.8,
+      "hpLostPct": 62,
+      "potions": 5
+    },
+    {
+      "seed": 2,
+      "scenario": "Vharzul",
+      "className": "rogue",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 73.6,
+      "hpLostPct": 63,
+      "potions": 5
+    },
+    {
+      "seed": 3,
+      "scenario": "Vharzul",
+      "className": "rogue",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 73.6,
+      "hpLostPct": 62,
+      "potions": 5
+    },
+    {
+      "seed": 1,
+      "scenario": "Vharzul",
+      "className": "ranger",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 78.3,
+      "hpLostPct": 56,
+      "potions": 1
+    },
+    {
+      "seed": 2,
+      "scenario": "Vharzul",
+      "className": "ranger",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 76.9,
+      "hpLostPct": 57,
+      "potions": 1
+    },
+    {
+      "seed": 3,
+      "scenario": "Vharzul",
+      "className": "ranger",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 76.9,
+      "hpLostPct": 59,
+      "potions": 1
+    }
+  ]
+}

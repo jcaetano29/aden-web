@@ -41,10 +41,11 @@ export function resolveAttack(
   cooldownMs: number,
   rng: () => number = Math.random,
   element?: DamageElement,
+  defenseMultiplier = 1,
 ): number {
   // Apply buff multipliers via duck-typing: if buff fields exist and are active, use them; otherwise default to 1
   const atkMult = ((attacker as any).atkBuffMs ?? 0) > 0 ? ((attacker as any).atkBuffMult ?? 1) : 1;
-  const defMult = ((target as any).defBuffMs ?? 0) > 0 ? ((target as any).defBuffMult ?? 1) : 1;
+  const defMult = (((target as any).defBuffMs ?? 0) > 0 ? ((target as any).defBuffMult ?? 1) : 1) * defenseMultiplier;
 
   attacker.attackCooldownMs = cooldownMs;
   if(target.itemEffects?.dodge && rng()<target.itemEffects.dodge)return 0;

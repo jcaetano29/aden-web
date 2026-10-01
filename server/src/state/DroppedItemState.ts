@@ -16,5 +16,6 @@ export class DroppedItemState extends Schema {
   pickDelayMs = 0; // no pickable hasta que llegue a 0 (loot visible al caer)
   reservedGuildId = '';
   reservedPlayerId = '';
+  reservedPartyMembers = new Set<string>();
   reservedMs = 0;
 }

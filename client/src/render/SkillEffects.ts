@@ -43,10 +43,14 @@ export class SkillEffects {
     }
 
     if (skill.type === "heal") {
-      this.push(this.sparkles(destination ?? caster, color));
+      this.push(this.sparkles(target ?? destination ?? caster, color));
       return;
     }
     if (skill.type === "buff") {
+      if (skill.allyTarget && target) {
+        this.push(this.ring(target, color, 0.5, 2.4, 0.55, 0.4));
+        this.push(this.sparkles(target, color));
+      }
       this.push(this.ring(destination ?? caster, color, 0.5, 2.4, 0.55, 0.4));
       this.push(this.sparkles(destination ?? caster, color));
       return;

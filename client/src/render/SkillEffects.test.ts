@@ -4,6 +4,13 @@ import { SkillEffects } from "./SkillEffects.js";
 import { SKILLS } from "@aden/shared";
 
 describe("SkillEffects", () => {
+  it('shows an allied heal at its recipient while keeping the cast flash on the caster', () => {
+    const scene = new THREE.Scene();
+    new SkillEffects(scene).cast('arcane_mend', { x: 0, z: 0 }, { x: 8, z: 4 }, { x: 0, z: 0 });
+    const particles = scene.children.find(o => o instanceof THREE.Points) as THREE.Points;
+    const positions = particles.geometry.getAttribute('position');
+    for (let i = 0; i < positions.count; i++) expect(positions.getX(i)).toBeGreaterThan(7);
+  });
   it.each(Object.keys(SKILLS))("%s tiene animación y libera sus recursos", (id) => {
     const scene = new THREE.Scene();
     const fx = new SkillEffects(scene);

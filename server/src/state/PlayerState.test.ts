@@ -5,10 +5,13 @@ const fieldCount = (cls: unknown) => Object.keys((cls as { _definition: { schema
 
 describe('PlayerState schema budget', () => {
   it('leaves headroom under the 64-field Colyseus limit', () => {
-    expect(fieldCount(PlayerState)).toBeLessThanOrEqual(46);
+    expect(fieldCount(PlayerState)).toBeLessThanOrEqual(47);
   });
-  it('groups attributes, retention and appearance into sub-states', () => {
+  it('groups attributes, retention, appearance and cooperation into sub-states', () => {
     const p = new PlayerState();
+    expect(p.cooperation.protectedMs).toBe(0);
+    expect(p.cooperation.rallyMs).toBe(0);
+    expect('protectedMs' in p).toBe(false);
     expect(p.appearance.version).toBe(1);
     expect('faceId' in p).toBe(false);
     expect(p.attributes.str).toBe(0);

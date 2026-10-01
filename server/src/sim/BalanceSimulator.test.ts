@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { BalanceSimulator, balancedAttributes, seededRandom } from './BalanceSimulator.js';
 import { baselineScenarios, castleScenarios, forgeScenarios, invasionScenarios, manaProfile, minesScenarios, type ScenarioSet } from './scenarios.js';
-import { CLASS_ORDER } from '@aden/shared';
+import { CLASS_ORDER, getSkill } from '@aden/shared';
+import type { GameRoom } from '../rooms/GameRoom.js';
 
 describe('BalanceSimulator', () => {
   let sim: BalanceSimulator;
@@ -86,5 +87,130 @@ describe('BalanceSimulator', () => {
     const prior = baselineScenarios('knight').find(s => s.templateId === 'memory_prior')!;
     const r = sim.fight({ ...prior, profile: { ...prior.profile, level: 8 } }, 'stationary', 1, 30);
     expect(r.outcome).not.toBe('kill');
+  });
+
+  it('forms an actual party and clears it before the next solo simulation', () => {
+    const inv = invasionScenarios()[0];
+    let room!: GameRoom;
+    const scenario = { ...inv.scenario, setup: (r: GameRoom) => { room = r; } };
+    sim.fightGroup(scenario, inv.group, 1, 0);
+    const players = [...room.state.players.values()];
+    expect(players.every(p => p.loaded)).toBe(true);
+    expect(room.state.parties.size).toBe(1);
+    const party = room.state.parties.get(players[0].partyId)!;
+    expect([...party.members]).toEqual(['sim_bot_0', 'sim_bot_1', 'sim_bot_2', 'sim_bot_3', 'sim_bot_4']);
+    expect(players.every(p => p.partyId === players[0].partyId)).toBe(true);
+    sim.fightGroup(scenario, [inv.group[0]], 1, 0);
+    expect(room.state.parties.size).toBe(0);
+    expect(room.state.players.get('sim_bot_0')!.partyId).toBe('');
+  });
+
+  it('heals the most injured party member without changing the enemy target and measures recovered health', () => {
+    const inv = invasionScenarios()[0];
+    const group = ['mage', 'knight', 'barbarian'].map(cls => inv.group.find(p => p.className === cls)!);
+    let room!: GameRoom, before = 0;
+    const scenario = { ...inv.scenario, setup: (r: GameRoom) => {
+      room = r;
+      const wounded = r.state.players.get('sim_bot_1')!;
+      before = wounded.hp = Math.round(wounded.maxHp * .25);
+      r.state.players.get('sim_bot_2')!.hp *= .5;
+    } };
+    const result = sim.fightGroup(scenario, group, 7, .05);
+    const wounded = room.state.players.get('sim_bot_1')!;
+    const mage = room.state.players.get('sim_bot_0')!;
+    expect(wounded.hp).toBeGreaterThan(before);
+    expect(result.support.healing).toBe(Math.round(mage.maxHp * getSkill('arcane_mend').healPct!));
+    expect(result.support.heals).toBe(1);
+    expect(mage.targetId).toBe('sim_target');
+    expect(mage.skillCooldowns.get('arcane_mend')).toBeGreaterThan(0);
+  });
+
+  it('can disable cooperative decisions while keeping the same party and never credits self healing as support', () => {
+    const inv = invasionScenarios()[0];
+    const group = ['mage', 'knight'].map(cls => inv.group.find(p => p.className === cls)!);
+    let room!: GameRoom;
+    const scenario = { ...inv.scenario, setup: (r: GameRoom) => {
+      room = r;
+      r.state.players.get('sim_bot_0')!.hp *= .2;
+      r.state.players.get('sim_bot_1')!.hp *= .1;
+    } };
+    const result = sim.fightGroup(scenario, group, 7, .05, { cooperation: false });
+    expect(room.state.parties.size).toBe(1);
+    expect(room.state.players.get('sim_bot_0')!.skillCooldowns.get('arcane_mend')).toBeGreaterThan(0);
+    expect(result.support).toEqual({ heals: 0, healing: 0, protections: 0 });
+    expect(result.potions).toBe(2);
+  });
+
+  it('protects a threatened companion without losing the offensive target', () => {
+    const inv = invasionScenarios()[0];
+    const group = ['knight', 'mage'].map(cls => inv.group.find(p => p.className === cls)!);
+    let room!: GameRoom;
+    const scenario = { ...inv.scenario, setup: (r: GameRoom) => {
+      room = r;
+      const threat = r.spawnMob('pressure', 'forged_guardian', inv.scenario.x, inv.scenario.z, inv.scenario.mapId);
+      threat.aggroTargetId = 'sim_bot_1'; threat.aiState = 'chase';
+    } };
+    const result = sim.fightGroup(scenario, group, 1, .05);
+    expect(room.state.players.get('sim_bot_1')!.cooperation.protectedBy).toBe('sim_bot_0');
+    expect(room.state.players.get('sim_bot_0')!.targetId).toBe('sim_target');
+    expect(result.support.protections).toBe(1);
+  });
+
+  it('limits the Crimson Dragon to two threshold waves even when all reinforcements remain alive', () => {
+    const inv = invasionScenarios()[0];
+    let room!: GameRoom;
+    sim.fightGroup({ ...inv.scenario, setup: r => { room = r; } }, inv.group, 1, 0);
+    const boss = room.state.mobs.get('sim_target')!;
+    boss.aggroTargetId = 'sim_bot_0'; boss.aiState = 'chase'; boss.hazardCooldownMs = 1e9;
+    for (const p of room.state.players.values()) { p.attackCooldownMs = 1e9; p.pDef = 100000; }
+    const adds = () => [...room.state.mobs.values()].filter(m => m.summonedBy === 'sim_target' && !m.dead);
+    boss.hp = Math.floor(boss.maxHp * .71); room.tick(.05);
+    expect(adds()).toHaveLength(0);
+    boss.hp = Math.floor(boss.maxHp * .7); room.tick(.05);
+    expect(adds()).toHaveLength(2);
+    boss.hp = Math.floor(boss.maxHp * .35); room.tick(.05);
+    expect(adds()).toHaveLength(4);
+    for (let i = 0; i < 10; i++) room.tick(.05);
+    expect(adds()).toHaveLength(4);
+    for (const add of adds()) { add.dead = true; add.hp = 0; }
+    for (let i = 0; i < 10; i++) room.tick(.05);
+    expect(adds()).toHaveLength(0);
+  });
+
+  it('counts the deaths that cause a complete wipe', () => {
+    const inv = invasionScenarios()[0];
+    const profiles = inv.group.slice(0, 2).map(p => ({ ...p, potions: {} }));
+    const result = sim.fightGroup({ ...inv.scenario, setup: room => {
+      for (const p of room.state.players.values()) {
+        p.hp = p.maxHp = 1; p.stunMs = 1e9; p.mp = 0;
+      }
+    } }, profiles, 4, 30);
+    expect(result.outcome).toBe('wipe');
+    expect(result.deaths).toBe(2);
+  });
+
+  it('repeats party fights with the same seed without retaining previous support or deaths', () => {
+    const inv = invasionScenarios()[0];
+    const first = sim.fightGroup(inv.scenario, inv.group, 23, 30);
+    expect(first).toEqual(sim.fightGroup(inv.scenario, inv.group, 23, 30));
+  });
+
+  it('starts consecutive short party fights with independent potion recovery', () => {
+    const inv = invasionScenarios()[0];
+    const group = inv.group.slice(0, 2).map(p => ({ ...p, potions: { health_potion: 2 } }));
+    let room!: GameRoom;
+    const scenario = { ...inv.scenario, setup: (r: GameRoom) => {
+      room = r;
+      for (const p of r.state.players.values()) { p.hp = Math.round(p.maxHp * .2); p.mp = 0; }
+    } };
+    const run = () => {
+      const result = sim.fightGroup(scenario, group, 7, .1, { cooperation: false });
+      return { result, players: [...room.state.players.values()].map(p => ({
+        hp: p.hp, potions: p.inventory.get('health_potion')?.qty ?? 0, cooldownMs: p.hpPotionCooldownMs,
+      })) };
+    };
+    const first = run();
+    expect(first.players.map(p => p.potions)).toEqual([1, 1]);
+    expect(run()).toEqual(first);
   });
 });

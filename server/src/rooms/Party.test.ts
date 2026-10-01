@@ -43,7 +43,8 @@ describe('party integration', () => {
     const mob = room.spawnMob('party-mob', 'skeleton_minion', 300, 0, 'bosque');
     room['killMob'](mob, 'party-mob', a.sessionId);
     const exp = getMobExp('skeleton_minion');
-    expect(pa.exp + pb.exp).toBe(exp); expect(pb.exp).toBe(Math.floor(exp / 2));
+    // Two eligible members add 10% once to the shared pool (15 -> 17).
+    expect(pa.exp + pb.exp).toBe(17); expect(pb.exp).toBe(8); expect(pa.exp).toBe(9);
     expect(pa.questProgress).toBe(1); expect(pb.questProgress).toBe(1);
     expect(pc.exp).toBe(0); expect(pc.questProgress).toBe(0);
     for (const mode of ['far', 'dead', 'other-map']) {
@@ -63,6 +64,28 @@ describe('party integration', () => {
       expect(room['parties'].invite(c.sessionId, b.sessionId).success).toBe(false);
       expect(room.state.players.get(a.sessionId)!.partyId).toBe('');
     } finally { await vi.waitFor(() => expect(release).toBeTypeOf('function')); release(); await leaving; }
+  });
+
+  it('synchronizes leader loot mode and reserves ordinary kills by turn', async () => {
+    const { room, a, b, pa, pb } = await setup();
+    const party = room.state.parties.get(pa.partyId)!;
+    expect(party.lootMode).toBe('round_robin');
+    b.send(MessageType.PartyLootMode, { mode: 'free' }); await room.waitForNextPatch();
+    expect(party.lootMode).toBe('round_robin');
+    a.send(MessageType.PartyLootMode, { mode: 'free' }); await room.waitForNextPatch();
+    expect(party.lootMode).toBe('free');
+    expect((b.state as any).parties.get(pa.partyId).lootMode).toBe('free');
+    a.send(MessageType.PartyLootMode, { mode: 'round_robin' }); await room.waitForNextPatch();
+    for (const p of [pa, pb]) { p.mapId = 'bosque'; p.x = 300; p.z = 0; }
+    vi.spyOn(Math, 'random').mockReturnValue(.01);
+    try {
+      room['killMob'](room.spawnMob('loot', 'skeleton_minion', 300, 0, 'bosque'), 'loot', a.sessionId);
+      const drops = [...room.state.droppedItems.values()];
+      expect(drops.length).toBeGreaterThan(0);
+      expect(drops.every(d => d.reservedMs === 30000)).toBe(true);
+      expect(drops[0].reservedPlayerId).toBe(a.sessionId);
+      if (drops.length > 1) expect(drops[1].reservedPlayerId).toBe(b.sessionId);
+    } finally { vi.restoreAllMocks(); }
   });
 
   it('preserves full public crypt EXP without granting it twice to a party member', async () => {

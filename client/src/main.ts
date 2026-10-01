@@ -129,6 +129,8 @@ async function main() {
     onRespond: (id, accept) => net.sendPartyRespond(id, accept),
     onKick: id => net.sendPartyKick(id),
     onLeave: () => net.sendPartyLeave(),
+    onSelectAlly: id => net.setSupportTarget(id),
+    onLootMode: mode => net.sendPartyLootMode(mode),
   });
   partyPanel.mount(document.body);
   const tradePanel = new TradePanel({
@@ -334,7 +336,7 @@ async function main() {
         const nameAbove = caster.clone(); nameAbove.y += 2.6;
         damageNumbers.spawnText(nameAbove, skill.name, "#ffe6a8");
         if ((skill.type === "heal" || skill.type === "buff") && ev.amount && ev.amount > 0) {
-          const healAt = caster.clone(); healAt.y += 1.4;
+          const healAt = (target ?? caster).clone(); healAt.y += 1.4;
           damageNumbers.spawnText(healAt, `+${ev.amount}`, "#5fd06a");
         }
       } catch { /* skill desconocida */ }
@@ -378,6 +380,21 @@ async function main() {
   await storyCard.showForEntry(entryMode);
   storyCard.remove();
   chatPanel.mount(document.body);
+  // Keep the party reachable above the chat as the HUD, viewport or chat size changes.
+  const positionParty = () => {
+    const available = chatPanel.el.getBoundingClientRect().top - 70;
+    partyPanel.roster.style.maxHeight = `${Math.max(80, Math.min(innerHeight * .45, available))}px`;
+    tradePanel.button.style.left = `${partyPanel.button.getBoundingClientRect().right + 8}px`;
+  };
+  const partyLayout = new ResizeObserver(positionParty);
+  partyLayout.observe(chatPanel.el); partyLayout.observe(partyPanel.button);
+  const playerHud = document.querySelector('[data-player-hud]');
+  if (playerHud) partyLayout.observe(playerHud);
+  window.addEventListener('resize', positionParty);
+  window.addEventListener('pagehide', event => {
+    if (!event.persisted) { partyLayout.disconnect(); window.removeEventListener('resize', positionParty); }
+  });
+  positionParty();
 
   // Interacción con el NPC de misiones: diálogo narrativo contextual.
   // El server es autoritativo; el diálogo es presentación.
@@ -597,6 +614,13 @@ async function main() {
       }
     }
 
+    const supportTarget = skill.allyTarget ? net.getSupportTarget() : '';
+    if (supportTarget) {
+      const from = views.selfPosition(), to = views.playerWorldPosition(supportTarget);
+      if (!from || !to || Math.hypot(from.x - to.x, from.z - to.z) > 10) {
+        hud.toast('Acercate a tu aliado (10 m)', '#ffe066'); return;
+      }
+    }
     net.sendUseSkill(skillId);
     // Cooldown local + veil en la barra.
     cooldownUntil[skillId] = Date.now() + skill.cooldownMs;

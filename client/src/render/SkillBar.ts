@@ -67,7 +67,7 @@ export class SkillBar {
     keyLabel.style.cssText =
       `font-family:${FONT_DISPLAY};font-size:11px;font-weight:700;color:#241a0b;margin-top:3px;` +
       "background:linear-gradient(180deg,#f2d896,#c9a24b);border-radius:4px;padding:1px 7px;box-shadow:0 1px 2px rgba(0,0,0,0.5);";
-    keyLabel.textContent = index < 6 ? String(index + 1) : "click";
+    keyLabel.textContent = index < 6 ? String(index + 1) : "clic";
     slot.appendChild(keyLabel);
 
     const cooldownVeil = document.createElement("div");
@@ -96,9 +96,11 @@ export class SkillBar {
         nameEl.textContent = skill.name;
         const targeted = skill.type === "damage" || skill.type === "dot";
         slot.title = `${skill.name} · ${skill.mpCost} MP · ${skill.cooldownMs / 1000}s` +
-          (targeted ? ` · Alcance ${skillRange(skill)} m` : " · Sobre vos") +
-          (skill.stunMs ? ` · Stun ${skill.stunMs / 1000}s` : "") +
-          (skill.rootMs ? ` · Inmoviliza ${skill.rootMs / 1000}s` : "");
+          (skill.allyTarget ? ' · Elegí un compañero en la lista del grupo y luego usá esta habilidad · Apoyo a 10 m · Sobre mí para usarla en vos' :
+            targeted ? ` · Alcance ${skillRange(skill)} m` : " · Sobre vos") +
+          (skill.stunMs ? ` · Aturde ${skill.stunMs / 1000}s` : "") +
+          (skill.rootMs ? ` · Inmoviliza ${skill.rootMs / 1000}s` : "") +
+          (skill.description ? ` · ${skill.description}` : '');
         const tint = TYPE_COLOR[skill.type] ?? COLORS.gold;
         slot.style.borderColor = tint;
         slot.style.boxShadow = `0 5px 16px rgba(0,0,0,0.55), inset 0 1px 0 rgba(242,216,150,0.12), 0 0 10px ${tint}44`;

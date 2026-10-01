@@ -18,7 +18,11 @@ import type { Client } from "colyseus";
 import { randomUUID } from 'node:crypto';
 import { rollCatalogDrop, lootSourceFor, LOOT_QUALITY_ODDS, INVASION_RESERVE_MS, CASTLE_MAP, CHAOS_SEAL, CHAOS_SEAL_CHANCE, dungeonReward, questReward, createItemInstance } from '@aden/shared';
 import { advanceQuest, advanceDungeonKill, activateSeal, canFightDungeonMob, encounterQuestLockText, resetDungeon } from '../systems/AdventureSystem.js';
-import { stepEncounter } from '../systems/EncounterSystem.js';
+import { stepEncounter, isEncounterEligible } from '../systems/EncounterSystem.js';
+import { CooperativeCombatSystem } from '../systems/CooperativeCombatSystem.js';
+import { addPoison, tickPoisons } from '../systems/PoisonSystem.js';
+import { reservePartyLoot } from '../systems/PartyLootSystem.js';
+import { partyExpMultiplier } from '@aden/shared';
 import { EventSystem } from '../systems/EventSystem.js';
 import { ChaosCastleSystem } from '../systems/ChaosCastleSystem.js';
 const { Room } = colyseusPkg;
@@ -150,6 +154,7 @@ export class GameRoom extends Room<GameState> {
     }
   };
   private parties!: PartySystem;
+  private cooperation!: CooperativeCombatSystem;
   private trades!: TradeSystem;
   /** Contador para generar ids únicos de ítems dropeados (R-E3b-3). */
   private dropSeq = 0;
@@ -295,6 +300,8 @@ export class GameRoom extends Room<GameState> {
 
   /** Centraliza la muerte de un jugador (por mob o por PvP). Aplica penalidad si es PvP. */
   private killPlayer(victim: PlayerState, victimId: string, killerId?: string): void {
+    this.cooperation.clearPlayer(victimId);
+    victim.poisons.clear(); victim.poisonMs = 0; victim.poisonAccumMs = 0;
     // Castillo del Caos: eliminación sin penalidad (el sistema lo devuelve al pueblo).
     if (this.castle.onPlayerDeath(victimId, killerId)) { this.broadcast(MessageType.Death, { entityId: victimId }); return; }
     resetDungeon(victim);
@@ -373,6 +380,7 @@ export class GameRoom extends Room<GameState> {
 
   async onCreate() {
     this.setState(new GameState());
+    this.cooperation = new CooperativeCombatSystem(this.state, (mobId, playerId, amount) => this.events.recordSupport(mobId, playerId, amount));
     this.events = new EventSystem({
       state: this.state,
       now: () => Date.now(),
@@ -390,6 +398,7 @@ export class GameRoom extends Room<GameState> {
         item.despawnMs = INVASION_RESERVE_MS + 120_000;
         item.pickDelayMs = PICKUP_DELAY_MS;
         item.reservedFor = owner.label; item.reservedGuildId = owner.guildId; item.reservedPlayerId = owner.playerId;
+        item.reservedPartyMembers = new Set(owner.partyMembers ?? []);
         item.reservedMs = INVASION_RESERVE_MS;
         this.state.droppedItems.set(`invasion_${itemId}_${this.dropSeq++}`, item);
       },
@@ -498,6 +507,10 @@ export class GameRoom extends Room<GameState> {
       if (typeof data?.inviterId !== 'string' || data.inviterId.length > 128 || typeof data.accept !== 'boolean') return;
       client.send(MessageType.ItemResult, this.parties.respond(client.sessionId, data.inviterId, data.accept));
     });
+    this.onMessage(MessageType.PartyLootMode, (client, msg: unknown) => {
+      const mode = (msg as { mode?: unknown } | null)?.mode;
+      client.send(MessageType.ItemResult, this.parties.setLootMode(client.sessionId, mode));
+    });
     this.onMessage(MessageType.PartyLeave, client => {
       client.send(MessageType.ItemResult, this.parties.leave(client.sessionId));
     });
@@ -590,6 +603,11 @@ export class GameRoom extends Room<GameState> {
       if (p.mp < skill.mpCost) return;
       if ((p.skillCooldowns.get(skill.id) ?? 0) > 0) return;
 
+      const ally = skill.allyTarget && msg.allyId !== undefined ? this.cooperation.ally(p, msg.allyId) : undefined;
+      if (msg.allyId !== undefined && (!skill.allyTarget || !ally)) {
+        client.send(MessageType.ItemResult, { success: false, text: 'Elegí un aliado vivo de tu party a menos de 10 m.' });
+        return;
+      }
       const origin = { x: p.x, z: p.z };
       const announceCast = (targetId: string, amount?: number) => {
         const target = targetId ? this.resolveTarget(targetId, p.mapId) : null;
@@ -634,11 +652,19 @@ export class GameRoom extends Room<GameState> {
         spend();
         p.skillGcdMs = atkCd;
         const variance = 0.9 + Math.random() * 0.2;
-        const dmg = resolveAttack(p, t.entity, (skill.factor ?? 1) * power, variance, atkCd,Math.random,skillElement(skill.id));
-        if (t.kind === 'mob' && dmg > 0) { this.engageMob(t.entity, client.sessionId); this.events.recordDamage(p.targetId, client.sessionId, dmg); }
-        // Modificadores de counterplay sobre el objetivo.
-        if (dmg > 0 && skill.stunMs) t.entity.stunMs = Math.max(t.entity.stunMs, skill.stunMs);
-        if (dmg > 0 && skill.rootMs) t.entity.rootMs = Math.max(t.entity.rootMs, Math.round(skill.rootMs*(1-(t.kind==='player'&&skillElement(skill.id)==='ice'?t.entity.itemEffects.iceResist:0))));
+        const modifiers = t.kind === 'mob' ? this.cooperation.modifiers(client.sessionId, t.entity) : undefined;
+        const hpBefore = t.entity.hp;
+        const dmg = resolveAttack(p, t.entity, (skill.factor ?? 1) * power * (modifiers?.factor ?? 1), variance, atkCd, Math.random, skillElement(skill.id), modifiers?.defenseMultiplier);
+        if (t.kind === 'mob' && dmg > 0) {
+          this.engageMob(t.entity, client.sessionId);
+          this.events.recordDamage(p.targetId, client.sessionId, Math.min(hpBefore, dmg));
+          this.cooperation.recordHit(p.targetId, client.sessionId, Math.min(hpBefore, dmg), modifiers, dmg, hpBefore);
+          this.cooperation.afterSkill(client.sessionId, p.targetId, skill);
+        }
+        if (t.kind === 'player' && dmg > 0) {
+          if (skill.stunMs) t.entity.stunMs = Math.max(t.entity.stunMs, skill.stunMs);
+          if (skill.rootMs) t.entity.rootMs = Math.max(t.entity.rootMs, Math.round(skill.rootMs * (1 - (skillElement(skill.id) === 'ice' ? t.entity.itemEffects.iceResist : 0))));
+        }
         if (skill.lifestealPct && p.hp>0) p.hp = Math.min(p.maxHp, p.hp + Math.round(dmg * skill.lifestealPct));
         this.markCombat(p);
         if (t.kind === "player") this.markCombat(t.entity);
@@ -651,10 +677,12 @@ export class GameRoom extends Room<GameState> {
         if(p.hp<=0) this.killPlayer(p,client.sessionId,t.kind==='player'?t.sessionId:undefined);
       } else if (skill.type === "heal") {
         spend();
-        const healAmount = Math.round(p.maxHp * (skill.healPct ?? 0));
-        p.hp = Math.min(p.maxHp, p.hp + healAmount);
+        const target = ally ?? p;
+        const healAmount = Math.min(target.maxHp - target.hp, Math.round(p.maxHp * (skill.healPct ?? 0)));
+        target.hp += healAmount;
+        if (ally) this.cooperation.healed(client.sessionId, msg.allyId!, healAmount);
         applyCleanse();
-        announceCast("", healAmount);
+        announceCast(ally ? msg.allyId! : '', healAmount);
       } else if (skill.type === "buff") {
         spend();
         if (skill.buffStat === "pAtk") {
@@ -664,12 +692,14 @@ export class GameRoom extends Room<GameState> {
           p.defBuffMs = skill.buffMs ?? 0;
           p.defBuffMult = skill.buffMult ?? 1;
         }
+        if (skill.id === 'guard' && ally) this.cooperation.protect(client.sessionId, ally);
+        if (skill.id === 'rage') this.cooperation.rally(client.sessionId);
         // Algunos buffs también curan (last_stand) / limpian / dan escape (vanish).
         let healAmount = 0;
         if (skill.healPct) { healAmount = Math.round(p.maxHp * skill.healPct); p.hp = Math.min(p.maxHp, p.hp + healAmount); }
         applyCleanse();
         if (skill.dash === "away") this.dashAway(p, skill.dashRange);
-        announceCast("", healAmount || undefined);
+        announceCast(ally ? msg.allyId! : '', healAmount || undefined);
       } else if (skill.type === "dash") {
         // Movilidad pura (blink): escape sin objetivo.
         spend();
@@ -684,6 +714,7 @@ export class GameRoom extends Room<GameState> {
         if(target.kind==='player' && (!this.inPvpZone(p)||!this.inPvpZone(target.entity)||this.areAllies(p, target.entity)))return;
         spend();
         p.skillGcdMs = atkCd;
+        addPoison(target.entity.poisons, client.sessionId, p.level, skill.dotDps ?? 0, skill.dotMs ?? 0);
         if(target.kind==='mob') { const mob=target.entity; mob.dotMs=skill.dotMs??0;mob.dotDps=skill.dotDps??0;mob.dotAttackerId=client.sessionId;mob.dotAttackerLevel=p.level;mob.dotAccumMs=0; this.engageMob(mob,client.sessionId); }
         else { const victim=target.entity;victim.poisonMs=skill.dotMs??0;victim.poisonDps=skill.dotDps??0;victim.poisonAttackerId=client.sessionId;victim.poisonAccumMs=0; }
         this.markCombat(p);
@@ -1140,6 +1171,7 @@ export class GameRoom extends Room<GameState> {
     mob.windupTargetId = "";
     mob.stunMs = 0;
     mob.rootMs = 0;
+    this.cooperation.resetMob(mob);
     mob.dotMs = 0;
     mob.dotDps=0;mob.dotAttackerId='';mob.dotAccumMs=0;
     mob.hazardMs = 0;
@@ -1167,6 +1199,7 @@ export class GameRoom extends Room<GameState> {
    */
   private killMob(mob: MobState, mobId: string, killerId?: string) {
     if(mob.dead)return;
+    this.cooperation.resetMob(mob);
     if (mob.summonedBy) {
       mob.dead = true; mob.hazardMs = 0; mob.channeling = false; mob.moving = false; mob.respawnMs = 0;
       this.broadcast(MessageType.Death, { entityId: mobId });
@@ -1195,7 +1228,7 @@ export class GameRoom extends Room<GameState> {
       recipients.push([killerId!, killer]);
     }
     const awardedExp = new Set<string>();
-    const exp = getMobExp(mob.templateId);
+    const exp = Math.round(getMobExp(mob.templateId) * (mob.mapId === 'cripta' ? 1 : partyExpMultiplier(recipients.length)));
     recipients.forEach(([id, member], index) => {
       const client = this.clients.find(c => c.sessionId === id);
       if (client) {
@@ -1251,7 +1284,8 @@ export class GameRoom extends Room<GameState> {
     }
 
     // Loot (R-E3b-2): rodar drop table del mob y crear ítems en el piso con scatter.
-    this.dropLoot(mob.templateId, mob.x, mob.z, mob.mapId, killer?.itemEffects.goldPct ?? 0);
+    const drops = this.dropLoot(mob.templateId, mob.x, mob.z, mob.mapId, killer?.itemEffects.goldPct ?? 0);
+    if (killer?.partyId) reservePartyLoot(this.state, killer.partyId, drops, recipients.map(([id]) => id));
     this.clearSummons(mobId);
     this.castle.onMobKilled(mobId, killerId);
   }
@@ -1346,8 +1380,8 @@ export class GameRoom extends Room<GameState> {
   }
 
   /** Rueda una tabla de loot y deja los ítems en el piso (mobs y objetos de mundo). */
-  private dropLoot(lootId: string, x: number, z: number, mapId: string, goldBonus=0): void {
-    if (mapId === CASTLE_MAP) return; // los Guardias del Caos no sueltan nada
+  private dropLoot(lootId: string, x: number, z: number, mapId: string, goldBonus=0): DroppedItemState[] {
+    if (mapId === CASTLE_MAP) return []; // los Guardias del Caos no sueltan nada
     const drops=rollDrops(lootId, Math.random);
     // Una pieza del catálogo por muerte/cofre: la fuente decide cuán seguido y cuán buena sale.
     const chosen=lootId==='breakable'?undefined:rollCatalogDrop(mapId,lootId,Math.random);
@@ -1355,6 +1389,7 @@ export class GameRoom extends Room<GameState> {
     // Sello del Caos: tirada aparte, no le quita lugar al botín del catálogo.
     if(lootId!=='breakable' && Math.random() < CHAOS_SEAL_CHANCE[lootSourceFor(lootId)])drops.push({itemTemplateId:CHAOS_SEAL,qty:1});
     const odds=LOOT_QUALITY_ODDS[lootSourceFor(lootId)];
+    const created: DroppedItemState[] = [];
     for (const [index, d] of drops.entries()) {
       const item = new DroppedItemState();
       item.itemTemplateId = instantiateItem(d.itemTemplateId,true,lootId==='skeleton_king'?6:2,odds);
@@ -1366,10 +1401,17 @@ export class GameRoom extends Room<GameState> {
       item.despawnMs = DROP_DESPAWN_MS;
       item.pickDelayMs = PICKUP_DELAY_MS; // visible al caer, no pickable hasta que expire
       this.state.droppedItems.set(`${lootId}_${d.itemTemplateId}_${this.dropSeq++}`, item);
+      created.push(item);
     }
+    return created;
   }
 
   tick(dt: number) {
+    for (const mob of this.state.mobs.values()) {
+      if (!mob.summonedBy) continue;
+      const owner = this.state.mobs.get(mob.summonedBy);
+      if (!owner || owner.dead || owner.hp <= 0) this.clearSummons(mob.summonedBy);
+    }
     this.maintainDungeonRun();
     this.state.players.forEach((p) => {
       if (p.dead) return; // un jugador muerto no se mueve
@@ -1387,6 +1429,7 @@ export class GameRoom extends Room<GameState> {
       playersByMap.set(p.mapId, arr);
     });
     const dtMs = dt * 1000;
+    this.cooperation.tick(dtMs);
     this.state.mobs.forEach((mob, mobId) => {
       if (mob.dead) return; // R-E2b1-3: un mob muerto no deambula ni persigue
       if (mob.windupMs > 0 || mob.hazardMs > 0) {
@@ -1395,15 +1438,18 @@ export class GameRoom extends Room<GameState> {
       }
       if (mob.stunMs > 0) { mob.moving = false; return; } // Etapa 22: aturdido no actúa
       const encounter = getEncounter(mob.templateId);
+      const owner = mob.summonedBy ? this.state.mobs.get(mob.summonedBy) : undefined;
+      const targetRules = encounter ?? (owner ? getEncounter(owner.templateId) : undefined);
       const aiConfig = encounter ? { ...AI_CONFIG, aggroRadius: encounter.aggroRadius, leashRadius: encounterLeashRadius(encounter) } : AI_CONFIG;
       const candidates=(playersByMap.get(mob.mapId) ?? []).filter(pos=>{
         const p=this.state.players.get(pos.id);
-        return p && canFightDungeonMob(p,mob.templateId) && p.level >= (encounter?.minTargetLevel ?? 0);
+        return p && canFightDungeonMob(p,mob.templateId) && (!targetRules || isEncounterEligible(targetRules, p));
       });
       const wasEngaged = mob.aiState === 'chase';
       stepMobAI(mob, candidates, aiConfig, Math.random, dtMs);
       if (wasEngaged && !mob.aggroTargetId) {
         mob.hp = mob.maxHp;
+        this.cooperation.resetMob(mob);
         mob.dotMs = 0; mob.dotDps = 0; mob.dotAccumMs = 0; mob.dotAttackerId = '';
         mob.hazardMs = 0; mob.hazardCooldownMs = 0;
         mob.channeling = false; mob.hazardCount = 0;
@@ -1455,7 +1501,21 @@ export class GameRoom extends Room<GameState> {
       // Etapa 22: regeneración de recursos (mantiene HP/MP enteros con acumuladores).
       p.msSinceCombat += dtMs;
       if (!p.dead) {
-        if(p.poisonMs>0) {
+        if (p.poisons.size) {
+          const victimId = [...this.state.players.entries()].find(([, candidate]) => candidate === p)![0];
+          p.poisonMs = tickPoisons(p.poisons, dtMs, effect => {
+            const source = this.state.players.get(effect.attackerId);
+            return !!source && !source.dead && source.mapId === p.mapId && !this.areAllies(p, source) && this.inPvpZone(p) && this.inPvpZone(source);
+          }, effect => {
+            const dmg = Math.max(1, Math.round(effect.dps * .5 * (1 - p.itemEffects.reduction) * (1 - p.itemEffects.poisonResist)));
+            p.hp = Math.max(0, p.hp - dmg);
+            this.markCombat(p);
+            this.broadcast(MessageType.Damage, { attackerId: effect.attackerId, targetId: victimId, amount: dmg, hp: p.hp, periodic: true });
+            if (p.hp <= 0) this.killPlayer(p, victimId, effect.attackerId);
+            return !p.dead && p.poisons.has(effect.attackerId);
+          });
+          p.poisonAccumMs = 0;
+        } else if(p.poisonMs>0) {
           const source=this.state.players.get(p.poisonAttackerId);
           if(!source || source.dead || source.mapId!==p.mapId || this.areAllies(p, source) || !this.inPvpZone(p)||!this.inPvpZone(source)) {p.poisonMs=0;p.poisonAccumMs=0;}
           else {
@@ -1506,8 +1566,14 @@ export class GameRoom extends Room<GameState> {
         if (canAttack(p, mob, weaponRange(playerLoadout(p)))) {
           if(!consumeAmmo(p))return;
           const variance = 0.9 + Math.random() * 0.2;
-          const dmg = resolveAttack(p, mob, power, variance, getClass(p.className).base.attackCooldownMs/(1+p.itemEffects.attackSpeed));
-          if (dmg > 0) { this.engageMob(mob, sessionId); this.events.recordDamage(p.targetId, sessionId, dmg); }
+          const modifiers = this.cooperation.modifiers(sessionId, mob);
+          const hpBefore = mob.hp;
+          const dmg = resolveAttack(p, mob, power * modifiers.factor, variance, getClass(p.className).base.attackCooldownMs/(1+p.itemEffects.attackSpeed), Math.random, undefined, modifiers.defenseMultiplier);
+          if (dmg > 0) {
+            this.engageMob(mob, sessionId);
+            this.events.recordDamage(p.targetId, sessionId, Math.min(hpBefore, dmg));
+            this.cooperation.recordHit(p.targetId, sessionId, Math.min(hpBefore, dmg), modifiers, dmg, hpBefore);
+          }
           if(getItem(p.equipment.get('weapon')??'worn_sword').ammo)this.broadcast(MessageType.SkillCast,{casterId:sessionId,skillId:'aimed_shot',targetId:p.targetId});
           this.markCombat(p);
           this.broadcast(MessageType.Damage, { attackerId: sessionId, targetId: p.targetId, amount: dmg, hp: mob.hp });
@@ -1539,7 +1605,8 @@ export class GameRoom extends Room<GameState> {
         const p=this.state.players.get(id)!;
         const def=p.pDef*(p.defBuffMs>0?p.defBuffMult:1);
         const power = mob.hazardPower;
-        const dmg=Math.max(1,Math.round(computeDamage(mob.pAtk,def,power * pvePower(p.level,mob.level).incoming,1)*(1-p.itemEffects.reduction)));
+        const rawDamage=Math.max(1,Math.round(computeDamage(mob.pAtk,def,power * pvePower(p.level,mob.level).incoming,1)*(1-p.itemEffects.reduction)));
+        const dmg = this.cooperation.mitigate(id, mobId, rawDamage);
         p.hp=Math.max(0,p.hp-dmg);
         this.markCombat(p);
         this.broadcast(MessageType.Damage,{attackerId:mobId,targetId:id,amount:dmg,hp:p.hp});
@@ -1568,7 +1635,8 @@ export class GameRoom extends Room<GameState> {
         // daño con def efectiva del jugador (buff): reusar computeDamage
         const defMult = (target.defBuffMs > 0) ? target.defBuffMult : 1;
         const fireMob=['infernal_demon','ancient_drake'].includes(mob.templateId);
-        const dmg = Math.random()<target.itemEffects.dodge?0:Math.max(1,Math.round(computeDamage(mob.pAtk, target.pDef * defMult, pvePower(target.level,mob.level).incoming, variance)*(1-target.itemEffects.reduction)*(1-(fireMob?target.itemEffects.fireResist:0))));
+        const rawDamage = Math.random()<target.itemEffects.dodge?0:Math.max(1,Math.round(computeDamage(mob.pAtk, target.pDef * defMult, pvePower(target.level,mob.level).incoming, variance)*(1-target.itemEffects.reduction)*(1-(fireMob?target.itemEffects.fireResist:0))));
+        const dmg = this.cooperation.mitigate(targetId, mobId, rawDamage);
         const reflected=Math.floor(Math.min(target.hp,dmg)*target.itemEffects.reflect*pvePower(target.level,mob.level).outgoing);
         target.hp = Math.max(0, target.hp - dmg);
         this.markCombat(target);
@@ -1590,7 +1658,30 @@ export class GameRoom extends Room<GameState> {
 
     // DoT ticks: aplicar daño por veneno a mobs
     this.state.mobs.forEach((mob, mobId) => {
-      if (mob.dead || mob.dotMs <= 0) return;
+      if (mob.dead) return;
+      if (mob.poisons.size) {
+        mob.dotMs = tickPoisons(mob.poisons, dtMs, effect => {
+          const source = this.state.players.get(effect.attackerId);
+          return !(mob.mapId === 'cripta' && !canFightDungeonMob(this.dungeonRun, mob.templateId)) &&
+            pvePower(source?.level ?? effect.level, mob.level).outgoing > 0;
+        }, effect => {
+          const source = this.state.players.get(effect.attackerId);
+          const power = pvePower(source?.level ?? effect.level, mob.level).outgoing;
+          const modifiers = source && !source.dead && source.mapId === mob.mapId ? this.cooperation.modifiers(effect.attackerId, mob, false) : undefined;
+          const dmg = Math.max(1, Math.round(effect.dps * .5 * power * (modifiers?.factor ?? 1)));
+          const hpBefore = mob.hp;
+          const actual = Math.min(hpBefore, dmg);
+          mob.hp = Math.max(0, mob.hp - dmg);
+          this.events.recordDamage(mobId, effect.attackerId, actual);
+          if (modifiers) this.cooperation.recordHit(mobId, effect.attackerId, actual, modifiers, dmg, hpBefore);
+          this.broadcast(MessageType.Damage, { attackerId: effect.attackerId, periodic: true, targetId: mobId, amount: dmg, hp: mob.hp });
+          if (mob.hp <= 0) this.killMob(mob, mobId, effect.attackerId);
+          return !mob.dead;
+        });
+        mob.dotAccumMs = 0;
+        return;
+      }
+      if (mob.dotMs <= 0) return;
       if(mob.mapId==='cripta' && !canFightDungeonMob(this.dungeonRun,mob.templateId)) {mob.dotMs=0;return;}
 
       const source = this.state.players.get(mob.dotAttackerId);
@@ -1638,7 +1729,7 @@ export class GameRoom extends Room<GameState> {
       if (it.pickDelayMs > 0) it.pickDelayMs -= dtMs;
       if (it.reservedMs > 0) {
         it.reservedMs -= dtMs;
-        if (it.reservedMs <= 0) { it.reservedMs = 0; it.reservedFor = ''; it.reservedGuildId = ''; it.reservedPlayerId = ''; }
+        if (it.reservedMs <= 0) { it.reservedPartyMembers.clear(); it.reservedMs = 0; it.reservedFor = ''; it.reservedGuildId = ''; it.reservedPlayerId = ''; }
       }
       if (it.despawnMs <= 0) despawnIds.push(id);
     });
@@ -1931,6 +2022,7 @@ export class GameRoom extends Room<GameState> {
     this.castle.eliminate(client.sessionId, 'disconnect'); // no queda atrapado en la arena
     this.chat.remove(client.sessionId);
     this.trades.remove(client.sessionId);
+    this.cooperation.clearPlayer(client.sessionId);
     this.parties.leave(client.sessionId);
     const player = this.state.players.get(client.sessionId);
     const name=this.accountNames.get(client.sessionId);
