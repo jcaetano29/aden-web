@@ -58,7 +58,7 @@ export interface PlayerSnapshot {
   targetX: number;
   targetZ: number;
   moving: boolean;
-  /** Velocidad efectiva replicada (base × equipo); la usa la predicción del movimiento propio. */
+  /** Velocidad efectiva replicada (base × atributos y equipo); la usa la predicción del movimiento propio. */
   moveSpeed?: number;
   /** Muerto/respawneando (server-autoritativo); permite animar death/respawn de OTROS jugadores. */
   dead: boolean;
@@ -127,6 +127,10 @@ export interface SelfCombatSnapshot {
   vit: number;
   ene: number;
   statPoints: number;
+  resetAvailable?: boolean;
+  /** Rapidez efectiva de atributos y equipo. */
+  attackSpeed?: number;
+  moveSpeed?: number;
   /** Control activo (Etapa 22): ms de aturdimiento / enraizamiento. */
   stunMs: number;
   rootMs: number;
@@ -351,6 +355,8 @@ export class NetworkClient {
     this.room.send(MessageType.AllocateStat, msg);
   }
 
+  sendResetAttributes() { this.room.send(MessageType.ResetAttributes, {}); }
+
   /** Envía la intención de comprar un ítem en la tienda. */
   sendBuyItem(itemTemplateId: string, qty = 1) {
     const msg: BuyItemMessage = { itemTemplateId, qty };
@@ -559,6 +565,9 @@ export class NetworkClient {
       vit: p.attributes?.vit ?? 0,
       ene: p.attributes?.ene ?? 0,
       statPoints: p.attributes?.statPoints ?? 0,
+      resetAvailable: p.attributes?.resetAvailable ?? false,
+      attackSpeed: p.attributes?.attackSpeed ?? 0,
+      moveSpeed: p.moveSpeed ?? MOVE_SPEED,
       stunMs: p.stunMs ?? 0,
       rootMs: p.rootMs ?? 0,
       className: p.className ?? "knight",

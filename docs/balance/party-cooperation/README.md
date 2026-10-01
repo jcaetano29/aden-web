@@ -15,15 +15,15 @@ Los aumentos de vida compensan el daño adicional del grupo. El Heraldo conserv�
 
 ## Resultados reproducibles
 
-Tres semillas, personajes de nivel 25 y equipo equivalente por clase contra el Dragón. Mediciones regeneradas con la versión preparada para integrar en `master`, sin los cambios locales pendientes de atributos y equipo. Mediana de segundos hasta derrotarlo:
+Tres semillas, personajes de nivel 25 y equipo equivalente por clase contra el Dragón. Mediciones regeneradas con los atributos por clase revisados y el mismo reparto equilibrado de puntos del simulador. Mediana de segundos hasta derrotarlo:
 
 | Composición | Sin decisiones de apoyo | Con decisiones de apoyo |
 |---|---:|---:|
-| Una de cada clase | 277,1 | 280,9 |
-| Cinco magos | 287,5 | 295,6 |
-| Cinco bárbaros | 320,9 | 320,9 |
+| Una de cada clase | 245,3 | 244,7 |
+| Cinco magos | 247,0 | 247,0 |
+| Cinco bárbaros | 271,3 | 271,3 |
 
-La diferencia más clara aparece en los cinco magos: pasan de 1/1/1 muertes a 0/0/1 y de 21/18/19 pociones a 5/6/4. El grupo mixto no mejora con las decisiones de apoyo actuales de los bots: pasa de 1/1/1 pociones a 2/2/5, sin muertes en ninguno de los casos y con un tiempo algo mayor. Los cinco bárbaros conservan una muerte por intento. Son resultados de bots; no establecen una composición óptima para jugadores humanos ni demuestran una mejora universal por usar apoyo.
+La diferencia más clara aparece en supervivencia y recursos. Los cinco magos pasan de 1/1/0 muertes a 0/0/0 y de 14/14/18 pociones a 0/12/4. El grupo mixto pasa de 4/2/3 pociones a 1/1/0, sin muertes en ninguno de los casos. Los cinco bárbaros conservan una muerte por intento. Son resultados de bots; no establecen una composición óptima para jugadores humanos ni demuestran una mejora universal por usar apoyo.
 
 Los grupos previstos derrotan las cuatro invasiones dentro de los intervalos originales en las tres semillas. Sus intentos individuales fracasan. Las cinco clases cumplen el límite de 1,5 veces la mediana en Halden y Vharzul. Vharzul con cinco personajes de nivel 25 muere demasiado rápido para demostrar complementariedad: sirve como comprobación de regresión, no como validación de un encuentro de grupo exigente.
 
@@ -39,8 +39,12 @@ El comando regenera [cooperation-results.json](cooperation-results.json), que in
 
 ## Verificación
 
+Los atributos ahora distinguen el ataque principal por clase: Fuerza para caballero y bárbaro, Energía para mago, Agilidad para pícaro y explorador. Agilidad también aporta rapidez y movimiento, con límites propios de +50% y +15%, respectivamente; los efectos del equipo se suman aparte. La vida por Vitalidad y el maná por Energía dependen de la clase. El panel muestra base 100 más la inversión; los 100 no conceden puntos extra ni alteran el formato de los atributos guardados.
+
+El servidor, la comparación de equipo y la descripción del próximo punto usan la misma composición de estadísticas, incluidos porcentajes de equipo y redondeos. Para proteger las inversiones previas al cambio de reglas, los personajes antiguos con puntos asignados reciben una redistribución gratuita opcional de un solo uso. Se confirma desde el panel C, estando vivo, fuera de combate y en una zona segura del pueblo. La disponibilidad y su consumo se guardan en el progreso existente; no requiere migrar tablas. Los personajes nuevos no reciben esta compensación.
+
 Se probaron por protocolo real la selección de aliados, distancia, muerte, mapa, party, recursos, curación efectiva, provocación, venenos simultáneos, bonus de EXP y permisos de botín. Las pruebas de dominio cubren reparto, contribución, recuperación entre controles y limpieza de estados. La revisión independiente encontró y permitió corregir falsas interrupciones, crédito por daño excesivo, bloqueo de viaje por curas pacíficas, ayuda PvP fuera de combate y refuerzos sin requisitos o huérfanos.
 
 La interfaz se comprobó con dos clientes locales: invitación y aceptación, selección de apoyo, cambio de modo replicado y permisos del líder. Se corrigieron superposiciones con el chat y el botón de intercambio. La consola de navegador no mostró errores durante la comprobación final.
 
-Verificación de la versión para integrar: `npm test` completó **1051 pruebas** (shared 282, servidor 400, cliente 369). TypeScript de los tres paquetes, builds de cliente y servidor y `git diff --check` correctos. Vite conserva el aviso de un chunk gráfico de más de 500 kB; no impide compilar. La comprobación anterior de 1071 pruebas incluía cambios locales de atributos y equipo que se conservaron fuera de este commit.
+Verificación con atributos por clase: `npm test` completó **1077 pruebas** (shared 291, servidor 412, cliente 374). TypeScript de los tres paquetes y builds de cliente y servidor correctos. Las pruebas nuevas cubren redondeos y porcentajes de equipo, confirmación, guardados antiguos, persistencia de la compensación, rechazo de usos repetidos y restricciones de combate. La revisión independiente no encontró bloqueos tras corregir la migración de builds y los textos del próximo punto. Vite conserva el aviso de un chunk gráfico de más de 500 kB; no impide compilar.

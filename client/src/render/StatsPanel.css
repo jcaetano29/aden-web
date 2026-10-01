@@ -2,7 +2,7 @@
   position: fixed; left: 50%; top: 28px; transform: translateX(-50%);
   width: min(450px, calc(100vw - 24px)); max-height: calc(100dvh - 56px);
   overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box;
-  z-index: 1000; pointer-events: auto; user-select: none;
+  z-index: 1400; pointer-events: auto; user-select: none;
   padding: 10px; border: 4px ridge #55574f;
   color: #d0d2c9; background: #0b0e0c;
   background-image: repeating-linear-gradient(135deg, transparent 0 34px, #74816a04 35px 36px, transparent 37px 70px);
@@ -31,8 +31,12 @@
 .stats-add:active:not(:disabled) { box-shadow: inset 0 2px 5px #190900; }
 .stats-add:disabled { filter: saturate(.25); opacity: .4; cursor: not-allowed; text-shadow: none; }
 .stats-panel button:focus-visible { outline: 2px solid #fff1ae; outline-offset: 2px; }
-.stats-derived { margin: 13px 12px 0; font-variant-numeric: tabular-nums; }
+.stats-derived { margin: 13px 12px 0; font-variant-numeric: tabular-nums; white-space: pre-line; }
 .stats-effect { margin: 8px 12px 0; color: #a1ad96; font-size: 11px; }
+.stats-reset { margin: 0 10px 12px; color: #c9c6a9; }
+.stats-reset:has(> button[hidden]) { display: none; }
+.stats-reset p { margin: 8px 0; }
+.stats-reset button { max-width: 100%; margin: 0 6px 6px 0; padding: 7px 9px; border: 1px solid #656650; background: #20271b; color: #e0d99c; cursor: pointer; }
 .stats-footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 10px; border-top: 1px solid #333c2d; padding: 10px 2px 0; color: #a0a88f; font-size: 11px; }
 @media (max-width: 480px), (max-height: 700px) {
   .stats-panel { top: 8px; max-height: calc(100dvh - 16px); }

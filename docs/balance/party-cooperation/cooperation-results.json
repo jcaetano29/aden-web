@@ -19,9 +19,9 @@
       "seed": 1,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 277.2,
+      "seconds": 249.2,
       "deaths": 0,
-      "potions": 1,
+      "potions": 4,
       "support": {
         "heals": 0,
         "healing": 0,
@@ -34,54 +34,54 @@
       "seed": 1,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 276.7,
-      "deaths": 0,
-      "potions": 2,
-      "support": {
-        "heals": 7,
-        "healing": 1463,
-        "protections": 3
-      }
-    },
-    {
-      "encounter": "Dragón Carmesí",
-      "composition": "mixto",
-      "seed": 2,
-      "cooperation": false,
-      "outcome": "kill",
-      "seconds": 274.9,
+      "seconds": 249.4,
       "deaths": 0,
       "potions": 1,
       "support": {
-        "heals": 0,
-        "healing": 0,
-        "protections": 0
-      }
-    },
-    {
-      "encounter": "Dragón Carmesí",
-      "composition": "mixto",
-      "seed": 2,
-      "cooperation": true,
-      "outcome": "kill",
-      "seconds": 280.9,
-      "deaths": 0,
-      "potions": 2,
-      "support": {
-        "heals": 9,
-        "healing": 1881,
+        "heals": 7,
+        "healing": 1463,
         "protections": 4
       }
     },
     {
       "encounter": "Dragón Carmesí",
       "composition": "mixto",
+      "seed": 2,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 241.8,
+      "deaths": 0,
+      "potions": 2,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "mixto",
+      "seed": 2,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 243.5,
+      "deaths": 0,
+      "potions": 1,
+      "support": {
+        "heals": 5,
+        "healing": 1045,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "mixto",
       "seed": 3,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 277.1,
+      "seconds": 245.3,
       "deaths": 0,
-      "potions": 1,
+      "potions": 3,
       "support": {
         "heals": 0,
         "healing": 0,
@@ -94,13 +94,13 @@
       "seed": 3,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 284.1,
+      "seconds": 244.7,
       "deaths": 0,
-      "potions": 5,
+      "potions": 0,
       "support": {
-        "heals": 8,
-        "healing": 1672,
-        "protections": 5
+        "heals": 6,
+        "healing": 1254,
+        "protections": 1
       }
     },
     {
@@ -109,9 +109,9 @@
       "seed": 1,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 287.5,
+      "seconds": 245.7,
       "deaths": 1,
-      "potions": 21,
+      "potions": 14,
       "support": {
         "heals": 0,
         "healing": 0,
@@ -124,12 +124,12 @@
       "seed": 1,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 295.6,
+      "seconds": 246.9,
       "deaths": 0,
-      "potions": 5,
+      "potions": 0,
       "support": {
-        "heals": 18,
-        "healing": 3762,
+        "heals": 29,
+        "healing": 6061,
         "protections": 0
       }
     },
@@ -139,8 +139,38 @@
       "seed": 2,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 287.5,
+      "seconds": 247.5,
       "deaths": 1,
+      "potions": 14,
+      "support": {
+        "heals": 0,
+        "healing": 0,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 magos",
+      "seed": 2,
+      "cooperation": true,
+      "outcome": "kill",
+      "seconds": 247,
+      "deaths": 0,
+      "potions": 12,
+      "support": {
+        "heals": 12,
+        "healing": 2508,
+        "protections": 0
+      }
+    },
+    {
+      "encounter": "Dragón Carmesí",
+      "composition": "5 magos",
+      "seed": 3,
+      "cooperation": false,
+      "outcome": "kill",
+      "seconds": 247,
+      "deaths": 0,
       "potions": 18,
       "support": {
         "heals": 0,
@@ -151,45 +181,15 @@
     {
       "encounter": "Dragón Carmesí",
       "composition": "5 magos",
-      "seed": 2,
+      "seed": 3,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 295.6,
+      "seconds": 247.2,
       "deaths": 0,
-      "potions": 6,
-      "support": {
-        "heals": 19,
-        "healing": 3971,
-        "protections": 0
-      }
-    },
-    {
-      "encounter": "Dragón Carmesí",
-      "composition": "5 magos",
-      "seed": 3,
-      "cooperation": false,
-      "outcome": "kill",
-      "seconds": 287.5,
-      "deaths": 1,
-      "potions": 19,
-      "support": {
-        "heals": 0,
-        "healing": 0,
-        "protections": 0
-      }
-    },
-    {
-      "encounter": "Dragón Carmesí",
-      "composition": "5 magos",
-      "seed": 3,
-      "cooperation": true,
-      "outcome": "kill",
-      "seconds": 295.7,
-      "deaths": 1,
       "potions": 4,
       "support": {
-        "heals": 23,
-        "healing": 4807,
+        "heals": 17,
+        "healing": 3553,
         "protections": 0
       }
     },
@@ -199,9 +199,9 @@
       "seed": 1,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 320.9,
+      "seconds": 278.1,
       "deaths": 1,
-      "potions": 28,
+      "potions": 24,
       "support": {
         "heals": 0,
         "healing": 0,
@@ -214,9 +214,9 @@
       "seed": 1,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 320.9,
+      "seconds": 278.1,
       "deaths": 1,
-      "potions": 28,
+      "potions": 24,
       "support": {
         "heals": 0,
         "healing": 0,
@@ -229,9 +229,9 @@
       "seed": 2,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 313.7,
+      "seconds": 269.2,
       "deaths": 1,
-      "potions": 25,
+      "potions": 22,
       "support": {
         "heals": 0,
         "healing": 0,
@@ -244,9 +244,9 @@
       "seed": 2,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 313.7,
+      "seconds": 269.2,
       "deaths": 1,
-      "potions": 25,
+      "potions": 22,
       "support": {
         "heals": 0,
         "healing": 0,
@@ -259,9 +259,9 @@
       "seed": 3,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 330.3,
+      "seconds": 271.3,
       "deaths": 1,
-      "potions": 29,
+      "potions": 21,
       "support": {
         "heals": 0,
         "healing": 0,
@@ -274,9 +274,9 @@
       "seed": 3,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 330.3,
+      "seconds": 271.3,
       "deaths": 1,
-      "potions": 29,
+      "potions": 21,
       "support": {
         "heals": 0,
         "healing": 0,
@@ -289,7 +289,7 @@
       "seed": 1,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 10.5,
+      "seconds": 8.9,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -304,7 +304,7 @@
       "seed": 1,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 10.5,
+      "seconds": 8.9,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -319,7 +319,7 @@
       "seed": 2,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 10.5,
+      "seconds": 8.9,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -334,7 +334,7 @@
       "seed": 2,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 10.5,
+      "seconds": 8.9,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -349,7 +349,7 @@
       "seed": 3,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 10.5,
+      "seconds": 8.7,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -364,7 +364,7 @@
       "seed": 3,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 10.5,
+      "seconds": 8.7,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -379,7 +379,7 @@
       "seed": 1,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 10.9,
+      "seconds": 10.2,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -394,7 +394,7 @@
       "seed": 1,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 10.9,
+      "seconds": 10.2,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -409,7 +409,7 @@
       "seed": 2,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 12,
+      "seconds": 10.2,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -424,7 +424,7 @@
       "seed": 2,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 12,
+      "seconds": 10.2,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -439,7 +439,7 @@
       "seed": 3,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 10.9,
+      "seconds": 10.2,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -454,7 +454,7 @@
       "seed": 3,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 10.9,
+      "seconds": 10.2,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -469,7 +469,7 @@
       "seed": 1,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 7.1,
+      "seconds": 5,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -484,7 +484,7 @@
       "seed": 1,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 7.1,
+      "seconds": 5,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -499,7 +499,7 @@
       "seed": 2,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 7.1,
+      "seconds": 5,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -514,7 +514,7 @@
       "seed": 2,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 7.1,
+      "seconds": 5,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -529,7 +529,7 @@
       "seed": 3,
       "cooperation": false,
       "outcome": "kill",
-      "seconds": 7.1,
+      "seconds": 5,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -544,7 +544,7 @@
       "seed": 3,
       "cooperation": true,
       "outcome": "kill",
-      "seconds": 7.1,
+      "seconds": 5,
       "deaths": 0,
       "potions": 0,
       "support": {
@@ -564,20 +564,20 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 276.7,
+        "seconds": 249.4,
         "deaths": 0,
-        "potions": 2,
+        "potions": 1,
         "support": {
           "heals": 7,
           "healing": 1463,
-          "protections": 3
+          "protections": 4
         }
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 103.6,
+        "seconds": 114.1,
         "deaths": 1,
-        "potions": 7,
+        "potions": 8,
         "support": {
           "heals": 0,
           "healing": 0,
@@ -594,18 +594,18 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 280.9,
+        "seconds": 243.5,
         "deaths": 0,
-        "potions": 2,
+        "potions": 1,
         "support": {
-          "heals": 9,
-          "healing": 1881,
-          "protections": 4
+          "heals": 5,
+          "healing": 1045,
+          "protections": 0
         }
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 103.6,
+        "seconds": 107.9,
         "deaths": 1,
         "potions": 7,
         "support": {
@@ -624,20 +624,20 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 284.1,
+        "seconds": 244.7,
         "deaths": 0,
-        "potions": 5,
+        "potions": 0,
         "support": {
-          "heals": 8,
-          "healing": 1672,
-          "protections": 5
+          "heals": 6,
+          "healing": 1254,
+          "protections": 1
         }
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 90.2,
+        "seconds": 114.1,
         "deaths": 1,
-        "potions": 5,
+        "potions": 8,
         "support": {
           "heals": 0,
           "healing": 0,
@@ -654,7 +654,7 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 136.3,
+        "seconds": 126.3,
         "deaths": 0,
         "potions": 4,
         "support": {
@@ -665,7 +665,7 @@
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 390.5,
+        "seconds": 372.2,
         "deaths": 1,
         "potions": 28,
         "support": {
@@ -684,9 +684,9 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 136.3,
+        "seconds": 126.3,
         "deaths": 0,
-        "potions": 5,
+        "potions": 4,
         "support": {
           "heals": 1,
           "healing": 166,
@@ -695,9 +695,9 @@
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 375.1,
+        "seconds": 364.9,
         "deaths": 1,
-        "potions": 28,
+        "potions": 27,
         "support": {
           "heals": 0,
           "healing": 0,
@@ -714,7 +714,7 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 135.7,
+        "seconds": 125.4,
         "deaths": 0,
         "potions": 4,
         "support": {
@@ -725,9 +725,9 @@
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 390.5,
+        "seconds": 367.9,
         "deaths": 1,
-        "potions": 28,
+        "potions": 27,
         "support": {
           "heals": 0,
           "healing": 0,
@@ -744,9 +744,9 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 146.5,
+        "seconds": 126.1,
         "deaths": 0,
-        "potions": 5,
+        "potions": 4,
         "support": {
           "heals": 1,
           "healing": 200,
@@ -755,7 +755,7 @@
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 298.1,
+        "seconds": 295.2,
         "deaths": 1,
         "potions": 24,
         "support": {
@@ -774,9 +774,9 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 145.3,
+        "seconds": 126.1,
         "deaths": 0,
-        "potions": 5,
+        "potions": 3,
         "support": {
           "heals": 1,
           "healing": 200,
@@ -785,9 +785,9 @@
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 306.3,
+        "seconds": 282.7,
         "deaths": 1,
-        "potions": 25,
+        "potions": 24,
         "support": {
           "heals": 0,
           "healing": 0,
@@ -804,20 +804,20 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 145.2,
+        "seconds": 128.3,
         "deaths": 0,
-        "potions": 5,
+        "potions": 3,
         "support": {
-          "heals": 1,
-          "healing": 200,
+          "heals": 3,
+          "healing": 600,
           "protections": 0
         }
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 303.3,
+        "seconds": 279.8,
         "deaths": 1,
-        "potions": 25,
+        "potions": 24,
         "support": {
           "heals": 0,
           "healing": 0,
@@ -834,20 +834,20 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 138.8,
+        "seconds": 121.5,
         "deaths": 0,
         "potions": 0,
         "support": {
-          "heals": 1,
-          "healing": 209,
+          "heals": 3,
+          "healing": 627,
           "protections": 0
         }
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 128.9,
+        "seconds": 137.1,
         "deaths": 1,
-        "potions": 10,
+        "potions": 11,
         "support": {
           "heals": 0,
           "healing": 0,
@@ -864,20 +864,20 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 138.8,
+        "seconds": 120.5,
         "deaths": 0,
         "potions": 0,
         "support": {
-          "heals": 1,
-          "healing": 209,
+          "heals": 3,
+          "healing": 627,
           "protections": 0
         }
       },
       "solo": {
         "outcome": "wipe",
-        "seconds": 133.9,
+        "seconds": 137.1,
         "deaths": 1,
-        "potions": 10,
+        "potions": 11,
         "support": {
           "heals": 0,
           "healing": 0,
@@ -894,12 +894,12 @@
       ],
       "group": {
         "outcome": "kill",
-        "seconds": 138,
+        "seconds": 120.5,
         "deaths": 0,
         "potions": 0,
         "support": {
-          "heals": 1,
-          "healing": 209,
+          "heals": 3,
+          "healing": 627,
           "protections": 0
         }
       },
@@ -907,7 +907,7 @@
         "outcome": "wipe",
         "seconds": 133.9,
         "deaths": 1,
-        "potions": 11,
+        "potions": 10,
         "support": {
           "heals": 0,
           "healing": 0,
@@ -925,8 +925,8 @@
       "level": 20,
       "enemyLevel": 20,
       "outcome": "kill",
-      "seconds": 87.4,
-      "hpLostPct": 44,
+      "seconds": 71.1,
+      "hpLostPct": 43,
       "potions": 0
     },
     {
@@ -937,8 +937,8 @@
       "level": 20,
       "enemyLevel": 20,
       "outcome": "kill",
-      "seconds": 85.1,
-      "hpLostPct": 44,
+      "seconds": 73.9,
+      "hpLostPct": 43,
       "potions": 0
     },
     {
@@ -949,8 +949,8 @@
       "level": 20,
       "enemyLevel": 20,
       "outcome": "kill",
-      "seconds": 85.1,
-      "hpLostPct": 45,
+      "seconds": 71.1,
+      "hpLostPct": 43,
       "potions": 0
     },
     {
@@ -961,9 +961,9 @@
       "level": 20,
       "enemyLevel": 20,
       "outcome": "kill",
-      "seconds": 61.3,
-      "hpLostPct": 66,
-      "potions": 2
+      "seconds": 59.1,
+      "hpLostPct": 59,
+      "potions": 1
     },
     {
       "seed": 2,
@@ -973,32 +973,32 @@
       "level": 20,
       "enemyLevel": 20,
       "outcome": "kill",
-      "seconds": 61.3,
-      "hpLostPct": 64,
-      "potions": 2
-    },
-    {
-      "seed": 3,
-      "scenario": "Halden",
-      "className": "mage",
-      "behavior": "attentive",
-      "level": 20,
-      "enemyLevel": 20,
-      "outcome": "kill",
-      "seconds": 61.3,
-      "hpLostPct": 64,
-      "potions": 2
-    },
-    {
-      "seed": 1,
-      "scenario": "Halden",
-      "className": "barbarian",
-      "behavior": "attentive",
-      "level": 20,
-      "enemyLevel": 20,
-      "outcome": "kill",
-      "seconds": 69.1,
+      "seconds": 59.1,
       "hpLostPct": 63,
+      "potions": 2
+    },
+    {
+      "seed": 3,
+      "scenario": "Halden",
+      "className": "mage",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 59,
+      "hpLostPct": 58,
+      "potions": 1
+    },
+    {
+      "seed": 1,
+      "scenario": "Halden",
+      "className": "barbarian",
+      "behavior": "attentive",
+      "level": 20,
+      "enemyLevel": 20,
+      "outcome": "kill",
+      "seconds": 57.1,
+      "hpLostPct": 61,
       "potions": 5
     },
     {
@@ -1009,8 +1009,8 @@
       "level": 20,
       "enemyLevel": 20,
       "outcome": "kill",
-      "seconds": 69.1,
-      "hpLostPct": 61,
+      "seconds": 58.5,
+      "hpLostPct": 68,
       "potions": 5
     },
     {
@@ -1021,9 +1021,9 @@
       "level": 20,
       "enemyLevel": 20,
       "outcome": "kill",
-      "seconds": 67.6,
-      "hpLostPct": 61,
-      "potions": 5
+      "seconds": 54.2,
+      "hpLostPct": 58,
+      "potions": 4
     },
     {
       "seed": 1,
@@ -1033,9 +1033,9 @@
       "level": 20,
       "enemyLevel": 20,
       "outcome": "kill",
-      "seconds": 60.7,
-      "hpLostPct": 59,
-      "potions": 4
+      "seconds": 61.3,
+      "hpLostPct": 71,
+      "potions": 5
     },
     {
       "seed": 2,
@@ -1045,8 +1045,8 @@
       "level": 20,
       "enemyLevel": 20,
       "outcome": "kill",
-      "seconds": 60.7,
-      "hpLostPct": 61,
+      "seconds": 60.8,
+      "hpLostPct": 71,
       "potions": 4
     },
     {
@@ -1057,8 +1057,8 @@
       "level": 20,
       "enemyLevel": 20,
       "outcome": "kill",
-      "seconds": 60.7,
-      "hpLostPct": 60,
+      "seconds": 60.8,
+      "hpLostPct": 71,
       "potions": 4
     },
     {
@@ -1070,7 +1070,7 @@
       "enemyLevel": 20,
       "outcome": "kill",
       "seconds": 73.7,
-      "hpLostPct": 57,
+      "hpLostPct": 70,
       "potions": 2
     },
     {
@@ -1082,7 +1082,7 @@
       "enemyLevel": 20,
       "outcome": "kill",
       "seconds": 73.7,
-      "hpLostPct": 66,
+      "hpLostPct": 69,
       "potions": 2
     },
     {
@@ -1094,7 +1094,7 @@
       "enemyLevel": 20,
       "outcome": "kill",
       "seconds": 73.7,
-      "hpLostPct": 59,
+      "hpLostPct": 71,
       "potions": 2
     },
     {
@@ -1105,7 +1105,7 @@
       "level": 25,
       "enemyLevel": 25,
       "outcome": "kill",
-      "seconds": 104.7,
+      "seconds": 83.5,
       "hpLostPct": 43,
       "potions": 0
     },
@@ -1117,165 +1117,165 @@
       "level": 25,
       "enemyLevel": 25,
       "outcome": "kill",
-      "seconds": 99.9,
-      "hpLostPct": 43,
-      "potions": 0
-    },
-    {
-      "seed": 3,
-      "scenario": "Vharzul",
-      "className": "knight",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 103.1,
+      "seconds": 83.5,
       "hpLostPct": 42,
       "potions": 0
     },
     {
+      "seed": 3,
+      "scenario": "Vharzul",
+      "className": "knight",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 83.5,
+      "hpLostPct": 41,
+      "potions": 0
+    },
+    {
       "seed": 1,
       "scenario": "Vharzul",
       "className": "mage",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 62.9,
+      "hpLostPct": 60,
+      "potions": 2
+    },
+    {
+      "seed": 2,
+      "scenario": "Vharzul",
+      "className": "mage",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 58.1,
+      "hpLostPct": 59,
+      "potions": 2
+    },
+    {
+      "seed": 3,
+      "scenario": "Vharzul",
+      "className": "mage",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 64.2,
+      "hpLostPct": 65,
+      "potions": 2
+    },
+    {
+      "seed": 1,
+      "scenario": "Vharzul",
+      "className": "barbarian",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 54.8,
+      "hpLostPct": 27,
+      "potions": 0
+    },
+    {
+      "seed": 2,
+      "scenario": "Vharzul",
+      "className": "barbarian",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 57.2,
+      "hpLostPct": 29,
+      "potions": 0
+    },
+    {
+      "seed": 3,
+      "scenario": "Vharzul",
+      "className": "barbarian",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 54.8,
+      "hpLostPct": 28,
+      "potions": 0
+    },
+    {
+      "seed": 1,
+      "scenario": "Vharzul",
+      "className": "rogue",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 62.5,
+      "hpLostPct": 64,
+      "potions": 4
+    },
+    {
+      "seed": 2,
+      "scenario": "Vharzul",
+      "className": "rogue",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 62.4,
+      "hpLostPct": 64,
+      "potions": 4
+    },
+    {
+      "seed": 3,
+      "scenario": "Vharzul",
+      "className": "rogue",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 61.5,
+      "hpLostPct": 62,
+      "potions": 4
+    },
+    {
+      "seed": 1,
+      "scenario": "Vharzul",
+      "className": "ranger",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 76.8,
+      "hpLostPct": 48,
+      "potions": 0
+    },
+    {
+      "seed": 2,
+      "scenario": "Vharzul",
+      "className": "ranger",
+      "behavior": "attentive",
+      "level": 25,
+      "enemyLevel": 25,
+      "outcome": "kill",
+      "seconds": 74.5,
+      "hpLostPct": 61,
+      "potions": 1
+    },
+    {
+      "seed": 3,
+      "scenario": "Vharzul",
+      "className": "ranger",
       "behavior": "attentive",
       "level": 25,
       "enemyLevel": 25,
       "outcome": "kill",
       "seconds": 75.7,
-      "hpLostPct": 60,
-      "potions": 1
-    },
-    {
-      "seed": 2,
-      "scenario": "Vharzul",
-      "className": "mage",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 74.1,
-      "hpLostPct": 57,
-      "potions": 2
-    },
-    {
-      "seed": 3,
-      "scenario": "Vharzul",
-      "className": "mage",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 74.1,
-      "hpLostPct": 60,
-      "potions": 2
-    },
-    {
-      "seed": 1,
-      "scenario": "Vharzul",
-      "className": "barbarian",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 66.7,
-      "hpLostPct": 58,
-      "potions": 1
-    },
-    {
-      "seed": 2,
-      "scenario": "Vharzul",
-      "className": "barbarian",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 66.7,
-      "hpLostPct": 59,
-      "potions": 1
-    },
-    {
-      "seed": 3,
-      "scenario": "Vharzul",
-      "className": "barbarian",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 66.7,
-      "hpLostPct": 62,
-      "potions": 1
-    },
-    {
-      "seed": 1,
-      "scenario": "Vharzul",
-      "className": "rogue",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 75.8,
-      "hpLostPct": 62,
-      "potions": 5
-    },
-    {
-      "seed": 2,
-      "scenario": "Vharzul",
-      "className": "rogue",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 73.6,
-      "hpLostPct": 63,
-      "potions": 5
-    },
-    {
-      "seed": 3,
-      "scenario": "Vharzul",
-      "className": "rogue",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 73.6,
-      "hpLostPct": 62,
-      "potions": 5
-    },
-    {
-      "seed": 1,
-      "scenario": "Vharzul",
-      "className": "ranger",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 78.3,
-      "hpLostPct": 56,
-      "potions": 1
-    },
-    {
-      "seed": 2,
-      "scenario": "Vharzul",
-      "className": "ranger",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 76.9,
-      "hpLostPct": 57,
-      "potions": 1
-    },
-    {
-      "seed": 3,
-      "scenario": "Vharzul",
-      "className": "ranger",
-      "behavior": "attentive",
-      "level": 25,
-      "enemyLevel": 25,
-      "outcome": "kill",
-      "seconds": 76.9,
-      "hpLostPct": 59,
-      "potions": 1
+      "hpLostPct": 49,
+      "potions": 0
     }
   ]
 }

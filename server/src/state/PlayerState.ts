@@ -17,7 +17,7 @@ export class PlayerState extends Schema {
   @type("number") targetX = 0;
   @type("number") targetZ = 0;
   @type("boolean") moving = false;
-  /** Velocidad efectiva (base × equipo). Replicada para que el cliente prediga el propio movimiento. */
+  /** Velocidad efectiva (base × atributos y equipo). Replicada para la predicción de movimiento. */
   @type("number") moveSpeed = MOVE_SPEED;
   @type("string") name = "";
 

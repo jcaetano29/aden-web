@@ -35,6 +35,7 @@ export const MessageType = {
   InteractObject: "interactObject",
   SkillCast: "skillCast",
   AllocateStat: "allocateStat",
+  ResetAttributes: "resetAttributes",
   PartyInvite: "partyInvite",
   PartyRespond: "partyRespond",
   PartyLeave: "partyLeave",

@@ -1375,6 +1375,97 @@ describe("GameRoom", () => {
   });
 
   describe("Cuentas y atributos (Etapa 21)", () => {
+    it.each([
+      ['knight', 'str'], ['barbarian', 'str'], ['mage', 'ene'], ['rogue', 'agi'], ['ranger', 'agi'],
+    ] as const)('asignar %s/%s aumenta el daño efectivo de sus habilidades', async (className, attr) => {
+      const room = await colyseus.createRoom('game', {}) as GameRoom;
+      const c = await colyseus.connectTo(room, { name: 'AttributeDamage', className });
+      await room.waitForNextPatch(); room.setSimulationInterval(() => {}, 50);
+      const p = room.state.players.get(c.sessionId)!;
+      p.attributes.statPoints = 10;
+      const attack = p.pAtk;
+      p.mapId = 'bosque'; p.x = 300; p.z = 0;
+      const mob = room.spawnMob('attribute-target', 'skeleton_minion', 301, 0, 'bosque');
+      mob.hp = mob.maxHp = 10000; mob.pDef = 0; p.targetId = 'attribute-target';
+      const skill = getClass(className).skillId;
+      vi.spyOn(Math, 'random').mockReturnValue(0.5);
+      try {
+        c.send(MessageType.UseSkill, { skillId: skill });
+        await room.waitForNextPatch();
+        const firstHit = 10000 - mob.hp;
+        expect(firstHit).toBeGreaterThan(0);
+        for (let i = 0; i < 10; i++) c.send(MessageType.AllocateStat, { attr });
+        await room.waitForNextPatch();
+        expect(p.pAtk).toBeGreaterThan(attack);
+        p.skillCooldowns.clear(); p.skillGcdMs = 0; p.mp = p.maxMp; mob.hp = 10000;
+        c.send(MessageType.UseSkill, { skillId: skill });
+        await room.waitForNextPatch();
+        expect(10000 - mob.hp).toBeGreaterThan(firstHit);
+      } finally { vi.restoreAllMocks(); }
+    });
+
+    it('agilidad del mago reduce la espera entre hechizos y acelera el movimiento replicado', async () => {
+      const room = await colyseus.createRoom('game', {}) as GameRoom;
+      const c = await colyseus.connectTo(room, { name: 'AgileMage', className: 'mage' });
+      await room.waitForNextPatch(); room.setSimulationInterval(() => {}, 50);
+      const p = room.state.players.get(c.sessionId)!;
+      p.attributes.statPoints = 10;
+      for (let i = 0; i < 10; i++) c.send(MessageType.AllocateStat, { attr: 'agi' });
+      await room.waitForNextPatch();
+      expect(p.moveSpeed).toBeCloseTo(MOVE_SPEED * 1.02);
+      await vi.waitFor(() => expect(c.state.players.get(c.sessionId)?.moveSpeed).toBeCloseTo(MOVE_SPEED * 1.02));
+      p.mapId = 'bosque'; p.x = 300; p.z = 0;
+      const mob = room.spawnMob('agile-target', 'skeleton_minion', 301, 0, 'bosque');
+      mob.hp = mob.maxHp = 10000; p.targetId = 'agile-target';
+      c.send(MessageType.UseSkill, { skillId: 'fireball' });
+      await room.waitForNextPatch();
+      expect(p.skillGcdMs).toBeCloseTo(1500 / 1.1);
+      expect(p.attackCooldownMs).toBeCloseTo(1500 / 1.1);
+      await vi.waitFor(() => expect(c.state.players.get(c.sessionId)?.attributes.attackSpeed).toBeCloseTo(0.1));
+    });
+
+    it('vitalidad y energía aumentan el recurso actual por la capacidad ganada', async () => {
+      const room = await colyseus.createRoom('game', {}) as GameRoom;
+      const c = await colyseus.connectTo(room, { name: 'Resources', className: 'knight' });
+      await room.waitForNextPatch(); room.setSimulationInterval(() => {}, 50);
+      const p = room.state.players.get(c.sessionId)!;
+      p.hp = 80; p.mp = 10; p.attributes.statPoints = 2;
+      c.send(MessageType.AllocateStat, { attr: 'vit' });
+      c.send(MessageType.AllocateStat, { attr: 'ene' });
+      await room.waitForNextPatch();
+      expect(p.hp).toBe(98); expect(p.maxHp).toBe(158);
+      expect(p.mp).toBe(16); expect(p.maxMp).toBe(36);
+      expect(p.attributes.statPoints).toBe(0);
+    });
+
+    it('asignar vitalidad estando muerto no da vida hasta reaparecer', async () => {
+      const room = await colyseus.createRoom('game', {}) as GameRoom;
+      const c = await colyseus.connectTo(room, { name: 'DeadStats' });
+      await room.waitForNextPatch(); room.setSimulationInterval(() => {}, 50);
+      const p = room.state.players.get(c.sessionId)!;
+      p.hp = 0; p.dead = true; p.attributes.statPoints = 1;
+      c.send(MessageType.AllocateStat, { attr: 'vit' });
+      await room.waitForNextPatch();
+      expect(p.hp).toBe(0); expect(p.dead).toBe(true);
+      expect(p.maxHp).toBe(158);
+    });
+
+    it('conserva los puntos guardados sin cobrar los 100 de base al reconectar', async () => {
+      const room = await colyseus.createRoom('game', {}) as GameRoom;
+      await colyseus.connectTo(room, { name: 'StatObserver' });
+      const c = await colyseus.connectTo(room, { name: 'SavedStats', className: 'mage' });
+      await room.waitForNextPatch();
+      const p = room.state.players.get(c.sessionId)!;
+      p.level = 10; p.attributes.str = 2; p.attributes.agi = 3; p.attributes.vit = 4; p.attributes.ene = 5;
+      await c.leave(); await room.waitForNextPatch();
+      const returned = await colyseus.connectTo(room, { name: 'SavedStats', className: 'mage' });
+      await room.waitForNextPatch();
+      const restored = room.state.players.get(returned.sessionId)!;
+      expect(restored.attributes).toMatchObject({ str: 2, agi: 3, vit: 4, ene: 5, statPoints: 13 });
+      expect(restored.pAtk).toBe(65); // 18 + 9×4 + 2×0,5 fuerza + 5×2 energía.
+      expect(restored.moveSpeed).toBeCloseTo(MOVE_SPEED * 1.006);
+    });
+
     it("registra una cuenta con contraseña y rechaza la contraseña incorrecta", async () => {
       const room = await colyseus.createRoom("game", {});
       await colyseus.connectTo(room, { name: 'AuthObserver' });
@@ -1410,7 +1501,7 @@ describe("GameRoom", () => {
       await room.waitForNextPatch();
       expect(p.attributes.str).toBe(1);
       expect(p.attributes.statPoints).toBe(4);
-      expect(p.pAtk).toBe(atk0 + 2); // +2 ataque por punto de Fuerza
+      expect(p.pAtk).toBe(atk0 + 3); // El caballero obtiene +3 ataque por Fuerza.
     });
 
     it("no se puede asignar sin puntos disponibles (no-op)", async () => {

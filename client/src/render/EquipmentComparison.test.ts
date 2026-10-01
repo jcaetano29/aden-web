@@ -11,6 +11,15 @@ function item(id: string, values: Partial<ItemTemplate>) {
 afterEach(() => ids.splice(0).forEach(id => delete ITEM_TEMPLATES[id]));
 
 describe('comparación de equipo', () => {
+  it('incluye el ataque que aporta energía al comparar el equipo de un mago', () => {
+    const plain = item('compare_mage_plain', { bonuses: { pAtk: 0 } });
+    const enhanced = item('compare_mage_wings', { category: 'alas', slot: 'wings' });
+    const result = compareEquipment(enhanced, { weapon: plain }, {
+      className: 'mage', level: 1, attributes: { str: 0, agi: 0, vit: 0, ene: 10 },
+    });
+    expect(result?.before.pAtk).toBe(38);
+    expect(result?.after.pAtk).toBe(39);
+  });
   it('distingue mejora, pérdida, igualdad y ventajas mixtas sin sumar stats incompatibles', () => {
     const old = item('compare_old', { bonuses: { pAtk: 10, maxHp: 20 } });
     const better = item('compare_better', { bonuses: { pAtk: 15, maxHp: 20 } });

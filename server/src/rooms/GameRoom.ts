@@ -52,7 +52,6 @@ import {
   objectRespawnMs,
   SHRINE_BUFF_MS,
   SHRINE_BUFF_MULT,
-  equipmentBonuses,
   getRarity,
   dayKey,
   previousDay,
@@ -94,7 +93,9 @@ import {
   type AllocateStatMessage,
   TOWN_SERVICE_RADIUS,
   HEAL_COST_GOLD,
-  attributeBonuses,
+  characterStats,
+  ATTRIBUTE_RULES_VERSION,
+  ATTRIBUTES,
   isValidAttribute,
   POINTS_PER_LEVEL,
   pointsForLevel,
@@ -111,7 +112,7 @@ import {
   applyPvpDeathPenalty,
   isBoss,
   getTemplate,
-  loadoutEffects, availableSkills, weaponRange, CATALOG_ITEMS, MOVE_SPEED, skillElement,
+  availableSkills, weaponRange, CATALOG_ITEMS, MOVE_SPEED, skillElement,
 } from "@aden/shared";
 import { grantItem, equipItem, useInventoryItem, consumeAmmo, playerLoadout, instantiateItem, removeItem } from '../systems/ItemSystem.js';
 import { GameState } from "../state/GameState.js";
@@ -202,20 +203,14 @@ export class GameRoom extends Room<GameState> {
    * (gainExp resetea los stats a la base, sin gear). Clampea hp/mp a los nuevos máximos.
    */
   private recomputeStats(p: PlayerState): void {
-    const base = statsForClass(p.className, p.level);
     const equipped: Partial<Record<EquipSlot, string>> = {};
     p.equipment.forEach((id, slot) => { equipped[slot as EquipSlot] = id; });
-    const bonus = equipmentBonuses(equipped);
-    const effects = loadoutEffects(equipped);
+    const { effects, ...stats } = characterStats(p.className, p.level, p.attributes, equipped);
     p.itemEffects = effects;
+    p.attributes.attackSpeed = effects.attackSpeed;
     p.moveSpeed = MOVE_SPEED * (1 + effects.moveSpeed);
     p.appearanceModel=equipped.ring && getItem(equipped.ring).ref_origen==='transformation_ring'?'DeathWraith':'';
-    // Etapa 21: bonus de atributos primarios asignados (str/agi/vit/ene).
-    const attr = attributeBonuses({ str: p.attributes.str, agi: p.attributes.agi, vit: p.attributes.vit, ene: p.attributes.ene });
-    p.maxHp = Math.round((base.maxHp + bonus.maxHp + attr.maxHp) * (1+effects.hpPct));
-    p.maxMp = Math.round((base.maxMp + bonus.maxMp + attr.maxMp) * (1+effects.mpPct));
-    p.pAtk = Math.round((base.pAtk + bonus.pAtk + attr.pAtk + p.level*effects.levelAttack)*(1+effects.attackPct));
-    p.pDef = base.pDef + bonus.pDef + attr.pDef;
+    Object.assign(p, stats);
     if (p.hp > p.maxHp) p.hp = p.maxHp;
     if (p.mp > p.maxMp) p.mp = p.maxMp;
   }
@@ -972,6 +967,27 @@ export class GameRoom extends Room<GameState> {
       o.respawnMs = objectRespawnMs(def.kind);
     });
 
+    this.onMessage(MessageType.ResetAttributes, client => {
+      const p = this.state.players.get(client.sessionId);
+      if (!p || !p.loaded) return;
+      if (!p.attributes.resetAvailable) {
+        client.send(MessageType.ItemResult, { success: false, text: 'No tenés una redistribución disponible.' });
+        return;
+      }
+      if (p.dead || p.hp <= 0 || p.mapId !== TOWN_ZONE_ID || this.inPvpZone(p) || travelLockRemainingMs(p.msSinceCombat) > 0) {
+        client.send(MessageType.ItemResult, { success: false, text: 'Redistribuí tus atributos en una zona segura del pueblo, vivo y fuera de combate.' });
+        return;
+      }
+      const missingHp = p.maxHp - p.hp, missingMp = p.maxMp - p.mp;
+      for (const attr of ATTRIBUTES) p.attributes[attr] = 0;
+      p.attributes.statPoints = pointsForLevel(p.level);
+      p.attributes.resetAvailable = false;
+      this.recomputeStats(p);
+      p.hp = Math.max(1, p.maxHp - missingHp);
+      p.mp = Math.max(0, p.maxMp - missingMp);
+      client.send(MessageType.ItemResult, { success: true, text: 'Recuperaste tus puntos. Ahora podés distribuirlos según tu clase.' });
+    });
+
     // Etapa 21: gastar un punto de atributo (Fuerza/Agilidad/Vitalidad/Energía).
     this.onMessage(MessageType.AllocateStat, (client, msg: AllocateStatMessage) => {
       const p = this.state.players.get(client.sessionId);
@@ -979,9 +995,15 @@ export class GameRoom extends Room<GameState> {
       if (p.attributes.statPoints <= 0) return;
       const attr = msg?.attr ?? "";
       if (!isValidAttribute(attr)) return;
+      const previousHp = p.maxHp, previousMp = p.maxMp;
       p.attributes[attr as Attribute] += 1;
       p.attributes.statPoints -= 1;
       this.recomputeStats(p);
+      // Ganar capacidad conserva la cantidad de recurso faltante, sin revivir al jugador.
+      if (!p.dead && p.hp > 0) {
+        p.hp = Math.min(p.maxHp, p.hp + Math.max(0, p.maxHp - previousHp));
+        p.mp = Math.min(p.maxMp, p.mp + Math.max(0, p.maxMp - previousMp));
+      }
     });
 
     const dt = 1 / TICK_RATE;
@@ -1971,6 +1993,9 @@ export class GameRoom extends Room<GameState> {
         player.attributes.agi = pr.agi ?? 0;
         player.attributes.vit = pr.vit ?? 0;
         player.attributes.ene = pr.ene ?? 0;
+        player.attributes.resetAvailable = pr.attributeResetAvailable === true ||
+          ((pr.attributeRulesVersion ?? 1) < ATTRIBUTE_RULES_VERSION &&
+            ATTRIBUTES.some(attr => player.attributes[attr] > 0));
       }
       player.attributes.statPoints = Math.max(0, pointsForLevel(player.level) - (player.attributes.str + player.attributes.agi + player.attributes.vit + player.attributes.ene));
       // Recalcular stats con clase/nivel + equipo + atributos, y rellenar HP/MP.

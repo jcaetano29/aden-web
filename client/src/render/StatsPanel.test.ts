@@ -11,6 +11,52 @@ const view = (over: Partial<StatsView> = {}): StatsView => ({
 afterEach(() => document.body.replaceChildren());
 
 describe('StatsPanel', () => {
+  it('pide confirmar la redistribución disponible y espera el estado del servidor', () => {
+    const reset = vi.fn();
+    const panel = new StatsPanel(vi.fn(), document.body, reset);
+    panel.update(view({ resetAvailable: true })); panel.open();
+    const action = document.querySelector<HTMLButtonElement>('[data-reset-attributes]')!;
+    expect(action).not.toBeNull();
+    expect(action.hidden).toBe(false);
+    action.click();
+    expect(reset).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain('una sola vez');
+    document.querySelector<HTMLButtonElement>('[data-cancel-reset]')!.click();
+    expect(reset).not.toHaveBeenCalled();
+    action.click();
+    document.querySelector<HTMLButtonElement>('[data-confirm-reset]')!.click();
+    expect(reset).toHaveBeenCalledTimes(1);
+    expect(document.querySelector('[data-attribute="str"] [data-val]')?.textContent).toBe('110');
+    panel.update(view({ resetAvailable: false }));
+    expect(action.hidden).toBe(true);
+  });
+  it('muestra 100 de base y conserva los puntos adicionales existentes', () => {
+    const panel = new StatsPanel(vi.fn());
+    panel.update(view({ str: 0, agi: 0, vit: 0, ene: 0 })); panel.open();
+    expect([...document.querySelectorAll('[data-val]')].map(e => e.textContent)).toEqual(['100', '100', '100', '100']);
+    panel.update(view({ str: 12 }));
+    expect(document.querySelector('[data-attribute="str"] [data-val]')?.textContent).toBe('112');
+    expect(document.querySelector('[data-pts]')?.textContent).toBe('3');
+  });
+
+  it('explica el daño de energía y la rapidez de agilidad según la clase', () => {
+    const panel = new StatsPanel(vi.fn());
+    panel.update(view({ className: 'mage', attackSpeed: 0.1 })); panel.open();
+    expect(document.querySelector('[data-attribute="ene"]')?.textContent).toContain('+2 ataque mágico');
+    expect(document.querySelector('[data-attribute="agi"]')?.textContent).toContain('Rapidez: +10%');
+    expect(document.querySelector('[data-attribute="agi"]')?.textContent).toContain('+1% rapidez');
+    panel.update(view({ className: 'knight' }));
+    expect(document.querySelector('[data-attribute="str"]')?.textContent).toContain('+3 ataque');
+    expect(document.querySelector('[data-attribute="ene"]')?.textContent).not.toContain('ataque mágico');
+  });
+
+  it('avisa cuando la agilidad alcanzó los límites de velocidad', () => {
+    const panel = new StatsPanel(vi.fn());
+    panel.update(view({ className: 'mage', agi: 100 })); panel.open();
+    const effect = document.querySelector('[data-attribute="agi"] .stats-effect')?.textContent;
+    expect(effect).toContain('límite');
+    expect(effect).not.toContain('+1% rapidez');
+  });
   it('muestra progreso y estadísticas debajo del atributo correspondiente', () => {
     const panel = new StatsPanel(vi.fn());
     panel.update(view()); panel.open();
@@ -31,7 +77,7 @@ describe('StatsPanel', () => {
     expect(allocate).toHaveBeenCalledWith('str');
     expect(document.querySelector('[data-pts]')?.textContent).toBe('3');
     panel.update(view({ str: 11, statPoints: 2 }));
-    expect(document.querySelector('[data-attribute="str"] [data-val]')?.textContent).toBe('11');
+    expect(document.querySelector('[data-attribute="str"] [data-val]')?.textContent).toBe('111');
     expect(document.querySelector('[data-pts]')?.textContent).toBe('2');
   });
 

@@ -1,4 +1,4 @@
-import { getItem, equipmentBonuses, loadoutEffects, statsForClass, attributeBonuses,
+import { getItem, equipmentBonuses, characterStats,
   type Attributes, type EquipSlot, type StatTotals } from '@aden/shared';
 
 export interface ComparisonContext {
@@ -19,16 +19,8 @@ export function compareEquipment(id: string, equipment: Partial<Record<EquipSlot
     const bonus = equipmentBonuses(loadout);
     // Old callers without character context can still compare flat equipment bonuses.
     if (!context) return bonus;
-    const base = statsForClass(context.className, context.level);
-    const attr = attributeBonuses(context.attributes);
-    const effects = loadoutEffects(loadout);
-    // Same rounding and order as GameRoom.recomputeStats.
-    return {
-      pAtk: Math.round((base.pAtk + bonus.pAtk + attr.pAtk + context.level * effects.levelAttack) * (1 + effects.attackPct)),
-      pDef: base.pDef + bonus.pDef + attr.pDef,
-      maxHp: Math.round((base.maxHp + bonus.maxHp + attr.maxHp) * (1 + effects.hpPct)),
-      maxMp: Math.round((base.maxMp + bonus.maxMp + attr.maxMp) * (1 + effects.mpPct)),
-    };
+    const { pAtk, pDef, maxHp, maxMp } = characterStats(context.className, context.level, context.attributes, loadout);
+    return { pAtk, pDef, maxHp, maxMp };
   };
   const before = totals(equipment);
   const after = totals({ ...equipment, [item.slot]: id });

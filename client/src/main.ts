@@ -146,7 +146,7 @@ async function main() {
   const progressPanel = new ProgressPanel((title) => net.sendSetTitle(title));
   progressPanel.mount(document.body);
   // Etapa 21: panel de atributos (tecla C).
-  const statsPanel = new StatsPanel((attr: Attribute) => net.sendAllocateStat(attr));
+  const statsPanel = new StatsPanel((attr: Attribute) => net.sendAllocateStat(attr), document.body, () => net.sendResetAttributes());
   const bossBar = new BossBar();
   // Tiempo de reaparición del jefe (config compartida) para el contador de la barra.
   const bossRespawnMs = respawnForTemplate("skeleton_king") ?? 60000;
@@ -679,7 +679,7 @@ async function main() {
     // Tecla C: panel de atributos (Etapa 21).
     if (e.key === "c" || e.key === "C" || e.code === "KeyC") {
       statsPanel.toggle();
-      if (statsPanel.isOpen()) { const s = net.getSelf(); if (s) statsPanel.update(s); }
+      if (statsPanel.isOpen()) { const s = net.getSelf(); if (s) statsPanel.update({ ...s, equipment: net.getEquipment() }); }
     }
     // Tecla M: menú de mapas (viajar). Etapa 15.
     if (e.key === "m" || e.key === "M" || e.code === "KeyM") {
@@ -847,7 +847,7 @@ async function main() {
     }
     if (statsPanel.isOpen()) {
       const s = net.getSelf();
-      if (s) statsPanel.update(s);
+      if (s) statsPanel.update({ ...s, equipment: net.getEquipment() });
     }
     if (progressPanelVisible) {
       progressPanel.update(net.getProgress());

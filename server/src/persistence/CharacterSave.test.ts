@@ -24,6 +24,7 @@ describe("toCharacterSave", () => {
       bountyId: "b_forest", bountyProgress: 3,
       sideChains: { varek: { id: "b_forest", progress: 3 } },
       str: 5, agi: 2, vit: 3, ene: 1, statPoints: 4,
+      attributeRulesVersion: 2, attributeResetAvailable: false,
     });
   });
 });

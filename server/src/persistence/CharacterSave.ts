@@ -1,4 +1,4 @@
-import { characterGender, type CharacterAppearanceV1, type CharacterGender } from '@aden/shared';
+import { ATTRIBUTE_RULES_VERSION, characterGender, type CharacterAppearanceV1, type CharacterGender } from '@aden/shared';
 
 export interface SideChainSave { id: string; progress: number }
 
@@ -29,6 +29,8 @@ export interface ProgressSave {
   vit: number;
   ene: number;
   statPoints: number;
+  attributeRulesVersion?: number;
+  attributeResetAvailable?: boolean;
 }
 
 export interface CharacterSave {
@@ -80,7 +82,7 @@ export interface Persistable {
   achievements: { forEach(cb: (v: string) => void): void };
   sideChains: { forEach(cb: (v: { id: string; progress: number }, k: string) => void): void };
   // Etapa 21: atributos asignados + puntos sin gastar.
-  attributes: { str: number; agi: number; vit: number; ene: number; statPoints: number };
+  attributes: { str: number; agi: number; vit: number; ene: number; statPoints: number; resetAvailable?: boolean };
 }
 
 export function toCharacterSave(p: Persistable): CharacterSave {
@@ -141,6 +143,8 @@ export function toCharacterSave(p: Persistable): CharacterSave {
       vit: p.attributes.vit,
       ene: p.attributes.ene,
       statPoints: p.attributes.statPoints,
+      attributeRulesVersion: ATTRIBUTE_RULES_VERSION,
+      attributeResetAvailable: p.attributes.resetAvailable ?? false,
     },
   };
 }
